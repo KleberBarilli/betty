@@ -792,9 +792,9 @@ carregarPeriodoEstatisticas();
 const name = document.querySelector(".sidebar .name");
 if (name) name.textContent = "MyBettys";
 const h1 = document.getElementById("topbarTitle");
-if (h1) h1.textContent = `Olá, ${MYBETTYS_USER.name.split(" ")[0]} 👋`;
+if (h1 && viewAtual === "dashboard") h1.textContent = TITULOS_SECAO.visao[0];
 const sub = document.getElementById("topbarSub");
-if (sub) sub.textContent = "Acompanhe suas apostas e resultados em tempo real";
+if (sub && viewAtual === "dashboard") sub.textContent = TITULOS_SECAO.visao[1];
 const footer = document.querySelector(".sidebar-footer");
 if (footer && !document.getElementById("mybettysUserBox")) {
 const box = document.createElement("div");
@@ -805,7 +805,7 @@ footer.append(box);
 // A configuração passa a ser do usuário logado, não global.
 await sincronizarConfiguracaoRemota(false);
 if (!casasConectadas().length && !MYBETTYS_CONNECTIONS?.trackedHistory) {
-setTimeout(() => trocarView("config"), 100);
+setTimeout(() => irPara("conexoes"), 100);
 }
 }
 async function logoutMyBettys() {
@@ -1440,7 +1440,6 @@ const renderToken = ++trocaViewRenderToken;
 // Atualiza o estado visual antes de qualquer renderização/consulta.
 // Isso impede a toolbar de Posições de aparecer no Dashboard durante refreshs.
 try { document.body.setAttribute("data-mybettys-view", view); } catch (_) {}
-document.querySelectorAll(".nav-item[data-view]").forEach(el => el.classList.toggle("active", el.dataset.view === view));
 // Os filtros pertencem à tela de posições. Não é necessário resetá-los ao
 // alternar entre as outras telas, nem renderizar uma tabela que ficará oculta.
 if (viewAnterior !== view && (viewAnterior === "posicoes" || view === "posicoes")) resetarFiltrosTabela();
@@ -1495,9 +1494,10 @@ if (sub) sub.textContent = "Seu resultado dia a dia, mês a mês";
 if (h1) h1.textContent = "Configurações";
 if (sub) sub.textContent = "Contas, histórico e preferências de stake";
 } else {
-if (h1) h1.textContent = "Bem-vindo de volta! 👋";
-if (sub) sub.textContent = "Acompanhe suas apostas e resultados em tempo real";
+if (h1) h1.textContent = TITULOS_SECAO.visao[0];
+if (sub) sub.textContent = TITULOS_SECAO.visao[1];
 }
+atualizarSecaoNavegacao(view);
 // Permite que o navegador apresente a aba selecionada antes de executar os
 // renderizadores mais custosos. O token ignora renderizações de cliques antigos.
 setTimeout(() => {
@@ -7241,6 +7241,7 @@ atualizarBannerStale();
 if (syncPanelAberto) renderSyncPanel();
 }
 function tickAtualizado() {
+renderSyncCasas();
 const el = document.getElementById("statusAtualizado");
 if (!el) return;
 if (mostrandoAtualizando) return;
@@ -7328,3 +7329,105 @@ function teclaToggleSyncPanel(event) {
   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSyncPanel(event); }
 }
 function teclaConfirmarSenhaConfig(event) { if (event.key === 'Enter') confirmarSenhaConfig(); }
+
+// ===== Navegação por seção (layout v2) =====
+// As seções do menu se apoiam nas views existentes: Histórico usa a tabela de
+// Posições na aba "fechado" (Lista) ou o calendário de lucro (Calendário), e
+// Conexões e Configurações dividem a view de configuração.
+const TITULOS_SECAO = {
+  visao: ["Visão geral", "Resultados no horário de São Paulo"],
+  posicoes: ["Posições", "Apostas em aberto e ao vivo"],
+  historico: ["Histórico", "Apostas fechadas, em lista ou no calendário"],
+  estatisticas: ["Estatísticas", "Desempenho das posições fechadas"],
+  conexoes: ["Conexões", "Contas conectadas, sempre só para leitura"],
+  config: ["Configurações", "Stake e período do histórico por casa"],
+};
+let secaoAtual = "visao";
+let secaoPedida = null;
+let modoHistorico = "lista";
+function irPara(secao) {
+  if (!TITULOS_SECAO[secao]) return;
+  secaoPedida = secao;
+  try {
+    if (secao === "visao") trocarView("dashboard");
+    else if (secao === "posicoes") {
+      trocarView("posicoes");
+      if (viewAtual === "posicoes" && abaAtual === "fechado") trocarAba("aberto");
+    } else if (secao === "historico") {
+      if (modoHistorico === "calendario") trocarView("calendario");
+      else {
+        trocarView("posicoes");
+        if (viewAtual === "posicoes") trocarAba("fechado");
+      }
+    } else if (secao === "estatisticas") trocarView("estatisticas");
+    else trocarView("config");
+  } finally {
+    secaoPedida = null;
+  }
+}
+function teclaIrPara(event, secao) {
+  if (event.key === "Enter" || event.key === " ") { event.preventDefault(); irPara(secao); }
+}
+function trocarModoHistorico(modo) {
+  if (modo !== "lista" && modo !== "calendario") return;
+  modoHistorico = modo;
+  irPara("historico");
+}
+// Chamada por trocarView depois de trocar a view: decide a seção, o item ativo
+// do menu e o título da tela.
+function atualizarSecaoNavegacao(view) {
+  const derivada = {
+    dashboard: "visao",
+    posicoes: abaAtual === "fechado" ? "historico" : "posicoes",
+    calendario: "historico",
+    estatisticas: "estatisticas",
+    config: secaoAtual === "conexoes" ? "conexoes" : "config",
+  }[view];
+  const secao = secaoPedida || derivada || "visao";
+  secaoAtual = secao;
+  document.body.dataset.secao = secao;
+  document.querySelectorAll(".nav-item[data-secao]").forEach(el => {
+    const ativo = el.dataset.secao === secao;
+    el.classList.toggle("active", ativo);
+    if (ativo) el.setAttribute("aria-current", "page");
+    else el.removeAttribute("aria-current");
+  });
+  const [titulo, sub] = TITULOS_SECAO[secao];
+  const h1 = document.getElementById("topbarTitle");
+  const subEl = document.getElementById("topbarSub");
+  if (h1) h1.textContent = titulo;
+  if (subEl) subEl.textContent = sub;
+  document.querySelectorAll("[data-modo-historico]").forEach(b => {
+    const ativo = b.dataset.modoHistorico === (view === "calendario" ? "calendario" : "lista");
+    b.classList.toggle("on", ativo);
+    b.setAttribute("aria-pressed", String(ativo));
+  });
+}
+// Rodapé do menu: uma linha por casa com logo, estado e tempo desde o último sync.
+function tempoDesde(ts) {
+  if (!ts) return "nunca";
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return "agora";
+  if (s < 3600) return `há ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  return `há ${Math.floor(s / 86400)} d`;
+}
+function renderSyncCasas() {
+  const el = document.getElementById("syncCasas");
+  if (!el) return;
+  const html = Object.entries(NOMES_CASAS).map(([id, nome]) => {
+    const s = casaSync[id] || casaSyncPadrao(id);
+    const conectada = Boolean(MYBETTYS_CONNECTIONS?.[id]);
+    const estado = conectada ? (s.state || "idle") : "disconnected";
+    const ponto = { ok: "ok", syncing: "run", error: "err", stale: "warn", partial: "warn" }[estado] || "";
+    const texto = !conectada ? "não conectada"
+      : estado === "ok" ? tempoDesde(s.lastOk)
+      : estado === "syncing" ? "atualizando"
+      : estado === "error" ? "falhou"
+      : estado === "stale" ? "desatualizada"
+      : estado === "partial" ? "parcial"
+      : "aguardando";
+    return `<button type="button" class="sync-casa${conectada ? "" : " off"}" data-on-click="irPara('conexoes')" title="${escapeHtml(nome)}: ${escapeHtml(rotuloEstadoSync(estado))}"><img src="/assets/platforms/${id}.png" alt="">${escapeHtml(nome)}<span class="st"><span class="dot ${ponto}"></span>${texto}</span></button>`;
+  }).join("");
+  if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
+}

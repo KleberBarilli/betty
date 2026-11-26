@@ -4,30 +4,33 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="Painel de posições e resultados do MyBettys" />
-<link rel="icon" type="image/png" href="/assets/mybettys-logo.png" />
+<link rel="icon" type="image/png" href="/assets/mybettys-logo-128.png" />
 <link rel="stylesheet" href="/profit-calendar.css" />
 <title>MyBettys</title>
 <link rel="stylesheet" href="/dashboard.css">
+<link rel="stylesheet" href="/layout.css">
 
 </head>
-<body class="initial-loading">
+<body class="initial-loading" data-secao="visao">
 <aside class="sidebar" inert>
 <div class="brand">
-<img class="mark" src="/assets/mybettys-logo.png" alt="Logo MyBettys">
+<img class="mark" src="/assets/mybettys-logo-128.png" alt="Logo MyBettys">
 <div class="name">MyBettys</div>
 </div>
-<ul class="nav-list">
-<li class="nav-section" aria-hidden="true">Menu</li>
-<li class="nav-item active" data-view="dashboard" data-on-click="trocarView('dashboard')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</li>
-<li class="nav-item" data-view="posicoes" data-on-click="trocarView('posicoes')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2 4 4 8-8 4 4"/></svg>Posições<span class="sidebar-position-count" id="sidebarPositionCount" hidden></span></li>
-<li class="nav-item" data-view="estatisticas" data-on-click="trocarView('estatisticas')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M12 19V5M20 19v-7"/></svg>Estatísticas</li>
-<li class="nav-item" data-view="calendario" role="button" tabindex="0" data-on-click="trocarView('calendario')" data-on-keydown="teclaTrocarView(event,'calendario')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2"/></svg>Calendário</li>
+<ul class="nav-list" aria-label="Principal">
+<li class="nav-item active" data-secao="visao" role="button" tabindex="0" aria-current="page" data-on-click="irPara('visao')" data-on-keydown="teclaIrPara(event,'visao')">Visão geral</li>
+<li class="nav-item" data-secao="posicoes" role="button" tabindex="0" data-on-click="irPara('posicoes')" data-on-keydown="teclaIrPara(event,'posicoes')">Posições<span class="sidebar-position-count" id="sidebarPositionCount" hidden></span></li>
+<li class="nav-item" data-secao="historico" role="button" tabindex="0" data-on-click="irPara('historico')" data-on-keydown="teclaIrPara(event,'historico')">Histórico</li>
+<li class="nav-item" data-secao="estatisticas" role="button" tabindex="0" data-on-click="irPara('estatisticas')" data-on-keydown="teclaIrPara(event,'estatisticas')">Estatísticas</li>
 <li class="nav-section" aria-hidden="true">Sistema</li>
-<li class="nav-item" data-view="config" data-on-click="trocarView('config')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.4.66.73.85.3.17.63.27.98.27H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</li>
+<li class="nav-item" data-secao="conexoes" role="button" tabindex="0" data-on-click="irPara('conexoes')" data-on-keydown="teclaIrPara(event,'conexoes')">Conexões</li>
+<li class="nav-item" data-secao="config" role="button" tabindex="0" data-on-click="irPara('config')" data-on-keydown="teclaIrPara(event,'config')">Configurações</li>
 </ul>
 <div class="sidebar-footer">
 <section class="sidebar-sync-card" aria-label="Sincronização dos dados">
+<div class="sync-hd">Sincronização</div>
 <div id="sidebarSyncStatusSlot"></div>
+<div class="sync-casas" id="syncCasas" aria-label="Sincronização por casa"></div>
 <div class="autorefresh-box">
 <button type="button" class="sidebar-auto-toggle" id="autoRefreshToggle" data-on-click="alternarAutoRefresh()" aria-pressed="false">
 <span class="sidebar-auto-copy">Auto-atualizar<strong id="autoRefreshLabel">Pausado</strong></span>
@@ -67,8 +70,12 @@ data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <main class="main" inert>
 <div class="topbar">
 <div>
-<h1 id="topbarTitle">Bem-vindo de volta! 👋</h1>
-<div class="sub" id="topbarSub">Acompanhe suas apostas e resultados em tempo real</div>
+<h1 id="topbarTitle">Visão geral</h1>
+<div class="sub" id="topbarSub">Resultados no horário de São Paulo</div>
+<div class="seg historico-modo" role="group" aria-label="Visualização do histórico">
+<button type="button" data-modo-historico="lista" data-on-click="trocarModoHistorico('lista')">Lista</button>
+<button type="button" data-modo-historico="calendario" data-on-click="trocarModoHistorico('calendario')">Calendário</button>
+</div>
 </div>
 <div class="topbar-right">
 <div id="headerSyncStatusSlot">
@@ -105,7 +112,7 @@ data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <button type="button" data-on-click="atualizarAgora()">Atualizar agora</button>
 </div>
 <section class="sync-progress" id="syncProgress" role="status" aria-live="polite" aria-atomic="true">
-<div class="sync-progress-brand" aria-hidden="true"><img src="/assets/mybettys-logo.png" alt=""><strong>MyBettys</strong></div>
+<div class="sync-progress-brand" aria-hidden="true"><img src="/assets/mybettys-logo-128.png" alt=""><strong>MyBettys</strong></div>
 <div class="sync-progress-heading"><span class="sync-progress-dot" aria-hidden="true"></span><span id="syncProgressTitle">Preparando seus dados</span></div>
 <div class="sync-progress-bar" aria-hidden="true"><div class="sync-progress-bar-fill"></div></div>
 <div class="sync-progress-detail" id="syncProgressDetail">Buscando posições nas casas conectadas…</div>

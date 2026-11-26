@@ -1,0 +1,204 @@
+/* Layout v2 (paleta Grafite): casca, menu lateral e navegação por seção.
+   Carregado depois do dashboard.css; os tokens de cor ficam no :root de lá.
+   Referência: design/layout-v2/. */
+
+body {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+h1, .topbar h1 {
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Menu lateral (desktop) ---------- */
+@media (min-width: 901px) {
+  .sidebar {
+    width: var(--sidebar-w);
+    padding: 18px 12px 14px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-soft);
+  }
+  .sidebar .brand {
+    gap: 10px;
+    padding: 0 10px 18px;
+    margin-bottom: 6px;
+    border-bottom: 0;
+  }
+  .sidebar .brand .mark { width: 30px; height: 30px; border-radius: 9px; }
+  .sidebar .brand .name { font-size: 1rem; font-weight: 700; letter-spacing: -0.015em; }
+
+  .sidebar .nav-list { gap: 2px; }
+  .sidebar .nav-item {
+    min-height: 38px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 550;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .sidebar .nav-item:hover { background: var(--card); color: var(--text); }
+  .sidebar .nav-item.active {
+    background: var(--accent-soft);
+    color: var(--text);
+    font-weight: 650;
+    box-shadow: none;
+  }
+  .sidebar .nav-item.active::before {
+    left: -12px;
+    width: 3px;
+    height: 20px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+  }
+  .sidebar .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sidebar .nav-section {
+    padding: 16px 12px 4px;
+    color: var(--muted-2);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+  }
+  .sidebar .sidebar-position-count {
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  /* Cartão de sincronização no rodapé */
+  .sidebar-sync-card {
+    margin: 0;
+    padding: 12px 10px 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 10px 24px -14px #000;
+  }
+  .sidebar-sync-card .sync-hd {
+    margin: 0 2px 4px;
+    color: var(--muted-2);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .sidebar-sync-card #sidebarSyncStatusSlot { margin: 0 2px 6px; }
+  .sidebar-sync-card .btn-refresh {
+    min-height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--card-2);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .sidebar-sync-card .btn-refresh:hover {
+    background: var(--hover);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    color: var(--text);
+  }
+  .sidebar-sync-card .btn-refresh:active { background: var(--card); border-color: var(--border); }
+  .sidebar-sync-card .autorefresh-box { margin: 8px 0 10px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+}
+
+.sync-casas { display: flex; flex-direction: column; gap: 1px; }
+.sync-casa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+}
+.sync-casa:hover { background: var(--hover); }
+.sync-casa:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sync-casa.off { color: var(--muted-2); }
+.sync-casa img { flex: none; width: 20px; height: 20px; border-radius: 6px; object-fit: cover; }
+.sync-casa.off img { opacity: 0.45; filter: grayscale(1); }
+.sync-casa .st {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.sync-casa .dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); }
+.sync-casa .dot.ok { background: var(--pos); box-shadow: 0 0 0 3px var(--pos-soft); }
+.sync-casa .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.sync-casa .dot.err { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+.sync-casa .dot.run {
+  background: transparent;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  animation: mb-giro 0.8s linear infinite;
+}
+@keyframes mb-giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sync-casa .dot.run { animation: none; } }
+
+/* ---------- Área principal ---------- */
+@media (min-width: 901px) {
+  .main { padding: 26px 32px 48px !important; }
+  .topbar h1 { font-size: 1.6rem; font-weight: 700; }
+  .topbar .sub { margin-top: 4px; color: var(--muted); font-size: 0.84rem; }
+}
+
+/* Seletor Lista / Calendário do Histórico */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.seg button {
+  min-height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.seg button:hover { color: var(--text); }
+.seg button.on {
+  background: var(--card-2);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.historico-modo { display: none; margin-top: 12px; }
+body[data-secao="historico"] .historico-modo { display: inline-flex; }
+
+/* ---------- Seções que dividem uma view ---------- */
+/* Posições: só abertas e ao vivo. Histórico: só fechadas (sem abas). */
+html body[data-secao="posicoes"] #toolbarSection .tabs .tab[data-tab="fechado"] { display: none !important; }
+html body[data-secao="historico"] #toolbarSection .tabs { display: none !important; }
+
+/* Conexões e Configurações dividem a view de configuração. */
+body[data-secao="conexoes"] #configView > .config-card:not(#connectionsCard),
+body[data-secao="conexoes"] #configView > .config-actions { display: none !important; }
+body[data-secao="config"] #configView > #connectionsCard { display: none !important; }
