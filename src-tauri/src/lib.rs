@@ -23,6 +23,7 @@ mod poly;
 mod poly_datas;
 mod protocol;
 mod titles;
+mod tracked;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -123,7 +124,7 @@ fn inicializar(pastas: &Pastas) -> anyhow::Result<api::Estado> {
     let usuario = db::usuario_local(&mut conn)?;
     eprintln!("[início] pronto em {} ms", inicio.elapsed().as_millis());
 
-    Ok(api::Estado { db: db::Db::new(conn), chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default() })
+    Ok(api::Estado { db: db::Db::new(conn), chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() })
 }
 
 fn registrar_falha(pastas: &Pastas, erro: &anyhow::Error) {

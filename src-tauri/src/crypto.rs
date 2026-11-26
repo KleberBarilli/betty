@@ -90,6 +90,12 @@ impl MasterKey {
             .map_err(|_| anyhow!("não foi possível decifrar: chave incorreta ou dado alterado"))?;
         Ok(Zeroizing::new(String::from_utf8(texto).context("dado decifrado não é UTF-8")?))
     }
+
+    /// `crypto.createHmac('sha256', MASTER_KEY).update(texto).digest('hex')`.
+    pub fn hmac_hex(&self, texto: &str) -> String {
+        let chave = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &self.0[..]);
+        hex::encode(ring::hmac::sign(&chave, texto.as_bytes()).as_ref())
+    }
 }
 
 #[cfg(test)]

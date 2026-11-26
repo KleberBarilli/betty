@@ -267,7 +267,7 @@ pub fn gravar(c: &mut Connection, user_id: &str, linhas: Vec<Value>, incremental
         .collect();
     let mut existente = mapa_existente(c, user_id, &normalizadas, incremental)?;
     let mut g = Gravacao { recebidas: normalizadas.len(), gravadas: 0, inalteradas: 0, alteradas: vec![], processadas: vec![] };
-    let tx = c.transaction()?;
+    let tx = c.savepoint()?;
     {
         let mut upsert = tx.prepare(
             "INSERT INTO closed_bets_ledger(user_id,platform,bet_key,data_json,first_seen_at,updated_at) VALUES(?,?,?,?,?,?)
@@ -377,7 +377,7 @@ pub fn salvar_indice(c: &mut Connection, user_id: &str, entradas: Option<&Value>
     }
     let recebidas = linhas.len();
     let mut gravadas = 0;
-    let tx = c.transaction()?;
+    let tx = c.savepoint()?;
     {
         let mut existente = tx.prepare("SELECT data_json FROM closed_bets_ledger WHERE user_id=? AND platform=? AND bet_key=?")?;
         let mut upsert = tx.prepare(

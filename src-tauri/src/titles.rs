@@ -659,7 +659,6 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
     if tipo.is_empty() || q.is_empty() || resultado.is_empty() {
         return String::new();
     }
-    let sn = if SIM_NAO.is_match(&resultado) { capitalizar(&resultado) } else { String::new() };
     let fonte_confronto = [titulo, q.as_str()]
         .into_iter()
         .find(|v| VS_DENTRO.is_match(clean(v).split(" - ").next().unwrap_or("")))
@@ -673,6 +672,47 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
         base = format!("{a} vs {b}");
     }
     let prefixo = if base.is_empty() { String::new() } else { format!("{base} - ") };
+    extended_core(&q, &tipo, &resultado, None, &prefixo)
+}
+
+/// `extendedTitle()` de um mercado exato `{question, line, sportsMarketType}`
+/// sem confronto (o Predict.fun remove o prefixo depois).
+pub fn extended_title_exato(pergunta: &str, tipo: &str, resultado: &str, linha: Option<&Value>) -> String {
+    let tipo = ET_TIPO_SEP.replace_all(&clean(tipo).to_lowercase(), "_").into_owned();
+    let q = clean(pergunta);
+    let resultado = clean(resultado);
+    if tipo.is_empty() || q.is_empty() || resultado.is_empty() {
+        return String::new();
+    }
+    extended_core(&q, &tipo, &resultado, linha, "")
+}
+
+regex_js!(ET_TIPO_RACE, r"_race_to_points$|_first_td(?:_team)?$|_first_touchdown(?:_scorer)?$");
+regex_js!(ET_RACE_LINHA, r"\bRace to (\d+) pontos");
+regex_js!(ET_TENIS_GAMES, r"^tennis_(?:(?:first|second|third|fourth|fifth)_)?set_games_totals$");
+regex_js!(ET_TENIS_SET_NOME, r"^tennis_(first|second|third|fourth|fifth)_set");
+regex_js!(ET_LINHA_DIRECAO, r"(?i)\b(O/U|Over/Under|Over|Under)\s+(\d+(?:[.,]\d+)?)");
+regex_js!(ET_AMBAS, r"^both_teams_to_score(?:_(?:first|second)_half)?$");
+regex_js!(ET_TORNEIO, r"(?i)\bwin\s+the\s+tournament\??$");
+regex_js!(ET_GOLFISTA, r"(?i)^(?:Will\s+)?(.+?)\s+win\s+the\s+tournament\??$");
+regex_js!(
+    ET_LEGADO,
+    r"^(?:moneyline|spreads?|totals?|team_totals(?:_home|_away)?|team_totals_(?:home|away)|game_team_totals|h2_team_totals|total_corners|total_goals|both_teams_to_score|rebounds|map_handicap|tennis_(?:set_handicap|game_handicap|set_totals|match_totals|first_set_totals)|baseball_(?:team_first_five_(?:spread|total|winner)|game_extra_innings)|nrfi|soccer_(?:team_to_advance|halftime_result|team_totals|home_team_totals|away_team_totals|team_total_corners|first_half_team_totals|second_half_team_totals|first_half_total_corners|second_half_total_corners)|(?:first_half|second_half|q[1-4])_(?:moneyline|spreads|totals|team_totals)|football_team_(?:first|second)_half_winner|football_team_(?:first|second|third|fourth)_quarter_winner|p[1-3]_totals)$"
+);
+regex_js!(ET_LEGADO_QUARTO, r"^(?:to_advance|(?:first|second|third|fourth)_quarter_(?:moneyline|totals|spreads))$");
+
+/// `m.line != null && Number(m.line) !== n`.
+fn linha_diverge(linha: Option<&Value>, n: f64) -> bool {
+    linha.is_some_and(|l| !l.is_null()) && js::number(linha) != n
+}
+
+/// Corpo do `extendedTitle()` depois de achar o mercado exato. `q`, `tipo` e
+/// `resultado` já vêm limpos e não vazios.
+fn extended_core(q: &str, tipo: &str, resultado: &str, linha: Option<&Value>, prefixo: &str) -> String {
+    let q = q.to_string();
+    let tipo = tipo.to_string();
+    let resultado = resultado.to_string();
+    let sn = if SIM_NAO.is_match(&resultado) { capitalizar(&resultado) } else { String::new() };
     let reserva = || format!("{prefixo}Mercado não confirmado: {q} — Seleção: {resultado}");
     if ET_TIPO_DRAW.is_match(&tipo) {
         let escopo_empate = if tipo.contains("first_half") || tipo.contains("halftime") {
@@ -696,6 +736,41 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
         if !empate.is_empty() {
             return format!("{prefixo}{empate}");
         }
+    }
+    if ET_TIPO_RACE.is_match(&tipo) {
+        let detalhe = selection_detail(&q, &resultado, "");
+        if let Some(c) = ET_RACE_LINHA.captures(&detalhe) {
+            if linha_diverge(linha, c[1].parse::<f64>().unwrap_or(f64::NAN)) {
+                return reserva();
+            }
+        }
+        return if detalhe.is_empty() { reserva() } else { format!("{prefixo}{detalhe}") };
+    }
+    if ET_TENIS_GAMES.is_match(&tipo) {
+        let numero = ET_SET.captures(&q).and_then(|c| c.get(1).or(c.get(2)).map(|m| m.as_str().to_string()));
+        let nomeado = ET_TENIS_SET_NOME
+            .captures(&tipo)
+            .map(|c| ["first", "second", "third", "fourth", "fifth"].iter().position(|w| *w == &c[1]).map_or(0, |i| i + 1))
+            .unwrap_or(0);
+        let n: f64 = match numero {
+            Some(t) => t.parse().unwrap_or(f64::NAN),
+            None => nomeado as f64,
+        };
+        let l = ET_LINHA_DIRECAO.captures(&q);
+        let ou_txt = if ET_LADO_OU.is_match(&resultado) {
+            resultado.clone()
+        } else {
+            match &l {
+                Some(c) if !sn.is_empty() && ET_LADO_OU.is_match(&c[1]) => c[1].to_string(),
+                _ => String::new(),
+            }
+        };
+        let Some(l) = l else { return reserva() };
+        let valor = l[2].replacen(',', ".", 1);
+        if n == 0.0 || n.is_nan() || ou_txt.is_empty() || linha_diverge(linha, valor.parse::<f64>().unwrap_or(f64::NAN)) {
+            return reserva();
+        }
+        return format!("{prefixo}{} Set {} {valor} games{}", ordinal(n as i64), capitalizar(&ou_txt), if sn == "No" { " No" } else { "" });
     }
     let vence = |escopo: &str| -> String {
         if escopo.is_empty() {
@@ -728,6 +803,23 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
         };
         return vence(&numero.map_or(String::new(), |n| format!("{} {}", ordinal_texto(&n), if mapa { "Map" } else { "Set" })));
     }
+    if ET_AMBAS.is_match(&tipo) {
+        let p = if tipo.ends_with("second_half") {
+            "2nd Half".to_string()
+        } else if tipo.ends_with("first_half") {
+            "1st Half".to_string()
+        } else {
+            period(&q)
+        };
+        return if sn.is_empty() {
+            reserva()
+        } else {
+            format!("{prefixo}Both Teams to Score{} {sn}", if p.is_empty() { String::new() } else { format!(" {p}") })
+        };
+    }
+    if tipo == "rugby_halftime_result" || tipo == "rugby_second_half_result" {
+        return vence(if tipo == "rugby_halftime_result" { "1st Half" } else { "2nd Half" });
+    }
     let props = match tipo.as_str() {
         "assists" => Some("Assistências"),
         "soccer_player_shots_on_target" => Some("Chutes no alvo"),
@@ -753,6 +845,13 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
         }
         return format!("{prefixo}{jogador} {nome_prop} {selecao}");
     }
+    if ["cricket_first_inning_runs", "cricket_second_inning_runs", "first_innings_totals", "second_innings_totals"].contains(&tipo.as_str()) {
+        let escopo = if tipo.contains("second") { "2nd Innings" } else { "1st Innings" };
+        return match (ET_LINHA_OU.captures(&q), ET_LADO_OU.captures(&resultado)) {
+            (Some(l), Some(o)) => format!("{prefixo}{escopo} {} {} runs", capitalizar(&o[1]), l[1].replacen(',', ".", 1)),
+            _ => reserva(),
+        };
+    }
     if ["ufc_method_of_victory", "ufc_method_of_finish", "combat_method_of_victory"].contains(&tipo.as_str()) {
         return match ET_METODO.captures(&q) {
             Some(c) if !sn.is_empty() => {
@@ -775,8 +874,24 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
             _ => reserva(),
         };
     }
-    // Os demais tipos não são gerados para a Kalshi.
-    String::new()
+    if tipo == "moneyline" && ET_TORNEIO.is_match(&q) {
+        return match ET_GOLFISTA.captures(&q) {
+            Some(c) if !sn.is_empty() => format!("{prefixo}Torneio {} ML{}", clean(&c[1]), if sn == "No" { " No" } else { "" }),
+            _ => reserva(),
+        };
+    }
+    // Tipos estruturados desconhecidos nunca caem nos palpites genéricos.
+    if ET_LEGADO.is_match(&tipo) || ET_LEGADO_QUARTO.is_match(&tipo) { String::new() } else { reserva() }
+}
+
+/// `sportUnit()`.
+pub fn sport_unit(esporte: &str) -> &'static str {
+    match clean(esporte).to_lowercase().as_str() {
+        "basquete" | "futebol americano" | "basketball" | "american football" => "pontos",
+        "beisebol" | "baseball" => "runs",
+        "futebol" | "hóquei" | "soccer" | "hockey" => "gols",
+        _ => "",
+    }
 }
 
 regex_js!(KS_OFICIAL, r"(?i)\b(?:in|of)\s+(?:the\s+)?(.+?\s+vs\.?\s+.+?)\s+(?:Pro Football|college football|professional baseball|Pro Basketball|college basketball)\s+game\b");

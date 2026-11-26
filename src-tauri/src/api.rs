@@ -1,6 +1,6 @@
 //! Rotas `/api/*` do MyBettys, com o mesmo contrato JSON do `server.js`.
 //!
-//! As rotas ainda não migradas respondem 501.
+//! Rotas que não existem no app desktop respondem 501.
 
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ use crate::crypto::MasterKey;
 use crate::db::{self, Db, UsuarioLocal};
 use crate::kalshi::{self, EstadoKalshi};
 use crate::poly::{self, EstadoPoly};
-use crate::{history, js, ledger, poly_datas};
+use crate::{history, js, ledger, poly_datas, tracked};
 
 /// Casas na ordem do `CASAS_HISTORICO` do Electron.
 pub const CASAS: [&str; 4] = ["polymarket", "kalshi", "predict", "sxbet"];
@@ -28,6 +28,7 @@ pub struct Estado {
     pub usuario: UsuarioLocal,
     pub kalshi: Arc<EstadoKalshi>,
     pub poly: Arc<EstadoPoly>,
+    pub tracked: Arc<tracked::EstadoTracked>,
 }
 
 pub struct ApiResponse {
@@ -58,10 +59,12 @@ impl From<Vec<u8>> for Corpo {
 
 pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<&str>, corpo: &[u8]) -> ApiResponse {
     use history as h;
-    const ERRO_GENERICO: &str = "Erro interno do MyBettys.";
+
     let resultado = match (method.as_str(), path) {
         ("GET", "/health") => Ok(ok(json!({ "ok": true, "service": "mybettys", "engine": "rust" }))),
         ("GET", "/api/me") => me(estado).await,
+        // No app desktop não há sessão: sair só volta para a tela inicial.
+        ("POST", "/api/auth/logout") => Ok(ok(json!({ "ok": true }))),
         ("GET", "/api/settings") => ler_settings(estado).await,
         ("POST", "/api/settings") => match ler_json(corpo, LIMITE_CORPO) {
             Ok(body) => salvar_settings(estado, body).await,
@@ -149,6 +152,7 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
         ("GET", "/api/history/closed/pnl") => {
             historico(estado, query, "Não foi possível consultar o PnL.", "", |c, u, q| h::pnl(c, u, q).map(|v| Some(v.into()))).await
         }
+        (m, p) if p.starts_with("/api/connections/") || p.starts_with("/api/tracked/") => rastreadas(estado, m, p, corpo).await,
         _ => Ok(nao_migrada(method, path)),
     };
     resultado.unwrap_or_else(|e| {
@@ -159,6 +163,50 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
 }
 
 type Resultado = anyhow::Result<ApiResponse>;
+
+const ERRO_GENERICO: &str = "Erro interno do MyBettys.";
+
+/// Um segmento de rota (`:platform`), sem barra.
+fn segmento<'a>(p: &'a str, prefixo: &str, sufixo: &str) -> Option<&'a str> {
+    let s = p.strip_prefix(prefixo)?.strip_suffix(sufixo)?;
+    (!s.is_empty() && !s.contains('/')).then_some(s)
+}
+
+/// Predict.fun e SX Bet: conexão, teste, sincronização e saldos.
+async fn rastreadas(estado: &Estado, metodo: &str, p: &str, corpo: &[u8]) -> Resultado {
+    if metodo == "GET" && p == "/api/tracked/predict/balance" {
+        return Ok(tracked::saldo_predict(estado).await);
+    }
+    if metodo == "GET" && p == "/api/tracked/sxbet/balance" {
+        return Ok(tracked::saldo_sxbet(estado).await);
+    }
+    let conexao = segmento(p, "/api/connections/", "");
+    match (metodo, conexao) {
+        ("POST", Some(casa)) => {
+            return match ler_json(corpo, LIMITE_CORPO) {
+                Ok(body) => com_conexoes(estado, tracked::conectar(estado, casa, &body).await, ERRO_GENERICO).await,
+                Err(resposta) => Ok(resposta),
+            };
+        }
+        ("DELETE", Some(casa)) => return com_conexoes(estado, tracked::desconectar(estado, casa).await, ERRO_GENERICO).await,
+        _ => {}
+    }
+    if metodo == "GET" {
+        if let Some(casa) = segmento(p, "/api/connections/", "/test") {
+            return Ok(tracked::testar(estado, casa).await);
+        }
+    }
+    if metodo == "POST" {
+        if let Some(casa) = segmento(p, "/api/tracked/", "/sync") {
+            return match ler_json(corpo, LIMITE_CORPO) {
+                Ok(_) => Ok(tracked::sincronizar(estado, casa).await),
+                Err(resposta) => Ok(resposta),
+            };
+        }
+    }
+    let m: Method = metodo.parse().unwrap_or(Method::GET);
+    Ok(nao_migrada(&m, p))
+}
 
 /// Executa uma consulta de histórico no banco. `Ok(None)` vira 400 com
 /// `msg_invalida`; um erro vira 500 com `msg_erro`, como no `server.js`.
@@ -528,7 +576,7 @@ mod tests {
         let mut conn = db::abrir(&dir.path().join("t.db")).unwrap();
         let usuario = db::usuario_local(&mut conn).unwrap();
         let chave = Arc::new(MasterKey::from_hex(&"11".repeat(32)).unwrap());
-        (dir, Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default() })
+        (dir, Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() })
     }
 
     fn chamar(e: &Estado, method: Method, path: &str, corpo: Value) -> ApiResponse {
@@ -629,7 +677,7 @@ mod tests {
             })
             .unwrap_or_else(|| "00".repeat(32));
         let chave = Arc::new(MasterKey::from_hex(&hex).unwrap());
-        let e = Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default() };
+        let e = Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() };
         let arquivo_urls = var("MYBETTYS_COMPARAR_URLS");
         let pasta = std::path::Path::new(&arquivo_urls).parent().unwrap().to_path_buf();
         let urls = std::fs::read_to_string(&arquivo_urls).unwrap();
@@ -705,7 +753,27 @@ mod tests {
     #[test]
     fn rota_desconhecida_responde_501() {
         let (_d, e) = estado();
-        let r = chamar(&e, Method::GET, "/api/tracked/predict/balance", Value::Null);
+        let r = chamar(&e, Method::GET, "/api/users", Value::Null);
         assert_eq!(r.status, StatusCode::NOT_IMPLEMENTED);
+    }
+
+    #[test]
+    fn casas_rastreadas_sem_conexao() {
+        let (_d, e) = estado();
+        let r = chamar(&e, Method::POST, "/api/tracked/predict/sync", json!({}));
+        assert_eq!((r.status, r.body["error"].as_str()), (StatusCode::CONFLICT, Some("Conta não conectada.")));
+        let r = chamar(&e, Method::GET, "/api/tracked/sxbet/balance", Value::Null);
+        assert_eq!(r.status, StatusCode::CONFLICT);
+        let r = chamar(&e, Method::GET, "/api/connections/predict/test", Value::Null);
+        assert_eq!(r.body["error"].as_str(), Some("Conecte a casa primeiro."));
+        let r = chamar(&e, Method::POST, "/api/connections/outra", json!({ "apiKey": "x" }));
+        assert_eq!(r.status, StatusCode::NOT_FOUND);
+        let r = chamar(&e, Method::POST, "/api/connections/predict", json!({ "apiKey": "abc", "wallet": "nao" }));
+        assert_eq!(r.status, StatusCode::BAD_REQUEST);
+        let r = chamar(&e, Method::POST, "/api/connections/sxbet", json!({ "apiKey": "com espaço" }));
+        assert_eq!(r.body["error"].as_str(), Some("Informe uma chave de API válida."));
+        let r = chamar(&e, Method::DELETE, "/api/connections/sxbet", Value::Null);
+        assert_eq!(r.status, StatusCode::OK);
+        assert_eq!(r.body["connections"]["sxbet"], json!(false));
     }
 }

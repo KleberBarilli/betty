@@ -621,7 +621,7 @@ pub async fn proxy(estado: &Estado, gamma: bool, resto: &str, query: Option<&str
 }
 
 /// `fetchErc20Balance()`: `balanceOf` via `eth_call`, só com o endereço público.
-async fn saldo_erc20(wallet: &str, rpc: &str, token: &str, decimais: i32, prazo: Duration) -> Result<f64> {
+pub(crate) async fn saldo_erc20(wallet: &str, rpc: &str, token: &str, decimais: i32, prazo: Duration) -> Result<f64> {
     if !wallet_valida(wallet) {
         bail!("Endereço da carteira inválido.");
     }
@@ -664,7 +664,7 @@ pub async fn saldo_pusd(wallet: &str) -> Result<f64> {
 }
 
 /// Garante o provedor criptográfico do rustls também em clientes avulsos.
-fn rustls_pronto() {
+pub(crate) fn rustls_pronto() {
     let _ = &*net::CLIENTE;
 }
 

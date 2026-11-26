@@ -303,7 +303,7 @@ fn filtros(c: &Connection, user_id: &str, raw: &Consulta) -> Result<Filtro> {
 // ---------------------------------------------------------------------------
 
 /// `stakeHistorico()`.
-fn stake_historico(aposta: &Value) -> f64 {
+pub(crate) fn stake_historico(aposta: &Value) -> f64 {
     let n = |k: &str| js::number(aposta.get(k));
     let inicial = n("initialValue");
     if inicial.is_finite() && inicial > 0.0 {
@@ -319,7 +319,7 @@ fn stake_historico(aposta: &Value) -> f64 {
     0.0
 }
 
-fn odd_historica(aposta: &Value) -> f64 {
+pub(crate) fn odd_historica(aposta: &Value) -> f64 {
     let preco = js::number(aposta.get("avgPrice"));
     if preco.is_finite() && preco > 0.0 { 1.0 / preco } else { 0.0 }
 }
