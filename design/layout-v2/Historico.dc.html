@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MyBettys — Histórico</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" data-pal="{{ pal.v }}">
+  <aside class="side">
+    <div class="brand"><span class="logo" aria-hidden="true">mb</span>MyBettys</div>
+    <nav class="nav" aria-label="Principal">
+      <a href="Main.dc.html">Visão geral</a>
+      <a href="Posicoes.dc.html">Posições<span class="cnt">14</span></a>
+      <a class="on" href="Historico.dc.html">Histórico</a>
+      <a href="Estatisticas.dc.html">Estatísticas</a>
+      <div class="sep">Sistema</div>
+      <a href="Conexoes.dc.html">Conexões</a>
+      <a href="Configuracoes.dc.html">Configurações</a>
+    </nav>
+    <section class="sync" aria-label="Sincronização por casa">
+      <div class="hd"><span>Sincronização</span><span class="mu">auto ligado</span></div>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket">Polymarket<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi">Kalshi<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun">Predict.fun<span class="st"><span class="dot warn"></span>parcial</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet">SX Bet<span class="st"><span class="dot err"></span>falhou</span></a>
+      <button type="button" class="btn full">Atualizar agora</button>
+    </section>
+    <div class="palp" role="group" aria-label="Paleta do protótipo"><span>Paleta</span><button type="button" class="{{ pal.ca }}" aria-label="Meia-noite" title="Meia-noite" onClick="{{ pal.a }}"></button><button type="button" class="{{ pal.cb }}" aria-label="Grafite" title="Grafite" onClick="{{ pal.b }}"></button><button type="button" class="{{ pal.cc }}" aria-label="Brasa" title="Brasa" onClick="{{ pal.c }}"></button></div>
+  </aside>
+
+  <main class="main">
+    <header class="row wrap between">
+      <div>
+        <h1>Histórico</h1>
+        <p class="mu sm" style="margin-top: 4px">1,249 apostas fechadas · totais calculados no banco local, só com resultados confirmados</p>
+      </div>
+      <div class="bar">
+        <div class="seg" aria-label="Visão">
+          <button type="button" class="{{ cLista }}" onClick="{{ verLista }}">Lista</button>
+          <button type="button" class="{{ cCal }}" onClick="{{ verCal }}">Calendário</button>
+        </div>
+        <div class="seg" aria-label="Unidade">
+          <button type="button" class="on">US$</button>
+          <button type="button">Stake (u)</button>
+        </div>
+        <div style="position: relative">
+          <button type="button" class="btn" aria-haspopup="dialog" aria-expanded="{{ csvAberto }}" onClick="{{ alternarCsv }}">Exportar CSV</button>
+          <sc-if value="{{ csvAberto }}" hint-placeholder-val="{{ false }}">
+            <div class="card pad col" role="dialog" aria-label="Exportar histórico" style="position: absolute; right: 0; top: 44px; z-index: 5; width: 300px; background: var(--sf2); box-shadow: 0 18px 40px -12px #000">
+              <label class="lb">Conteúdo do CSV
+                <select class="fld">
+                  <option>Todo o histórico</option>
+                  <option>Períodos configurados por casa</option>
+                  <option>Filtros atuais desta tela</option>
+                </select>
+              </label>
+              <p class="sm mu">Todo o histórico inclui apostas antigas e ignora os períodos por casa.</p>
+              <button type="button" class="btn pri">Baixar CSV</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </header>
+
+    <div class="bar">
+      <input class="fld grow" type="search" placeholder="Pesquisar mercado, time…" aria-label="Pesquisar no histórico" style="max-width: 300px">
+      <button type="button" class="btn gh">Período: tudo</button>
+      <select class="fld" aria-label="Filtrar por casa"><option>Casa: todas</option><option>Polymarket</option><option>Kalshi</option><option>Predict.fun</option><option>SX Bet</option></select>
+      <select class="fld" aria-label="Filtrar por esporte"><option>Esporte: todos</option><option>Futebol</option><option>Basquete</option><option>Futebol Americano</option><option>Tênis</option><option>Esports</option></select>
+      <a class="pill warn" href="Configuracoes.dc.html"><span class="dot warn"></span>Período por casa ativo: Kalshi desde 01/03/2026</a>
+    </div>
+
+    <div class="minis" aria-label="Totais do recorte">
+      <div><div class="k">Apostas</div><div class="v2">1,249</div></div>
+      <div><div class="k">Volume</div><div class="v2">$66,348.00</div></div>
+      <div><div class="k">Lucro</div><div class="v2 pos">+$3,184.70</div></div>
+      <div><div class="k">ROI</div><div class="v2 pos">+4.80%</div></div>
+      <div><div class="k">Taxa de acerto</div><div class="v2">54.1%</div></div>
+    </div>
+
+    <sc-if value="{{ lista }}" hint-placeholder-val="{{ true }}">
+      <section class="card" aria-label="Apostas fechadas">
+        <div class="scroll">
+          <div class="tb">
+            <div class="tr th c-pos"><span title="Data da venda ou resolução">Fechamento ▼</span><span></span><span>Jogo</span><span>Aposta</span><span class="r">Odd</span><span class="r">Stake ($)</span><span class="r">PnL</span></div>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="12">
+              <div class="tr c-pos"><span class="num mu">{{ r.data }}</span><img class="lg" src="{{ r.lg }}" alt="{{ r.sg }}"><span class="el">{{ r.jogo }}</span><span class="el">{{ r.aposta }}</span><span class="r num">{{ r.odd }}</span><span class="r num">{{ r.stake }}</span><span class="{{ r.pc }}">{{ r.pnl }}</span></div>
+            </sc-for>
+            <div class="tr c-pos"><span class="fa" style="grid-column: 1 / -1">… mais 13 linhas nesta página</span></div>
+          </div>
+        </div>
+        <div class="ft">
+          <span class="sm mu num">1–25 de 1,249</span>
+          <div class="bar">
+            <select class="fld" aria-label="Itens por página"><option>25 por página</option><option>50 por página</option><option>100 por página</option></select>
+            <button type="button" class="btn gh" aria-label="Página anterior" disabled>‹</button>
+            <span class="sm num">1 / 50</span>
+            <button type="button" class="btn gh" aria-label="Próxima página">›</button>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ cal }}" hint-placeholder-val="{{ false }}">
+      <div class="split">
+        <section class="card pad wide" aria-label="Calendário de resultados">
+          <div class="row wrap between" style="margin-bottom: 14px">
+            <div class="bar">
+              <button type="button" class="btn gh" aria-label="Mês anterior">‹</button>
+              <h2 style="min-width: 150px; text-align: center">Novembro de 2026</h2>
+              <button type="button" class="btn gh" aria-label="Próximo mês">›</button>
+              <button type="button" class="btn gh">Hoje</button>
+            </div>
+            <div class="sm mu">Mês: <span class="b num pos">+$1,483.25</span> · 17 dias positivos · 8 negativos</div>
+          </div>
+          <div class="cal">
+            <span class="wd">dom</span><span class="wd">seg</span><span class="wd">ter</span><span class="wd">qua</span><span class="wd">qui</span><span class="wd">sex</span><span class="wd">sáb</span>
+            <sc-for list="{{ dias }}" as="d" hint-placeholder-count="35">
+              <button type="button" class="{{ d.cls }}" aria-pressed="{{ d.sel }}"><span class="d">{{ d.d }}</span><span class="{{ d.pc }}">{{ d.p }}</span><span class="n">{{ d.n }}</span></button>
+            </sc-for>
+          </div>
+        </section>
+
+        <section class="card thin" aria-label="Resultados do dia">
+          <div class="ch">
+            <div>
+              <h2>Quinta-feira, 26 de novembro</h2>
+              <p class="sm mu">9 apostas · volume $640.00 · ROI 19.75% · acerto 66.7%</p>
+            </div>
+            <span class="v2 pos">+$126.40</span>
+          </div>
+          <div class="tb">
+            <div class="tr" style="grid-template-columns: 34px minmax(0,1fr) 76px"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket"><span><span class="el" style="display: block">Juventus vs Napoli</span><span class="sm mu">Napoli ML · 2.15 · $80.00</span></span><span class="r num pos">+92.00</span></div>
+            <div class="tr" style="grid-template-columns: 34px minmax(0,1fr) 76px"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi"><span><span class="el" style="display: block">Djokovic vs Zverev</span><span class="sm mu">Over 22.5 games · 1.90 · $70.00</span></span><span class="r num pos">+63.00</span></div>
+            <div class="tr" style="grid-template-columns: 34px minmax(0,1fr) 76px"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket"><span><span class="el" style="display: block">PSG vs Lyon</span><span class="sm mu">PSG ML · 1.50 · $90.00</span></span><span class="r num neg">−90.00</span></div>
+            <div class="tr" style="grid-template-columns: 34px minmax(0,1fr) 76px"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet"><span><span class="el" style="display: block">Celtic vs Rangers</span><span class="sm mu">Celtic ML · 1.80 · $60.00</span></span><span class="r num pos">+48.00</span></div>
+          </div>
+          <div class="ft">
+            <span class="sm mu num">1–4 de 9</span>
+            <button type="button" class="btn gh">Ver as 9 na lista</button>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1120}}'>
+class Component extends DCLogic {
+  palette() {
+    let saved = null;
+    try { saved = window.localStorage.getItem('mb-pal'); } catch (e) {}
+    const v = (this.state && this.state.pal) || saved || 'a';
+    const set = (p) => () => { try { window.localStorage.setItem('mb-pal', p); } catch (e) {} this.setState({ pal: p }); };
+    const cls = (p) => 'sw ' + p + (v === p ? ' on' : '');
+    return { v, a: set('a'), b: set('b'), c: set('c'), ca: cls('a'), cb: cls('b'), cc: cls('c') };
+  }
+  renderVals() {
+    const pal = this.palette();
+    const LG = { PM: '/_blob/edf4d9dc71a90263e2450a7586ae9828', KA: '/_blob/0f267796be31166ba81af29d98cd38d0', PF: '/_blob/23efd309617249fd4b5b9ca02a2bbe05', SX: '/_blob/3af833b1f2e89e545ac57db217c9142b' };
+    const heat = (p) => { if (!p) return ''; const n = parseFloat(p.replace('−', '-').replace('+', '')); return n >= 150 ? ' up2' : n > 0 ? ' up' : n <= -90 ? ' dn2' : ' dn'; };
+    const st = this.state || {};
+    const view = st.view || 'lista';
+    const tone = (s) => (s.charAt(0) === '+' ? 'pos' : s.charAt(0) === '−' ? 'neg' : 'mu');
+    const R = (data, sg, jogo, aposta, odd, stake, pnl) => ({ data, sg, lg: LG[sg], jogo, aposta, odd, stake, pnl, pc: 'r num ' + tone(pnl) });
+    const rows = [
+      R('26/11 15:52', 'PM', 'Juventus vs Napoli', 'Napoli ML', '2.15', '80.00', '+92.00'),
+      R('26/11 15:10', 'KA', 'Djokovic vs Zverev', 'Over 22.5 games', '1.90', '70.00', '+63.00'),
+      R('26/11 14:31', 'PM', 'PSG vs Lyon', 'PSG ML', '1.50', '90.00', '−90.00'),
+      R('26/11 13:47', 'SX', 'Celtic vs Rangers', 'Celtic ML', '1.80', '60.00', '+48.00'),
+      R('26/11 12:20', 'PF', 'FURIA vs NAVI', 'NAVI ML', '1.65', '70.00', '+45.50'),
+      R('26/11 11:05', 'KA', 'Nuggets vs Thunder', 'Under 228.5 pontos', '1.95', '80.00', '−80.00'),
+      R('26/11 03:12', 'PM', 'Raptors vs Bulls', 'Bulls +2.5', '1.87', '60.00', '+52.20'),
+      R('26/11 02:40', 'KA', 'Kings vs Clippers', 'Clippers ML', '2.05', '60.00', '+63.00'),
+      R('26/11 01:15', 'PM', 'Oilers vs Flames', 'Oilers ML · vendida antes da resolução', '1.72', '70.00', '−67.30'),
+      R('25/11 23:48', 'KA', 'Bucks vs Pacers', 'Bucks −3.5', '1.90', '80.00', '+72.00'),
+      R('25/11 21:05', 'PM', 'Benfica vs Porto', 'Empate No', '1.45', '100.00', '+45.00'),
+      R('25/11 19:40', 'SX', 'Atlético vs Betis', 'Over 2.5 gols', '2.00', '50.00', '−50.00')
+    ];
+    const pnl = ['+84.20', '−41.50', '+120.10', '+18.40', '−96.30', '+210.75', '+64.00', '+152.30', '−30.20', '', '+47.60', '−118.90', '+92.10', '+175.40', '+221.00', '−64.70', '+38.25', '−12.80', '+140.60', '+56.90', '−88.40', '+199.30', '+73.15', '−45.60', '+161.20', '+126.40'];
+    const qtd = [5, 4, 7, 3, 6, 9, 4, 8, 3, 0, 4, 7, 5, 8, 10, 5, 3, 2, 7, 4, 6, 9, 5, 4, 8, 9];
+    const dias = [];
+    for (let i = 1; i <= 35; i++) {
+      if (i > 30) dias.push({ d: '', p: '', n: '', cls: 'day off', pc: 'p', sel: false });
+      else if (i > 26) dias.push({ d: String(i), p: '', n: '', cls: 'day off', pc: 'p', sel: false });
+      else {
+        const p = pnl[i - 1];
+        dias.push({ d: String(i), p: p || '—', n: p ? qtd[i - 1] + ' apostas' : 'sem apostas', cls: 'day' + heat(p) + (i === 26 ? ' sel' : ''), pc: 'p ' + (p ? tone(p) : 'mu'), sel: i === 26 });
+      }
+    }
+    return {
+      pal, rows, dias,
+      lista: view === 'lista', cal: view === 'cal',
+      cLista: view === 'lista' ? 'on' : '', cCal: view === 'cal' ? 'on' : '',
+      csvAberto: !!st.csv,
+      verLista: () => this.setState({ view: 'lista' }),
+      verCal: () => this.setState({ view: 'cal' }),
+      alternarCsv: () => this.setState({ csv: !st.csv })
+    };
+  }
+}
+</script>
+</body>
+</html>

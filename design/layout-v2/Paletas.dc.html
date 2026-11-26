@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MyBettys — Três paletas</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; padding: 28px; background: #040405; display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch">
+  <sc-for list="{{ paletas }}" as="p" hint-placeholder-count="3">
+    <section data-pal="{{ p.id }}" aria-label="{{ p.nome }}" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 24px; border: 1px solid var(--bd); border-radius: 18px; background: var(--bg)">
+      <div class="row between" style="align-items: flex-start">
+        <div>
+          <div class="k">{{ p.tag }}</div>
+          <h1 style="margin-top: 8px; font-size: 30px">{{ p.nome }}</h1>
+        </div>
+        <button type="button" class="{{ p.btn }}" onClick="{{ p.usar }}">{{ p.btnTxt }}</button>
+      </div>
+      <p class="mu" style="min-height: 60px">{{ p.just }}</p>
+
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px" aria-hidden="true">
+        <div class="col" style="gap: 5px"><span style="height: 38px; border-radius: 8px; border: 1px solid var(--bd); background: var(--bg)"></span><span class="sm fa">fundo</span></div>
+        <div class="col" style="gap: 5px"><span style="height: 38px; border-radius: 8px; border: 1px solid var(--bd); background: var(--sf2)"></span><span class="sm fa">cartão</span></div>
+        <div class="col" style="gap: 5px"><span style="height: 38px; border-radius: 8px; background: var(--ac)"></span><span class="sm fa">acento</span></div>
+        <div class="col" style="gap: 5px"><span style="height: 38px; border-radius: 8px; background: var(--pos)"></span><span class="sm fa">ganho</span></div>
+        <div class="col" style="gap: 5px"><span style="height: 38px; border-radius: 8px; background: var(--neg)"></span><span class="sm fa">perda</span></div>
+        <div class="col" style="gap: 5px"><span style="height: 38px; border-radius: 8px; background: var(--warn)"></span><span class="sm fa">aviso</span></div>
+      </div>
+
+      <div class="card hero pad">
+        <div class="k">Patrimônio</div>
+        <div class="hn" style="margin-top: 8px; font-size: 40px">$6,117.05</div>
+        <div class="row wrap" style="margin-top: 10px; gap: 8px"><span class="chip pos">▲ +$126.40 hoje</span><span class="chip neg">−$58.20 em aberto</span></div>
+        <svg viewBox="0 0 320 70" preserveAspectRatio="none" aria-hidden="true" style="display: block; width: 100%; height: 70px; margin-top: 12px; color: var(--ac)"><polyline points="0,62 26,58 52,60 78,50 104,53 130,42 156,45 182,33 208,36 234,24 260,27 286,15 320,8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline></svg>
+      </div>
+
+      <div class="card">
+        <div class="tb">
+          <div class="tr" style="grid-template-columns: 26px minmax(0,1fr) 84px"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket"><span class="el">Lakers vs Celtics · Celtics −4.5</span><span class="r num pos b">+21.60</span></div>
+          <div class="tr sel" style="grid-template-columns: 26px minmax(0,1fr) 84px"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi"><span class="el">Knicks vs Heat · Over 215.5 pontos</span><span class="r num neg b">−18.20</span></div>
+          <div class="tr" style="grid-template-columns: 26px minmax(0,1fr) 84px"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun"><span class="el">T1 vs Gen.G · T1 ML</span><span class="r num neg b">−14.30</span></div>
+          <div class="tr" style="grid-template-columns: 26px minmax(0,1fr) 84px"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet"><span class="el">Warriors vs Suns · Suns +3.5</span><span class="r num mu">—</span></div>
+        </div>
+      </div>
+
+      <div class="bar">
+        <button type="button" class="btn pri">Salvar</button>
+        <button type="button" class="btn">Atualizar agora</button>
+        <span class="pill ok"><span class="dot ok"></span>Confirmado</span>
+        <span class="pill warn"><span class="dot warn"></span>Parcial</span>
+        <span class="pill err"><span class="dot err"></span>Falha</span>
+      </div>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    let saved = null;
+    try { saved = window.localStorage.getItem('mb-pal'); } catch (e) {}
+    const v = (this.state && this.state.pal) || saved || 'a';
+    const usar = (p) => () => { try { window.localStorage.setItem('mb-pal', p); } catch (e) {} this.setState({ pal: p }); };
+    const base = [
+      { id: 'a', tag: 'Paleta A · recomendada', nome: 'Meia-noite', just: 'Azul-marinho profundo com acento azul elétrico. Lê como produto financeiro e deixa verde e vermelho só para o resultado.' },
+      { id: 'b', tag: 'Paleta B', nome: 'Grafite', just: 'Quase preto neutro com acento violeta. A mais silenciosa: os números de PnL são a única cor forte da tela.' },
+      { id: 'c', tag: 'Paleta C', nome: 'Brasa', just: 'Carvão quente com acento âmbar. Foge do azul de fintech e dá uma cara própria, com clima de placar.' }
+    ];
+    return {
+      paletas: base.map((p) => ({ ...p, usar: usar(p.id), btn: v === p.id ? 'btn pri' : 'btn', btnTxt: v === p.id ? 'Em uso no protótipo' : 'Usar no protótipo' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

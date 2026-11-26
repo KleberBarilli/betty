@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MyBettys — Configurações</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" data-pal="{{ pal.v }}">
+  <aside class="side">
+    <div class="brand"><span class="logo" aria-hidden="true">mb</span>MyBettys</div>
+    <nav class="nav" aria-label="Principal">
+      <a href="Main.dc.html">Visão geral</a>
+      <a href="Posicoes.dc.html">Posições<span class="cnt">14</span></a>
+      <a href="Historico.dc.html">Histórico</a>
+      <a href="Estatisticas.dc.html">Estatísticas</a>
+      <div class="sep">Sistema</div>
+      <a href="Conexoes.dc.html">Conexões</a>
+      <a class="on" href="Configuracoes.dc.html">Configurações</a>
+    </nav>
+    <section class="sync" aria-label="Sincronização por casa">
+      <div class="hd"><span>Sincronização</span><span class="mu">auto ligado</span></div>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket">Polymarket<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi">Kalshi<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun">Predict.fun<span class="st"><span class="dot warn"></span>parcial</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet">SX Bet<span class="st"><span class="dot err"></span>falhou</span></a>
+      <button type="button" class="btn full">Atualizar agora</button>
+    </section>
+    <div class="palp" role="group" aria-label="Paleta do protótipo"><span>Paleta</span><button type="button" class="{{ pal.ca }}" aria-label="Meia-noite" title="Meia-noite" onClick="{{ pal.a }}"></button><button type="button" class="{{ pal.cb }}" aria-label="Grafite" title="Grafite" onClick="{{ pal.b }}"></button><button type="button" class="{{ pal.cc }}" aria-label="Brasa" title="Brasa" onClick="{{ pal.c }}"></button></div>
+  </aside>
+
+  <main class="main">
+    <header class="row wrap between">
+      <div>
+        <h1>Configurações</h1>
+        <p class="mu sm" style="margin-top: 4px">Regras que mudam como os resultados são contados. Credenciais ficam em <a href="Conexoes.dc.html">Conexões</a>.</p>
+      </div>
+      <div class="bar">
+        <span class="pill warn"><span class="dot warn"></span>1 alteração não salva</span>
+        <button type="button" class="btn gh">Restaurar padrão</button>
+        <button type="button" class="btn pri">Salvar alterações</button>
+      </div>
+    </header>
+
+    <section class="card" aria-label="Stake por casa">
+      <div class="ch">
+        <div>
+          <h2>Stake por casa</h2>
+          <p class="sm mu">Valor de 1 unidade (u) em cada casa. As mudanças por data valem para a conversão histórica em Estatísticas e no Calendário.</p>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="tb">
+          <div class="tr th c-cfg"><span>Casa</span><span>Stake padrão · 1 u ($)</span><span>Mudanças por data</span><span></span></div>
+          <div class="tr c-cfg">
+            <span class="row"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket">Polymarket</span>
+            <input class="fld num" type="number" step="0.01" min="0.01" value="50.00" aria-label="Stake padrão da Polymarket">
+            <span class="bar">
+              <input class="fld num" type="date" value="2026-06-01" aria-label="Data da mudança, Polymarket">
+              <span class="fa">→</span>
+              <input class="fld num" type="number" step="0.01" min="0.01" value="60.00" aria-label="Nova unidade, Polymarket" style="width: 96px">
+              <button type="button" class="btn gh" aria-label="Remover mudança de 01/06/2026">×</button>
+            </span>
+            <button type="button" class="btn gh" aria-label="Adicionar mudança, Polymarket">+</button>
+          </div>
+          <div class="tr c-cfg">
+            <span class="row"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi">Kalshi</span>
+            <input class="fld num" type="number" step="0.01" min="0.01" value="50.00" aria-label="Stake padrão da Kalshi">
+            <span class="fa sm">Sem mudanças: a unidade vale para todo o histórico</span>
+            <button type="button" class="btn gh" aria-label="Adicionar mudança, Kalshi">+</button>
+          </div>
+          <div class="tr c-cfg">
+            <span class="row"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun">Predict.fun</span>
+            <input class="fld num" type="number" step="0.01" min="0.01" value="25.00" aria-label="Stake padrão do Predict.fun">
+            <span class="fa sm">Sem mudanças: a unidade vale para todo o histórico</span>
+            <button type="button" class="btn gh" aria-label="Adicionar mudança, Predict.fun">+</button>
+          </div>
+          <div class="tr c-cfg">
+            <span class="row"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet">SX Bet</span>
+            <input class="fld num" type="number" step="0.01" min="0.01" value="30.00" aria-label="Stake padrão da SX Bet" style="border-color: var(--warn)">
+            <span class="wn sm">Alterado de $25.00 · ainda não salvo</span>
+            <button type="button" class="btn gh" aria-label="Adicionar mudança, SX Bet">+</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Período do histórico por casa">
+      <div class="ch">
+        <div>
+          <h2>Período do histórico por casa</h2>
+          <p class="sm mu">Recorta as fechadas em Histórico, Estatísticas, gráficos e Calendário. A exportação “Todo o histórico” ignora este recorte.</p>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="tb">
+          <div class="tr th c-per"><span>Casa</span><span>Data inicial</span><span>Data final</span><span>Efeito</span></div>
+          <div class="tr c-per"><span class="row"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket">Polymarket</span><input class="fld num" type="date" aria-label="Data inicial, Polymarket"><input class="fld num" type="date" aria-label="Data final, Polymarket"><span class="mu sm">Todo o histórico · 562 fechadas</span></div>
+          <div class="tr c-per"><span class="row"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi">Kalshi</span><input class="fld num" type="date" value="2026-03-01" aria-label="Data inicial, Kalshi"><input class="fld num" type="date" aria-label="Data final, Kalshi"><span class="row sm"><span class="chip wn">Desde 01/03/2026 · 388 de 451 fechadas</span><button type="button" class="btn gh" aria-label="Limpar período da Kalshi">Limpar</button></span></div>
+          <div class="tr c-per"><span class="row"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun">Predict.fun</span><input class="fld num" type="date" aria-label="Data inicial, Predict.fun"><input class="fld num" type="date" aria-label="Data final, Predict.fun"><span class="mu sm">Todo o histórico · 187 fechadas</span></div>
+          <div class="tr c-per"><span class="row"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet">SX Bet</span><input class="fld num" type="date" aria-label="Data inicial, SX Bet"><input class="fld num" type="date" aria-label="Data final, SX Bet"><span class="mu sm">Todo o histórico · 112 fechadas</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="g2">
+      <section class="card" aria-label="Atualização">
+        <div class="ch"><h2>Atualização</h2></div>
+        <div class="pad col" style="gap: 14px">
+          <label class="row between"><span>Atualizar automaticamente<span class="sm mu" style="display: block">Atualizações em segundo plano não bloqueiam a tela</span></span><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: var(--ac)"></label>
+          <label class="row between"><span>Densidade das tabelas</span>
+            <select class="fld"><option>Confortável</option><option>Compacta</option></select>
+          </label>
+        </div>
+      </section>
+      <section class="card" aria-label="Dados locais">
+        <div class="ch"><h2>Dados locais</h2></div>
+        <div class="pad col" style="gap: 14px">
+          <div class="row between wrap"><span>Histórico no banco local<span class="sm mu" style="display: block">1,312 fechadas guardadas · nada é apagado ao desconectar uma casa</span></span><a class="btn gh" href="Historico.dc.html">Exportar CSV</a></div>
+          <div class="row between wrap"><span>Conta local<span class="sm mu" style="display: block">[NOME DA CONTA]</span></span><button type="button" class="btn gh">Sair</button></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1000}}'>
+class Component extends DCLogic {
+  palette() {
+    let saved = null;
+    try { saved = window.localStorage.getItem('mb-pal'); } catch (e) {}
+    const v = (this.state && this.state.pal) || saved || 'a';
+    const set = (p) => () => { try { window.localStorage.setItem('mb-pal', p); } catch (e) {} this.setState({ pal: p }); };
+    const cls = (p) => 'sw ' + p + (v === p ? ' on' : '');
+    return { v, a: set('a'), b: set('b'), c: set('c'), ca: cls('a'), cb: cls('b'), cc: cls('c') };
+  }
+  renderVals() {
+    return { pal: this.palette() };
+  }
+}
+</script>
+</body>
+</html>

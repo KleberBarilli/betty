@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MyBettys — Posições</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" data-pal="{{ pal.v }}">
+  <aside class="side">
+    <div class="brand"><span class="logo" aria-hidden="true">mb</span>MyBettys</div>
+    <nav class="nav" aria-label="Principal">
+      <a href="Main.dc.html">Visão geral</a>
+      <a class="on" href="Posicoes.dc.html">Posições<span class="cnt">14</span></a>
+      <a href="Historico.dc.html">Histórico</a>
+      <a href="Estatisticas.dc.html">Estatísticas</a>
+      <div class="sep">Sistema</div>
+      <a href="Conexoes.dc.html">Conexões</a>
+      <a href="Configuracoes.dc.html">Configurações</a>
+    </nav>
+    <section class="sync" aria-label="Sincronização por casa">
+      <div class="hd"><span>Sincronização</span><span class="mu">auto ligado</span></div>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket">Polymarket<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="Kalshi">Kalshi<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun">Predict.fun<span class="st"><span class="dot warn"></span>parcial</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="SX Bet">SX Bet<span class="st"><span class="dot err"></span>falhou</span></a>
+      <button type="button" class="btn full">Atualizar agora</button>
+    </section>
+    <div class="palp" role="group" aria-label="Paleta do protótipo"><span>Paleta</span><button type="button" class="{{ pal.ca }}" aria-label="Meia-noite" title="Meia-noite" onClick="{{ pal.a }}"></button><button type="button" class="{{ pal.cb }}" aria-label="Grafite" title="Grafite" onClick="{{ pal.b }}"></button><button type="button" class="{{ pal.cc }}" aria-label="Brasa" title="Brasa" onClick="{{ pal.c }}"></button></div>
+  </aside>
+
+  <main class="main">
+    <header class="row wrap between">
+      <div>
+        <h1>Posições</h1>
+        <p class="mu sm" style="margin-top: 4px">14 abertas em 4 casas · exposição $1,860.00 · confirmadas às 16:38</p>
+      </div>
+      <div class="seg" aria-label="Visão">
+        <button type="button" class="{{ cAbertas }}" onClick="{{ verAbertas }}">Abertas · 14</button>
+        <button type="button" class="{{ cVivo }}" onClick="{{ verVivo }}">Ao vivo · 2</button>
+      </div>
+    </header>
+
+    <div class="bar">
+      <input class="fld grow" type="search" placeholder="Pesquisar mercado, time…" aria-label="Pesquisar mercado ou time" style="max-width: 320px">
+      <select class="fld" aria-label="Filtrar por casa"><option>Casa: todas</option><option>Polymarket</option><option>Kalshi</option><option>Predict.fun</option><option>SX Bet</option></select>
+      <select class="fld" aria-label="Filtrar por esporte"><option>Esporte: todos</option><option>Futebol</option><option>Basquete</option><option>Futebol Americano</option><option>Tênis</option><option>Esports</option></select>
+      <button type="button" class="btn gh">Data do evento: todas</button>
+      <span class="grow"></span>
+      <div class="seg" aria-label="Agrupar">
+        <button type="button" class="on">Por casa</button>
+        <button type="button">Sem grupo</button>
+      </div>
+    </div>
+
+    <sc-if value="{{ abertas }}" hint-placeholder-val="{{ true }}">
+      <section class="card" aria-label="Posições abertas por casa">
+        <div class="scroll">
+          <div class="{{ tbCls }}">
+            <div class="tr th c-pos"><span title="Data e horário do evento">Evento ▲</span><span></span><span>Jogo</span><span>Aposta</span><span class="r">Odd</span><span class="r">Stake ($)</span><span class="r">PnL</span></div>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="12">
+              <sc-if value="{{ r.g }}" hint-placeholder-val="{{ false }}">
+                <div class="tr tg c-pos"><span class="row" style="grid-column: 1 / 4"><img class="lg" src="{{ r.lg }}" alt=""><span style="font-size: 14px">{{ r.casa }}</span><span class="mu sm" style="font-weight: 500">{{ r.qtd }}</span></span><span><span class="{{ r.ec }}">{{ r.estado }}</span></span><span></span><span class="r num">{{ r.stake }}</span><span class="{{ r.pc }}">{{ r.pnl }}</span></div>
+              </sc-if>
+              <sc-if value="{{ r.n }}" hint-placeholder-val="{{ true }}">
+                <div class="tr c-pos"><span class="num mu">{{ r.data }}</span><img class="lg" src="{{ r.lg }}" alt="{{ r.sg }}"><span class="el">{{ r.jogo }}</span><span class="el">{{ r.aposta }}</span><span class="r num">{{ r.odd }}</span><span class="r num">{{ r.stake }}</span><span class="{{ r.pc }}">{{ r.pnl }}</span></div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </div>
+        <div class="ft">
+          <span class="sm mu">14 posições · exposição <span class="num">$1,860.00</span> · PnL não realizado <span class="num neg">−$58.20</span> nas 12 com cotação</span>
+          <span class="sm fa">SX Bet informa exposição, sem PnL a mercado</span>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ vivo }}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-label="Apostas ao vivo">
+        <div class="ch">
+          <div class="row"><span class="dot ok"></span><h2>Em andamento agora</h2></div>
+          <span class="sm mu">Eventos iniciados nas últimas 2 horas. Visão temporária: não altera histórico nem exportação.</span>
+        </div>
+        <div class="scroll">
+          <div class="{{ tbCls }}">
+            <div class="tr th c-live"><span>Início</span><span></span><span>Jogo</span><span>Aposta</span><span class="r">Odd</span><span class="r">Stake ($)</span><span class="r" title="Lucro líquido estimado se a aposta vencer">Profit</span><span class="r">PnL</span></div>
+            <div class="tr c-live"><span class="num mu">hoje 16:00</span><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket"><span class="el">Arsenal vs Chelsea</span><span class="el">Arsenal ML</span><span class="r num">1.85</span><span class="r num">150.00</span><span class="r num">+127.50</span><span class="r num pos">+12.40</span></div>
+            <div class="tr c-live"><span class="num mu">hoje 15:30</span><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="Predict.fun"><span class="el">T1 vs Gen.G</span><span class="el">T1 ML</span><span class="r num">1.75</span><span class="r num">159.00</span><span class="r num">+119.25</span><span class="r num neg">−14.30</span></div>
+          </div>
+        </div>
+        <div class="ft">
+          <span class="sm mu">2 apostas · stake <span class="num">$309.00</span> · profit potencial <span class="num">+$246.75</span></span>
+        </div>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"densidade":{"editor":"enum","options":["Confortável","Compacta"],"default":"Confortável"},"$preview":{"width":1360,"height":1080}}'>
+class Component extends DCLogic {
+  palette() {
+    let saved = null;
+    try { saved = window.localStorage.getItem('mb-pal'); } catch (e) {}
+    const v = (this.state && this.state.pal) || saved || 'a';
+    const set = (p) => () => { try { window.localStorage.setItem('mb-pal', p); } catch (e) {} this.setState({ pal: p }); };
+    const cls = (p) => 'sw ' + p + (v === p ? ' on' : '');
+    return { v, a: set('a'), b: set('b'), c: set('c'), ca: cls('a'), cb: cls('b'), cc: cls('c') };
+  }
+  renderVals() {
+    const pal = this.palette();
+    const LG = { PM: '/_blob/edf4d9dc71a90263e2450a7586ae9828', KA: '/_blob/0f267796be31166ba81af29d98cd38d0', PF: '/_blob/23efd309617249fd4b5b9ca02a2bbe05', SX: '/_blob/3af833b1f2e89e545ac57db217c9142b' };
+    const tab = (this.state && this.state.tab) || 'abertas';
+    const G = (sg, casa, qtd, estado, stake, pnl) => ({ g: true, n: false, sg, casa, qtd, estado, stake, pnl, ec: 'chip ' + (sg === 'PF' ? 'wn' : sg === 'SX' ? 'neg' : 'pos') });
+    const P = (sg, data, jogo, aposta, odd, stake, pnl) => ({ g: false, n: true, sg, data, jogo, aposta, odd, stake, pnl });
+    const rows = [
+      G('PM', 'Polymarket', '6 abertas', 'confirmado há 2 min', '837.00', '−6.50'),
+      P('PM', '26/11 16:00', 'Arsenal vs Chelsea', 'Arsenal ML', '1.85', '150.00', '+12.40'),
+      P('PM', '26/11 21:30', 'Flamengo vs Palmeiras', 'Over 2.5 gols', '2.10', '120.00', '−8.10'),
+      P('PM', '27/11 00:30', 'Lakers vs Celtics', 'Celtics −4.5', '1.91', '180.00', '+21.60'),
+      P('PM', '27/11 17:00', 'Sinner vs Alcaraz', 'Alcaraz ML', '2.05', '140.00', '−15.30'),
+      P('PM', '28/11 15:00', 'Real Madrid vs Sevilla', 'Under 3.5 gols', '1.62', '147.00', '+4.90'),
+      P('PM', '30/11 18:25', 'Chiefs vs Bills', 'Bills ML', '2.20', '100.00', '−22.00'),
+      G('KA', 'Kalshi', '4 abertas', 'confirmado há 2 min', '558.00', '−26.90'),
+      P('KA', '26/11 22:00', 'Knicks vs Heat', 'Over 215.5 pontos', '1.88', '160.00', '−18.20'),
+      P('KA', '27/11 21:15', 'Cowboys vs Eagles', 'Eagles ML', '1.70', '150.00', '+9.50'),
+      P('KA', '28/11 20:00', 'Bruins vs Rangers', 'Rangers ML', '2.30', '118.00', '−11.40'),
+      P('KA', '29/11 13:00', 'Inter vs Milan', 'Inter ML', '2.00', '130.00', '−6.80'),
+      G('PF', 'Predict.fun', '2 abertas', 'histórico parcial', '279.00', '−24.80'),
+      P('PF', '26/11 15:30', 'T1 vs Gen.G', 'T1 ML', '1.75', '159.00', '−14.30'),
+      P('PF', '29/11 16:00', 'Bayern vs Dortmund', 'Over 3.5 gols', '2.40', '120.00', '−10.50'),
+      G('SX', 'SX Bet', '2 abertas', 'última confirmação 14:02', '186.00', '—'),
+      P('SX', '26/11 20:00', 'Warriors vs Suns', 'Suns +3.5', '1.95', '96.00', '—'),
+      P('SX', '28/11 17:30', 'Liverpool vs Everton', 'Liverpool ML', '1.55', '90.00', '—')
+    ].map((r) => ({ ...r, lg: LG[r.sg], pc: 'r num ' + (r.pnl.charAt(0) === '+' ? 'pos' : r.pnl.charAt(0) === '−' ? 'neg' : 'mu') }));
+    const dense = (this.props.densidade ?? 'Confortável') === 'Compacta';
+    return {
+      pal, rows,
+      abertas: tab === 'abertas',
+      vivo: tab === 'vivo',
+      cAbertas: tab === 'abertas' ? 'on' : '',
+      cVivo: tab === 'vivo' ? 'on' : '',
+      tbCls: dense ? 'tb dense' : 'tb',
+      verAbertas: () => this.setState({ tab: 'abertas' }),
+      verVivo: () => this.setState({ tab: 'vivo' })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MyBettys — Visão geral</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" data-pal="{{ pal.v }}">
+  <aside class="side">
+    <div class="brand"><span class="logo" aria-hidden="true">mb</span>MyBettys</div>
+    <nav class="nav" aria-label="Principal">
+      <a class="on" href="Main.dc.html">Visão geral</a>
+      <a href="Posicoes.dc.html">Posições<span class="cnt">14</span></a>
+      <a href="Historico.dc.html">Histórico</a>
+      <a href="Estatisticas.dc.html">Estatísticas</a>
+      <div class="sep">Sistema</div>
+      <a href="Conexoes.dc.html">Conexões</a>
+      <a href="Configuracoes.dc.html">Configurações</a>
+    </nav>
+    <section class="sync" aria-label="Sincronização por casa">
+      <div class="hd"><span>Sincronização</span><span class="mu">auto ligado</span></div>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="">Polymarket<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt="">Kalshi<span class="st"><span class="dot ok"></span>há 2 min</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt="">Predict.fun<span class="st"><span class="dot warn"></span>parcial</span></a>
+      <a class="row" href="Conexoes.dc.html"><img class="lg" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt="">SX Bet<span class="st"><span class="dot err"></span>falhou</span></a>
+      <button type="button" class="btn full">Atualizar agora</button>
+    </section>
+    <div class="palp" role="group" aria-label="Paleta do protótipo"><span>Paleta</span><button type="button" class="{{ pal.ca }}" aria-label="Meia-noite" title="Meia-noite" onClick="{{ pal.a }}"></button><button type="button" class="{{ pal.cb }}" aria-label="Grafite" title="Grafite" onClick="{{ pal.b }}"></button><button type="button" class="{{ pal.cc }}" aria-label="Brasa" title="Brasa" onClick="{{ pal.c }}"></button></div>
+  </aside>
+
+  <main class="main">
+    <header class="row wrap between">
+      <div>
+        <h1>Visão geral</h1>
+        <p class="mu sm" style="margin-top: 5px">Confirmado às 16:38 · resultados agrupados no horário de São Paulo</p>
+      </div>
+      <a class="pill warn" href="Conexoes.dc.html"><span class="dot warn"></span>2 de 4 casas com aviso</a>
+    </header>
+
+    <div class="banner" role="status">
+      <span><b>SX Bet desatualizada.</b> A última atualização falhou; os números usam a confirmação das 14:02. <b>Predict.fun com histórico parcial:</b> 3 operações sem custo confirmado ficaram fora do PnL.</span>
+      <a class="btn" href="Conexoes.dc.html">Ver detalhes</a>
+    </div>
+
+    <div class="split">
+      <section class="card hero wide" aria-label="Patrimônio e evolução do PnL">
+        <div class="pad row wrap between" style="align-items: flex-start; padding-bottom: 0">
+          <div>
+            <div class="k">Patrimônio</div>
+            <div class="hn" style="margin-top: 8px">$6,117.05</div>
+            <div class="row wrap" style="margin-top: 12px; gap: 8px">
+              <span class="chip pos">▲ +$126.40 hoje</span>
+              <span class="chip pos">+$482.95 em 7 dias</span>
+              <span class="sm mu">Saldo <b class="num" style="color: var(--tx)">$4,501.25</b> · em aberto <b class="num" style="color: var(--tx)">$1,615.80</b></span>
+            </div>
+          </div>
+          <div class="col" style="align-items: flex-end; gap: 8px; margin-left: auto">
+            <div class="seg" aria-label="Tipo de gráfico">
+              <button type="button" class="on">PnL acumulado</button>
+              <button type="button">Por dia</button>
+              <button type="button">Por mês</button>
+            </div>
+            <div class="bar">
+              <div class="seg" aria-label="Período">
+                <button type="button">7 dias</button>
+                <button type="button">30 dias</button>
+                <button type="button" class="on">Tudo</button>
+              </div>
+              <select class="fld" aria-label="Casa do gráfico">
+                <option>Todas as casas</option><option>Polymarket</option><option>Kalshi</option><option>Predict.fun</option><option>SX Bet</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div style="padding: 6px 18px 12px; color: var(--ac)">
+          <svg viewBox="0 0 840 250" role="img" aria-label="PnL acumulado subindo de zero a 3.184 dólares entre março e novembro de 2026" style="display: block; width: 100%; height: auto">
+            <defs>
+              <linearGradient id="mbArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="currentColor" stop-opacity="0.32"></stop>
+                <stop offset="1" stop-color="currentColor" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            <g style="stroke: var(--ln)" stroke-width="1" stroke-dasharray="3 5">
+              <line x1="44" y1="210" x2="840" y2="210"></line>
+              <line x1="44" y1="152" x2="840" y2="152"></line>
+              <line x1="44" y1="94" x2="840" y2="94"></line>
+              <line x1="44" y1="36" x2="840" y2="36"></line>
+            </g>
+            <g style="fill: var(--fa)" font-size="11" font-family="Segoe UI, system-ui, sans-serif">
+              <text x="0" y="214">$0</text><text x="0" y="156">$1k</text><text x="0" y="98">$2k</text><text x="0" y="40">$3k</text>
+              <text x="44" y="238">mar</text><text x="240" y="238">mai</text><text x="440" y="238">jul</text><text x="640" y="238">set</text><text x="806" y="238">nov</text>
+            </g>
+            <path d="M44 210 L76 204 L108 196 L140 199 L172 185 L204 176 L236 181 L268 165 L300 150 L332 156 L364 140 L396 128 L428 133 L460 118 L492 121 L524 104 L556 92 L588 98 L620 80 L652 71 L684 76 L716 60 L748 52 L780 57 L808 44 L832 26 L832 210 Z" fill="url(#mbArea)"></path>
+            <path d="M44 210 L76 204 L108 196 L140 199 L172 185 L204 176 L236 181 L268 165 L300 150 L332 156 L364 140 L396 128 L428 133 L460 118 L492 121 L524 104 L556 92 L588 98 L620 80 L652 71 L684 76 L716 60 L748 52 L780 57 L808 44 L832 26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></path>
+            <circle cx="832" cy="26" r="9" fill="currentColor" fill-opacity="0.22"></circle>
+            <circle cx="832" cy="26" r="4" fill="currentColor"></circle>
+          </svg>
+        </div>
+        <div class="ft">
+          <span class="sm mu">PnL acumulado <b class="num pos" style="font-size: 14px">+$3,184.70</b> em 1,249 apostas fechadas</span>
+          <a class="sm" href="Estatisticas.dc.html">Abrir estatísticas</a>
+        </div>
+      </section>
+
+      <section class="thin col" aria-label="Casas" style="gap: 10px">
+        <a class="card pad" href="Conexoes.dc.html" style="padding: 12px 14px">
+          <div class="row"><img class="lg l" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt=""><div class="grow"><div class="b">Polymarket</div><div class="sm mu">6 abertas · $837.00 em risco</div></div><div style="text-align: right"><div class="v2" style="margin: 0">$2,418.60</div><div class="sm pos num">+$268.40 · 7d</div></div></div>
+          <svg class="pos" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true" style="display: block; width: 100%; height: 26px; margin-top: 8px"><polyline points="0,23 20,19 40,21 60,13 80,15 100,8 120,4" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"></polyline></svg>
+        </a>
+        <a class="card pad" href="Conexoes.dc.html" style="padding: 12px 14px">
+          <div class="row"><img class="lg l" src="/_blob/0f267796be31166ba81af29d98cd38d0" alt=""><div class="grow"><div class="b">Kalshi</div><div class="sm mu">4 abertas · $558.00 em risco</div></div><div style="text-align: right"><div class="v2" style="margin: 0">$1,130.25</div><div class="sm pos num">+$171.15 · 7d</div></div></div>
+          <svg class="pos" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true" style="display: block; width: 100%; height: 26px; margin-top: 8px"><polyline points="0,21 20,22 40,15 60,17 80,10 100,11 120,6" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"></polyline></svg>
+        </a>
+        <a class="card pad" href="Conexoes.dc.html" style="padding: 12px 14px">
+          <div class="row"><img class="lg l" src="/_blob/23efd309617249fd4b5b9ca02a2bbe05" alt=""><div class="grow"><div class="b row" style="gap: 8px">Predict.fun<span class="chip wn">parcial</span></div><div class="sm mu">2 abertas · $279.00 em risco</div></div><div style="text-align: right"><div class="v2" style="margin: 0">$640.00</div><div class="sm pos num">+$62.80 · 7d</div></div></div>
+          <svg class="pos" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true" style="display: block; width: 100%; height: 26px; margin-top: 8px"><polyline points="0,18 20,14 40,17 60,12 80,13 100,9 120,10" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"></polyline></svg>
+        </a>
+        <a class="card pad" href="Conexoes.dc.html" style="padding: 12px 14px">
+          <div class="row"><img class="lg l" src="/_blob/3af833b1f2e89e545ac57db217c9142b" alt=""><div class="grow"><div class="b row" style="gap: 8px">SX Bet<span class="chip neg">falhou · 14:02</span></div><div class="sm mu">2 abertas · $186.00 em risco</div></div><div style="text-align: right"><div class="v2" style="margin: 0">$312.40</div><div class="sm neg num">−$19.40 · 7d</div></div></div>
+          <svg class="neg" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true" style="display: block; width: 100%; height: 26px; margin-top: 8px"><polyline points="0,6 20,10 40,8 60,15 80,13 100,20 120,22" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"></polyline></svg>
+        </a>
+      </section>
+    </div>
+
+    <section class="kpis" aria-label="Indicadores" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr))">
+      <div class="card pad">
+        <div class="row between"><span class="k">PnL realizado</span><span class="chip pos">ROI +4.80%</span></div>
+        <div class="row between" style="align-items: flex-end">
+          <div><div class="v pos">+$3,184.70</div><div class="sm mu">últimos 14 dias ao lado</div></div>
+          <svg viewBox="0 0 222 60" role="img" aria-label="PnL por dia nos últimos 14 dias: dez dias positivos e quatro negativos" style="width: 150px; height: 44px">
+            <g class="pos" fill="currentColor"><rect x="1" y="25" width="10" height="17" rx="2"></rect><rect x="17" y="10" width="10" height="32" rx="2"></rect><rect x="33" y="2" width="10" height="40" rx="2"></rect><rect x="65" y="35" width="10" height="7" rx="2"></rect><rect x="97" y="17" width="10" height="25" rx="2"></rect><rect x="113" y="32" width="10" height="10" rx="2"></rect><rect x="145" y="6" width="10" height="36" rx="2"></rect><rect x="161" y="29" width="10" height="13" rx="2"></rect><rect x="193" y="13" width="10" height="29" rx="2"></rect><rect x="209" y="19" width="10" height="23" rx="2"></rect></g>
+            <g class="neg" fill="currentColor"><rect x="49" y="43" width="10" height="12" rx="2"></rect><rect x="81" y="43" width="10" height="3" rx="1"></rect><rect x="129" y="43" width="10" height="16" rx="2"></rect><rect x="177" y="43" width="10" height="8" rx="2"></rect></g>
+          </svg>
+        </div>
+      </div>
+      <div class="card pad">
+        <div class="row between"><span class="k">PnL não realizado</span><span class="chip">12 de 14 com cotação</span></div>
+        <div class="v neg">−$58.20</div>
+        <div class="sm mu">SX Bet informa exposição, sem valor a mercado</div>
+      </div>
+      <div class="card pad">
+        <div class="row between"><span class="k">Exposição · 14 abertas</span><a class="sm" href="Posicoes.dc.html">Ver posições</a></div>
+        <div class="v">$1,860.00</div>
+        <div class="pbar" role="img" aria-label="Polymarket 45%, Kalshi 30%, Predict.fun 15%, SX Bet 10%" style="margin-top: 10px"><i style="width: 45%"></i><i class="o2" style="width: 30%"></i><i class="o3" style="width: 15%"></i><i class="o4" style="width: 10%"></i></div>
+        <div class="row wrap sm mu" style="margin-top: 8px; gap: 4px 12px"><span class="row" style="gap: 5px"><span class="key"></span>Polymarket 45%</span><span class="row" style="gap: 5px"><span class="key o2"></span>Kalshi 30%</span><span class="row" style="gap: 5px"><span class="key o3"></span>Predict.fun 15%</span><span class="row" style="gap: 5px"><span class="key o4"></span>SX Bet 10%</span></div>
+      </div>
+    </section>
+
+    <section class="minis" aria-label="Resumo rápido">
+      <div><div class="k">Lucro realizado</div><div class="v2 pos">+$3,184.70</div></div>
+      <div><div class="k">ROI</div><div class="v2 pos">+4.80%</div></div>
+      <div><div class="k">Taxa de acerto</div><div class="v2">54.1%</div></div>
+      <div><div class="k">Odd média</div><div class="v2">1.92</div></div>
+      <div><div class="k">Stake média</div><div class="v2">$53.10</div></div>
+    </section>
+
+    <section class="g2" aria-label="Destaques" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr))">
+      <a class="card pad" href="Posicoes.dc.html">
+        <div class="k">Maior exposição atual</div>
+        <div class="row" style="margin-top: 8px"><img class="lg" src="/_blob/edf4d9dc71a90263e2450a7586ae9828" alt="Polymarket"><span class="b el">Lakers vs Celtics · Celtics −4.5</span></div>
+        <div class="sm mu" style="margin-top: 4px"><span class="num">$180.00</span> · 9.7% da exposição</div>
+      </a>
+      <div class="card pad">
+        <div class="k">Drawdown diário</div>
+        <div class="v2" style="margin-top: 8px">$0.00 <span class="sm mu" style="font-weight: 500">agora</span></div>
+        <div class="sm mu" style="margin-top: 4px">Máximo no período <span class="neg num b">−$412.30</span></div>
+      </div>
+      <div class="card pad">
+        <div class="k">Variação · 7 dias</div>
+        <div class="v2 pos" style="margin-top: 8px">+$482.95</div>
+        <div class="sm mu" style="margin-top: 4px">7 dias anteriores <span class="num b" style="color: var(--tx)">+$589.85</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1100}}'>
+class Component extends DCLogic {
+  palette() {
+    let saved = null;
+    try { saved = window.localStorage.getItem('mb-pal'); } catch (e) {}
+    const v = (this.state && this.state.pal) || saved || 'a';
+    const set = (p) => () => { try { window.localStorage.setItem('mb-pal', p); } catch (e) {} this.setState({ pal: p }); };
+    const cls = (p) => 'sw ' + p + (v === p ? ' on' : '');
+    return { v, a: set('a'), b: set('b'), c: set('c'), ca: cls('a'), cb: cls('b'), cc: cls('c') };
+  }
+  renderVals() {
+    const pal = this.palette();
+    return { pal };
+  }
+}
+</script>
+</body>
+</html>
