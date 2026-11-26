@@ -18,23 +18,23 @@
 </div>
 <ul class="nav-list">
 <li class="nav-section" aria-hidden="true">Menu</li>
-<li class="nav-item active" data-view="dashboard" onclick="trocarView('dashboard')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</li>
-<li class="nav-item" data-view="posicoes" onclick="trocarView('posicoes')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2 4 4 8-8 4 4"/></svg>Posições<span class="sidebar-position-count" id="sidebarPositionCount" hidden></span></li>
-<li class="nav-item" data-view="estatisticas" onclick="trocarView('estatisticas')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M12 19V5M20 19v-7"/></svg>Estatísticas</li>
-<li class="nav-item" data-view="calendario" role="button" tabindex="0" onclick="trocarView('calendario')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();trocarView('calendario')}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2"/></svg>Calendário</li>
+<li class="nav-item active" data-view="dashboard" data-on-click="trocarView('dashboard')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</li>
+<li class="nav-item" data-view="posicoes" data-on-click="trocarView('posicoes')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2 4 4 8-8 4 4"/></svg>Posições<span class="sidebar-position-count" id="sidebarPositionCount" hidden></span></li>
+<li class="nav-item" data-view="estatisticas" data-on-click="trocarView('estatisticas')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M12 19V5M20 19v-7"/></svg>Estatísticas</li>
+<li class="nav-item" data-view="calendario" role="button" tabindex="0" data-on-click="trocarView('calendario')" data-on-keydown="teclaTrocarView(event,'calendario')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2"/></svg>Calendário</li>
 <li class="nav-section" aria-hidden="true">Sistema</li>
-<li class="nav-item" data-view="config" onclick="trocarView('config')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.4.66.73.85.3.17.63.27.98.27H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</li>
+<li class="nav-item" data-view="config" data-on-click="trocarView('config')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.4.66.73.85.3.17.63.27.98.27H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</li>
 </ul>
 <div class="sidebar-footer">
 <section class="sidebar-sync-card" aria-label="Sincronização dos dados">
 <div id="sidebarSyncStatusSlot"></div>
 <div class="autorefresh-box">
-<button type="button" class="sidebar-auto-toggle" id="autoRefreshToggle" onclick="alternarAutoRefresh()" aria-pressed="false">
+<button type="button" class="sidebar-auto-toggle" id="autoRefreshToggle" data-on-click="alternarAutoRefresh()" aria-pressed="false">
 <span class="sidebar-auto-copy">Auto-atualizar<strong id="autoRefreshLabel">Pausado</strong></span>
 <span class="sidebar-auto-switch" aria-hidden="true"></span>
 </button>
 </div>
-<button type="button" class="btn-refresh" onclick="atualizarAgora()">
+<button type="button" class="btn-refresh" data-on-click="atualizarAgora()">
 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
 Atualizar agora
 </button>
@@ -48,22 +48,22 @@ Atualizar agora
 <input id="configLockInput" class="config-lock-input"
 type="password" autocomplete="current-password"
 placeholder="Senha"
-onkeydown="if(event.key==='Enter') confirmarSenhaConfig()">
+data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <div id="configLockError" class="config-lock-error"></div>
 <div class="config-lock-actions">
-<button type="button" class="config-lock-btn" onclick="fecharSenhaConfig()">Cancelar</button>
-<button type="button" class="config-lock-btn primary" onclick="confirmarSenhaConfig()">Entrar</button>
+<button type="button" class="config-lock-btn" data-on-click="fecharSenhaConfig()">Cancelar</button>
+<button type="button" class="config-lock-btn primary" data-on-click="confirmarSenhaConfig()">Entrar</button>
 </div>
 </div>
 </div>
 <div class="account-modal" id="connectionTestModal" role="dialog" aria-modal="true" aria-labelledby="connectionTestTitle" aria-hidden="true">
-<div class="account-box"><button type="button" class="account-close" aria-label="Fechar teste" onclick="fecharTesteConexao()">×</button>
+<div class="account-box"><button type="button" class="account-close" aria-label="Fechar teste" data-on-click="fecharTesteConexao()">×</button>
 <h3 id="connectionTestTitle">Teste de conexão</h3>
 <p id="connectionTestStatus" class="muted" role="status">Consultando…</p>
 <dl id="connectionTestValues" class="connection-test-values"></dl>
-<div class="account-actions"><button type="button" class="btn-save" onclick="fecharTesteConexao()">Fechar</button></div>
+<div class="account-actions"><button type="button" class="btn-save" data-on-click="fecharTesteConexao()">Fechar</button></div>
 </div></div>
-<div class="account-modal" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="accountModalTitle" aria-hidden="true"><div class="account-box"><button class="account-close" aria-label="Fechar conexão" onclick="fecharContaModal()">×</button><h3 id="accountModalTitle">Conectar</h3><div class="muted" id="accountModalSub"></div><div id="accountModalFields"></div><div class="account-error" id="accountModalError" aria-live="polite"></div><div class="account-actions"><button type="button" class="btn-ghost" onclick="fecharContaModal()">Cancelar</button><button type="button" class="btn-save" id="accountModalSave">Salvar conexão</button></div></div></div>
+<div class="account-modal" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="accountModalTitle" aria-hidden="true"><div class="account-box"><button class="account-close" aria-label="Fechar conexão" data-on-click="fecharContaModal()">×</button><h3 id="accountModalTitle">Conectar</h3><div class="muted" id="accountModalSub"></div><div id="accountModalFields"></div><div class="account-error" id="accountModalError" aria-live="polite"></div><div class="account-actions"><button type="button" class="btn-ghost" data-on-click="fecharContaModal()">Cancelar</button><button type="button" class="btn-save" id="accountModalSave">Salvar conexão</button></div></div></div>
 <main class="main" inert>
 <div class="topbar">
 <div>
@@ -73,7 +73,7 @@ onkeydown="if(event.key==='Enter') confirmarSenhaConfig()">
 <div class="topbar-right">
 <div id="headerSyncStatusSlot">
 <div class="online-wrap">
-<div class="online-box" id="statusBox" role="button" tabindex="0" onclick="toggleSyncPanel(event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSyncPanel(event)}" title="Detalhes da sincronização" aria-expanded="false">
+<div class="online-box" id="statusBox" role="button" tabindex="0" data-on-click="toggleSyncPanel(event)" data-on-keydown="teclaToggleSyncPanel(event)" title="Detalhes da sincronização" aria-expanded="false">
 <div class="line1"><span class="status-dot off" id="statusDot"></span><span class="status-label" id="statusOnline">Sem dados</span></div>
 <div id="statusAtualizado">—</div>
 </div>
@@ -102,7 +102,7 @@ onkeydown="if(event.key==='Enter') confirmarSenhaConfig()">
 </div>
 <div class="stale-banner" id="staleBanner" role="status">
 <div id="staleBannerText"></div>
-<button type="button" onclick="atualizarAgora()">Atualizar agora</button>
+<button type="button" data-on-click="atualizarAgora()">Atualizar agora</button>
 </div>
 <section class="sync-progress" id="syncProgress" role="status" aria-live="polite" aria-atomic="true">
 <div class="sync-progress-brand" aria-hidden="true"><img src="/assets/mybettys-logo.png" alt=""><strong>MyBettys</strong></div>
@@ -124,29 +124,29 @@ onkeydown="if(event.key==='Enter') confirmarSenhaConfig()">
 <div>
 <div class="chart-type-controls" style="margin-bottom:8px;">
 <div class="chart-periods">
-<button type="button" class="chart-period-btn chart-type-btn active" data-tipo="patrimonio" onclick="trocarTipoGrafico('patrimonio',this)">PnL Acumulado</button>
-<button type="button" class="chart-period-btn chart-type-btn" data-tipo="pnldia" onclick="trocarTipoGrafico('pnldia',this)">PnL por Dia</button>
-<button type="button" class="chart-period-btn chart-type-btn" data-tipo="pnlmes" onclick="trocarTipoGrafico('pnlmes',this)">PnL por Mês</button>
+<button type="button" class="chart-period-btn chart-type-btn active" data-tipo="patrimonio" data-on-click="trocarTipoGrafico('patrimonio',this)">PnL Acumulado</button>
+<button type="button" class="chart-period-btn chart-type-btn" data-tipo="pnldia" data-on-click="trocarTipoGrafico('pnldia',this)">PnL por Dia</button>
+<button type="button" class="chart-period-btn chart-type-btn" data-tipo="pnlmes" data-on-click="trocarTipoGrafico('pnlmes',this)">PnL por Mês</button>
 </div>
 </div>
 <div class="chart-title" id="chartTitleText">Evolução do PnL Acumulado</div>
 <div class="chart-periods" style="margin-top:8px;" id="chartPeriodButtons">
-<button type="button" class="chart-period-btn" data-periodo="7" onclick="trocarPeriodoGrafico(7)">7 dias</button>
-<button type="button" class="chart-period-btn" data-periodo="30" onclick="trocarPeriodoGrafico(30)">30 dias</button>
-<button type="button" class="chart-period-btn active" data-periodo="all" onclick="trocarPeriodoGrafico(-1)">All</button>
+<button type="button" class="chart-period-btn" data-periodo="7" data-on-click="trocarPeriodoGrafico(7)">7 dias</button>
+<button type="button" class="chart-period-btn" data-periodo="30" data-on-click="trocarPeriodoGrafico(30)">30 dias</button>
+<button type="button" class="chart-period-btn active" data-periodo="all" data-on-click="trocarPeriodoGrafico(-1)">All</button>
 </div>
 </div>
 <div class="chart-side">
 <div class="chart-house-menu" id="graficoCasaMenu">
-<button type="button" class="chart-house-trigger" id="graficoCasaTrigger" onclick="toggleCasaGraficoMenu()" aria-label="Filtrar gráficos por casa" aria-haspopup="listbox" aria-expanded="false">
+<button type="button" class="chart-house-trigger" id="graficoCasaTrigger" data-on-click="toggleCasaGraficoMenu()" aria-label="Filtrar gráficos por casa" aria-haspopup="listbox" aria-expanded="false">
 <span class="chart-house-caption">Casa</span><span class="chart-house-value" id="graficoCasaValor">Todas</span><span class="chart-house-chevron" aria-hidden="true"></span>
 </button>
 <div class="chart-house-options" role="listbox" aria-label="Casa para os gráficos">
-<button type="button" class="chart-house-option active" data-casa="todas" onclick="alterarCasaGrafico('todas')">Todas</button>
-<button type="button" class="chart-house-option" data-casa="polymarket" onclick="alterarCasaGrafico('polymarket')">Polymarket</button>
-<button type="button" class="chart-house-option" data-casa="kalshi" onclick="alterarCasaGrafico('kalshi')">Kalshi</button>
-<button type="button" class="chart-house-option" data-casa="predict" onclick="alterarCasaGrafico('predict')">Predict.fun</button>
-<button type="button" class="chart-house-option" data-casa="sxbet" onclick="alterarCasaGrafico('sxbet')">SX Bet</button>
+<button type="button" class="chart-house-option active" data-casa="todas" data-on-click="alterarCasaGrafico('todas')">Todas</button>
+<button type="button" class="chart-house-option" data-casa="polymarket" data-on-click="alterarCasaGrafico('polymarket')">Polymarket</button>
+<button type="button" class="chart-house-option" data-casa="kalshi" data-on-click="alterarCasaGrafico('kalshi')">Kalshi</button>
+<button type="button" class="chart-house-option" data-casa="predict" data-on-click="alterarCasaGrafico('predict')">Predict.fun</button>
+<button type="button" class="chart-house-option" data-casa="sxbet" data-on-click="alterarCasaGrafico('sxbet')">SX Bet</button>
 </div>
 </div>
 <div class="chart-valorwrap">
@@ -191,9 +191,9 @@ onkeydown="if(event.key==='Enter') confirmarSenhaConfig()">
 <!-- Tabs + Search + filtros (só Posições) -->
 <div class="toolbar" id="toolbarSection" style="display:none;">
 <div class="tabs">
-<button class="tab active" data-tab="aberto" onclick="trocarAba('aberto')">Ativas</button>
-<button class="tab" data-tab="fechado" onclick="trocarAba('fechado')">Fechadas</button>
-<button class="tab tab-live" id="tabAoVivo" data-tab="ao-vivo" onclick="trocarAba('ao-vivo')">
+<button class="tab active" data-tab="aberto" data-on-click="trocarAba('aberto')">Ativas</button>
+<button class="tab" data-tab="fechado" data-on-click="trocarAba('fechado')">Fechadas</button>
+<button class="tab tab-live" id="tabAoVivo" data-tab="ao-vivo" data-on-click="trocarAba('ao-vivo')">
 <span class="live-dot"></span> Ao vivo
 </button>
 </div>
@@ -202,10 +202,10 @@ type="text"
 class="search-input"
 id="filtroTitulo"
 placeholder="Pesquisar mercado, time..."
-oninput="aplicarFiltrosDebounced()"
+data-on-input="aplicarFiltrosDebounced()"
 />
 <div class="date-filter-wrap">
-<button type="button" class="filter-group date-filter-button" id="filtroDataBox" onclick="toggleDatePopup(event)" aria-label="Filtrar por data" aria-haspopup="dialog" aria-expanded="false">
+<button type="button" class="filter-group date-filter-button" id="filtroDataBox" data-on-click="toggleDatePopup(event)" aria-label="Filtrar por data" aria-haspopup="dialog" aria-expanded="false">
 <span class="filter-label">Data</span>
 <span class="date-value" id="dataValueLabel">Todas</span>
 </button>
@@ -214,7 +214,7 @@ oninput="aplicarFiltrosDebounced()"
 <div class="casa-filter-wrap">
 <div class="filter-group native-filter-group" id="filtroCasaBox">
 <span class="filter-label">Casa</span>
-<select id="filtroCasaSelect" aria-label="Filtrar por casa" onchange="alterarFiltroCasa(this.value)">
+<select id="filtroCasaSelect" aria-label="Filtrar por casa" data-on-change="alterarFiltroCasa(this.value)">
 <option value="todas">Todas</option>
 <option value="polymarket">Polymarket</option>
 <option value="kalshi">Kalshi</option><option value="predict">Predict.fun</option><option value="sxbet">SX Bet</option>
@@ -224,16 +224,16 @@ oninput="aplicarFiltrosDebounced()"
 <div class="sport-filter-wrap">
 <div class="filter-group native-filter-group" id="filtroEsporteBox">
 <span class="filter-label">Esporte</span>
-<select id="filtroEsporteSelect" aria-label="Filtrar por esporte" onchange="alterarFiltroEsportePosicoes(this.value)">
+<select id="filtroEsporteSelect" aria-label="Filtrar por esporte" data-on-change="alterarFiltroEsportePosicoes(this.value)">
 <option value="todos">Todos</option>
 </select>
 </div>
 </div>
-<select id="ordenar" onchange="sortCol=null;aplicarFiltros()" style="display:none;">
+<select id="ordenar" data-on-change="aplicarFiltrosSemOrdem()" style="display:none;">
 <option value="inicio-asc" selected>Data</option>
 </select>
 <div class="csv-export-wrap">
-<button type="button" class="btn-download-csv" onclick="toggleExportPopup(event)" title="Exportar CSV" aria-label="Exportar CSV" aria-haspopup="dialog" aria-expanded="false" aria-controls="csvExportPopup">
+<button type="button" class="btn-download-csv" data-on-click="toggleExportPopup(event)" title="Exportar CSV" aria-label="Exportar CSV" aria-haspopup="dialog" aria-expanded="false" aria-controls="csvExportPopup">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
 </button>
 <div id="csvExportPopup" class="csv-export-popup" role="dialog" aria-label="Exportar posições" hidden>
@@ -244,7 +244,7 @@ oninput="aplicarFiltrosDebounced()"
 <option value="stats">Fechadas dos filtros de estatísticas</option>
 </select>
 <p>O histórico completo inclui apostas manuais e antigas.</p>
-<button type="button" class="csv-export-confirm" onclick="baixarCSVPosicoes()">Baixar CSV</button>
+<button type="button" class="csv-export-confirm" data-on-click="baixarCSVPosicoes()">Baixar CSV</button>
 </div>
 </div>
 </div>
@@ -260,15 +260,15 @@ oninput="aplicarFiltrosDebounced()"
 <section id="profitCalendarView" class="profit-calendar" style="display:none;" aria-label="Calendário de resultados">
 <div class="profit-calendar-toolbar">
 <div class="profit-calendar-navigation">
-<button type="button" class="calendar-control" aria-label="Mês anterior" onclick="mudarMesProfit(-1)">‹</button>
+<button type="button" class="calendar-control" aria-label="Mês anterior" data-on-click="mudarMesProfit(-1)">‹</button>
 <h2 id="profitCalendarMonth"></h2>
-<button type="button" class="calendar-control" aria-label="Próximo mês" onclick="mudarMesProfit(1)">›</button>
-<button type="button" class="calendar-control calendar-today" onclick="irHojeProfit()">Hoje</button>
+<button type="button" class="calendar-control" aria-label="Próximo mês" data-on-click="mudarMesProfit(1)">›</button>
+<button type="button" class="calendar-control calendar-today" data-on-click="irHojeProfit()">Hoje</button>
 </div>
 <div class="profit-calendar-filters">
-<div class="profit-calendar-month-field"><label for="profitCalendarMonthInput">Mês</label><button type="button" id="profitCalendarMonthInput" class="profit-calendar-month-button" aria-label="Mês do calendário" aria-haspopup="dialog" aria-expanded="false" aria-controls="profitCalendarMonthPopup" onclick="toggleSeletorMesProfit(event)"><span id="profitCalendarMonthLabel"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></button><div id="profitCalendarMonthPopup" class="date-popup profit-calendar-month-popup" role="dialog" aria-label="Selecionar mês do calendário" hidden></div></div>
-<label>Casa<select id="profitCalendarHouse" onchange="alterarCasaProfit(this.value)"><option value="todas">Todas as casas</option><option value="polymarket">Polymarket</option><option value="kalshi">Kalshi</option><option value="predict">Predict.fun</option><option value="sxbet">SX Bet</option></select></label>
-<label>Unidade<select id="profitCalendarUnit" onchange="alterarUnidadeProfit(this.value)"><option value="usd">US$</option><option value="stake">Stake (u)</option></select></label>
+<div class="profit-calendar-month-field"><label for="profitCalendarMonthInput">Mês</label><button type="button" id="profitCalendarMonthInput" class="profit-calendar-month-button" aria-label="Mês do calendário" aria-haspopup="dialog" aria-expanded="false" aria-controls="profitCalendarMonthPopup" data-on-click="toggleSeletorMesProfit(event)"><span id="profitCalendarMonthLabel"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></button><div id="profitCalendarMonthPopup" class="date-popup profit-calendar-month-popup" role="dialog" aria-label="Selecionar mês do calendário" hidden></div></div>
+<label>Casa<select id="profitCalendarHouse" data-on-change="alterarCasaProfit(this.value)"><option value="todas">Todas as casas</option><option value="polymarket">Polymarket</option><option value="kalshi">Kalshi</option><option value="predict">Predict.fun</option><option value="sxbet">SX Bet</option></select></label>
+<label>Unidade<select id="profitCalendarUnit" data-on-change="alterarUnidadeProfit(this.value)"><option value="usd">US$</option><option value="stake">Stake (u)</option></select></label>
 </div>
 </div>
 <div id="profitCalendarSummary" class="profit-calendar-summary stats-row cols-4"></div>
@@ -281,7 +281,7 @@ oninput="aplicarFiltrosDebounced()"
 <div class="stats-global-filters stats-filters-compact">
 <div class="stats-filter-control">
 <span class="stats-filter-caption">Período</span>
-<select class="stats-period-select" id="statsPeriodSelect" aria-label="Selecionar período" onchange="selecionarAtalhoPeriodoEstat(this.value)">
+<select class="stats-period-select" id="statsPeriodSelect" aria-label="Selecionar período" data-on-change="selecionarAtalhoPeriodoEstat(this.value)">
 <option value="custom">Período customizado</option>
 <option value="hoje">Hoje</option>
 <option value="7">7 dias</option>
@@ -294,16 +294,16 @@ oninput="aplicarFiltrosDebounced()"
 </div>
 <div class="stats-period-filter" aria-label="Datas do período">
 <input type="hidden" id="statsDateStart">
-<button type="button" class="stats-date-trigger" id="statsDateStartButton" onclick="toggleCalendarioPeriodoEstat('start', event)" aria-label="Data inicial" aria-haspopup="dialog" aria-expanded="false"><span id="statsDateStartValue">dd/mm/aaaa</span></button>
+<button type="button" class="stats-date-trigger" id="statsDateStartButton" data-on-click="toggleCalendarioPeriodoEstat('start', event)" aria-label="Data inicial" aria-haspopup="dialog" aria-expanded="false"><span id="statsDateStartValue">dd/mm/aaaa</span></button>
 <input type="hidden" id="statsDateEnd">
-<button type="button" class="stats-date-trigger" id="statsDateEndButton" onclick="toggleCalendarioPeriodoEstat('end', event)" aria-label="Data final" aria-haspopup="dialog" aria-expanded="false"><span id="statsDateEndValue">dd/mm/aaaa</span></button>
-<button type="button" onclick="limparPeriodoEstatisticas()" title="Limpar período" aria-label="Limpar período">×</button>
+<button type="button" class="stats-date-trigger" id="statsDateEndButton" data-on-click="toggleCalendarioPeriodoEstat('end', event)" aria-label="Data final" aria-haspopup="dialog" aria-expanded="false"><span id="statsDateEndValue">dd/mm/aaaa</span></button>
+<button type="button" data-on-click="limparPeriodoEstatisticas()" title="Limpar período" aria-label="Limpar período">×</button>
 </div>
 <div class="stats-selection-controls">
 <div class="stats-filter-control">
 <span class="stats-filter-caption">Casa</span>
 <label class="filter-group native-filter-group" style="height:32px;min-width:125px;">
-<select id="statsHouseFilter" aria-label="Filtrar estatísticas por casa" onchange="alterarFiltroCasaEstat(this.value)">
+<select id="statsHouseFilter" aria-label="Filtrar estatísticas por casa" data-on-change="alterarFiltroCasaEstat(this.value)">
 <option value="todas">Todas</option>
 <option value="polymarket">Polymarket</option>
 <option value="kalshi">Kalshi</option><option value="predict">Predict.fun</option><option value="sxbet">SX Bet</option>
@@ -313,7 +313,7 @@ oninput="aplicarFiltrosDebounced()"
 <div class="stats-filter-control">
 <span class="stats-filter-caption">Categoria</span>
 <label class="filter-group native-filter-group" style="height:32px;min-width:145px;">
-<select id="statsSportFilter" aria-label="Filtrar estatísticas por categoria" onchange="alterarFiltroEsporte(this.value)">
+<select id="statsSportFilter" aria-label="Filtrar estatísticas por categoria" data-on-change="alterarFiltroEsporte(this.value)">
 <option value="todos">Todas</option>
 </select>
 </label>
@@ -321,7 +321,7 @@ oninput="aplicarFiltrosDebounced()"
 <div class="stats-filter-control">
 <span class="stats-filter-caption">Odds</span>
 <label class="filter-group native-filter-group" style="height:32px;min-width:135px;">
-<select id="statsOddsFilter" aria-label="Filtrar estatísticas por faixa de odds" onchange="alterarFiltroOddsEstat(this.value)">
+<select id="statsOddsFilter" aria-label="Filtrar estatísticas por faixa de odds" data-on-change="alterarFiltroOddsEstat(this.value)">
 <option value="todas">Todas</option>
 </select>
 </label>
@@ -333,15 +333,15 @@ oninput="aplicarFiltrosDebounced()"
 <div class="metrics-extra-row" id="statsExtraMetrics"></div>
 <div class="stat-subtabs-row">
 <div class="stat-subtabs">
-<button type="button" class="stat-subtab active" data-sub="site" onclick="trocarSubAbaEstat('site')">Por Site</button>
-<button type="button" class="stat-subtab" data-sub="esporte" onclick="trocarSubAbaEstat('esporte')">Por Categoria</button>
-<button type="button" class="stat-subtab" data-sub="mercado" onclick="trocarSubAbaEstat('mercado')">Por Mercado</button>
-<button type="button" class="stat-subtab" data-sub="resumo" onclick="trocarSubAbaEstat('resumo')">Resumo</button>
+<button type="button" class="stat-subtab active" data-sub="site" data-on-click="trocarSubAbaEstat('site')">Por Site</button>
+<button type="button" class="stat-subtab" data-sub="esporte" data-on-click="trocarSubAbaEstat('esporte')">Por Categoria</button>
+<button type="button" class="stat-subtab" data-sub="mercado" data-on-click="trocarSubAbaEstat('mercado')">Por Mercado</button>
+<button type="button" class="stat-subtab" data-sub="resumo" data-on-click="trocarSubAbaEstat('resumo')">Resumo</button>
 </div>
 <div class="stats-toolbar-actions">
 <div class="unit-toggle">
 <span class="unit-lbl" id="unitLblStake">Stake</span>
-<span class="unit-switch on" id="unitSwitch" onclick="alternarUnidadeEstat()" title="Alterna entre dólar ($) e unidades de stake (u)"><span class="unit-knob"></span></span>
+<span class="unit-switch on" id="unitSwitch" data-on-click="alternarUnidadeEstat()" title="Alterna entre dólar ($) e unidades de stake (u)"><span class="unit-knob"></span></span>
 <span class="unit-lbl active" id="unitLblDolar">Dólar</span>
 </div>
 </div>
@@ -355,26 +355,26 @@ oninput="aplicarFiltrosDebounced()"
 <p class="hint">Somente leitura · credenciais criptografadas</p>
 <div id="connectionGrid" class="stake-platform-grid"><section class="stake-platform-card connection-card" data-house="polymarket"><h3><img src="/assets/platforms/polymarket.png" alt="" width="28" height="28">Polymarket</h3>
 <p class="hint" id="polyConnectionStatus">Não conectada</p>
-<div class="connection-actions"><button type="button" class="btn-save" onclick="conectarPolymarket()">Conectar / alterar</button>
+<div class="connection-actions"><button type="button" class="btn-save" data-on-click="conectarPolymarket()">Conectar / alterar</button>
 
-<button type="button" class="btn-ghost" onclick="desconectarPolymarket()">Desconectar</button></div></section><section class="stake-platform-card connection-card" data-house="kalshi"><h3><img src="/assets/platforms/kalshi.png" alt="" width="28" height="28">Kalshi</h3>
+<button type="button" class="btn-ghost" data-on-click="desconectarPolymarket()">Desconectar</button></div></section><section class="stake-platform-card connection-card" data-house="kalshi"><h3><img src="/assets/platforms/kalshi.png" alt="" width="28" height="28">Kalshi</h3>
 <p class="hint" id="kalshiConnectionStatus">Não conectada</p>
-<div class="connection-actions"><button type="button" class="btn-save" onclick="conectarKalshi()">Conectar / alterar</button>
-<button type="button" class="btn-ghost" data-connection-test="kalshi" onclick="testarKalshi()">Testar</button>
-<button type="button" class="btn-ghost" onclick="desconectarKalshi()">Desconectar</button></div></section></div></div>
+<div class="connection-actions"><button type="button" class="btn-save" data-on-click="conectarKalshi()">Conectar / alterar</button>
+<button type="button" class="btn-ghost" data-connection-test="kalshi" data-on-click="testarKalshi()">Testar</button>
+<button type="button" class="btn-ghost" data-on-click="desconectarKalshi()">Desconectar</button></div></section></div></div>
 <div class="config-card">
 <h2>Período das apostas fechadas</h2>
 <p class="hint">Defina o período de resultados de cada casa pela data de venda ou resolução. Deixe em branco para incluir todo o histórico.</p>
 <div id="closedRangeGrid" class="stake-platform-grid" style="margin-top:12px">
 <section class="stake-platform-card closed-range-card"><h3>Polymarket</h3><div class="closed-range-fields">
-<div class="config-field"><label for="cfgClosedRangeStart-polymarketButton">Data inicial</label><input type="hidden" id="cfgClosedRangeStart-polymarket" /><button type="button" class="config-date-button" id="cfgClosedRangeStart-polymarketButton" onclick="toggleCalendarioPeriodoFechadasConfigurado('polymarket','start',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeStart-polymarketValue">dd/mm/aaaa</span></button></div>
-<div class="config-field"><label for="cfgClosedRangeEnd-polymarketButton">Data final</label><input type="hidden" id="cfgClosedRangeEnd-polymarket" /><button type="button" class="config-date-button" id="cfgClosedRangeEnd-polymarketButton" onclick="toggleCalendarioPeriodoFechadasConfigurado('polymarket','end',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeEnd-polymarketValue">dd/mm/aaaa</span></button></div>
-<button type="button" class="closed-range-clear" onclick="limparPeriodoFechadasConfigurado('polymarket')" aria-label="Limpar período da Polymarket" title="Limpar período da Polymarket">×</button>
+<div class="config-field"><label for="cfgClosedRangeStart-polymarketButton">Data inicial</label><input type="hidden" id="cfgClosedRangeStart-polymarket" /><button type="button" class="config-date-button" id="cfgClosedRangeStart-polymarketButton" data-on-click="toggleCalendarioPeriodoFechadasConfigurado('polymarket','start',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeStart-polymarketValue">dd/mm/aaaa</span></button></div>
+<div class="config-field"><label for="cfgClosedRangeEnd-polymarketButton">Data final</label><input type="hidden" id="cfgClosedRangeEnd-polymarket" /><button type="button" class="config-date-button" id="cfgClosedRangeEnd-polymarketButton" data-on-click="toggleCalendarioPeriodoFechadasConfigurado('polymarket','end',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeEnd-polymarketValue">dd/mm/aaaa</span></button></div>
+<button type="button" class="closed-range-clear" data-on-click="limparPeriodoFechadasConfigurado('polymarket')" aria-label="Limpar período da Polymarket" title="Limpar período da Polymarket">×</button>
 </div></section>
 <section class="stake-platform-card closed-range-card"><h3>Kalshi</h3><div class="closed-range-fields">
-<div class="config-field"><label for="cfgClosedRangeStart-kalshiButton">Data inicial</label><input type="hidden" id="cfgClosedRangeStart-kalshi" /><button type="button" class="config-date-button" id="cfgClosedRangeStart-kalshiButton" onclick="toggleCalendarioPeriodoFechadasConfigurado('kalshi','start',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeStart-kalshiValue">dd/mm/aaaa</span></button></div>
-<div class="config-field"><label for="cfgClosedRangeEnd-kalshiButton">Data final</label><input type="hidden" id="cfgClosedRangeEnd-kalshi" /><button type="button" class="config-date-button" id="cfgClosedRangeEnd-kalshiButton" onclick="toggleCalendarioPeriodoFechadasConfigurado('kalshi','end',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeEnd-kalshiValue">dd/mm/aaaa</span></button></div>
-<button type="button" class="closed-range-clear" onclick="limparPeriodoFechadasConfigurado('kalshi')" aria-label="Limpar período da Kalshi" title="Limpar período da Kalshi">×</button>
+<div class="config-field"><label for="cfgClosedRangeStart-kalshiButton">Data inicial</label><input type="hidden" id="cfgClosedRangeStart-kalshi" /><button type="button" class="config-date-button" id="cfgClosedRangeStart-kalshiButton" data-on-click="toggleCalendarioPeriodoFechadasConfigurado('kalshi','start',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeStart-kalshiValue">dd/mm/aaaa</span></button></div>
+<div class="config-field"><label for="cfgClosedRangeEnd-kalshiButton">Data final</label><input type="hidden" id="cfgClosedRangeEnd-kalshi" /><button type="button" class="config-date-button" id="cfgClosedRangeEnd-kalshiButton" data-on-click="toggleCalendarioPeriodoFechadasConfigurado('kalshi','end',event)" aria-haspopup="dialog" aria-expanded="false"><span id="cfgClosedRangeEnd-kalshiValue">dd/mm/aaaa</span></button></div>
+<button type="button" class="closed-range-clear" data-on-click="limparPeriodoFechadasConfigurado('kalshi')" aria-label="Limpar período da Kalshi" title="Limpar período da Kalshi">×</button>
 </div></section>
 </div>
 <div class="date-popup" id="configClosedRangePopup" role="dialog" aria-label="Selecionar período das apostas fechadas"></div>
@@ -391,7 +391,7 @@ oninput="aplicarFiltrosDebounced()"
 </div>
 <label style="display:block;font-size:0.72rem;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin:4px 0 8px;">Mudanças por data</label>
 <div class="stake-rules" id="stakeRulesList-polymarket"></div>
-<button type="button" class="btn-add-rule" onclick="adicionarRegraStake('polymarket')">+ Adicionar mudança</button>
+<button type="button" class="btn-add-rule" data-on-click="adicionarRegraStake('polymarket')">+ Adicionar mudança</button>
 </section>
 <section class="stake-platform-card">
 <h3>Kalshi</h3>
@@ -401,13 +401,13 @@ oninput="aplicarFiltrosDebounced()"
 </div>
 <label style="display:block;font-size:0.72rem;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin:4px 0 8px;">Mudanças por data</label>
 <div class="stake-rules" id="stakeRulesList-kalshi"></div>
-<button type="button" class="btn-add-rule" onclick="adicionarRegraStake('kalshi')">+ Adicionar mudança</button>
+<button type="button" class="btn-add-rule" data-on-click="adicionarRegraStake('kalshi')">+ Adicionar mudança</button>
 </section>
 </div>
 </div>
 <div class="config-actions">
-<button type="button" class="btn-save" onclick="salvarConfiguracao()">Salvar alterações</button>
-<button type="button" class="btn-ghost" onclick="restaurarConfiguracao()">Restaurar padrão</button>
+<button type="button" class="btn-save" data-on-click="salvarConfiguracao()">Salvar alterações</button>
+<button type="button" class="btn-ghost" data-on-click="restaurarConfiguracao()">Restaurar padrão</button>
 </div>
 <div class="config-msg" id="configMsg"></div>
 </div>
@@ -420,6 +420,7 @@ Dados via <a href="https://polymarket.com" target="_blank" rel="noopener">Polyma
 <script src="/market-breakdown.js"></script>
 <script src="/odds-ranges.js"></script>
 <script src="/profit-calendar.js"></script>
+<script src="/acoes.js"></script>
 <script src="/dashboard.js"></script>
 </body>
 </html>

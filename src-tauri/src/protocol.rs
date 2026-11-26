@@ -14,10 +14,11 @@ const ORIGEM: &str = "http://betty.localhost";
 #[cfg(not(windows))]
 const ORIGEM: &str = "betty://localhost";
 
-/// A interface atual tem scripts, estilos e handlers inline, por isso ainda
-/// precisa de 'unsafe-inline'. Todo o resto fica restrito à própria origem:
-/// nenhuma consulta externa sai do navegador.
-const CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; \
+/// Scripts só dos arquivos do próprio app: nenhum script ou handler inline
+/// roda (as ações do HTML passam por `ui/acoes.js`). Estilos inline ainda são
+/// permitidos. Todo o resto fica restrito à própria origem: nenhuma consulta
+/// externa sai do navegador.
+const CSP: &str = "default-src 'self'; script-src 'self'; \
     style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; \
     connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; \
     frame-ancestors 'none'";

@@ -194,13 +194,13 @@ el.innerHTML = config.regras.map((r, i) => `
 <div class="stake-rule" data-i="${i}">
 <div>
 <div class="rule-lbl">A partir de</div>
-<input type="date" value="${r.from}" onchange="atualizarRegraStake('${casa}',${i},'from',this.value)" />
+<input type="date" value="${r.from}" data-on-change="atualizarRegraStake('${casa}',${i},'from',this.value)" />
 </div>
 <div>
 <div class="rule-lbl">1 u ($)</div>
-<input type="number" step="0.01" min="0.01" value="${Number(r.unidade).toFixed(2)}" onchange="atualizarRegraStake('${casa}',${i},'unidade',this.value)" />
+<input type="number" step="0.01" min="0.01" value="${Number(r.unidade).toFixed(2)}" data-on-change="atualizarRegraStake('${casa}',${i},'unidade',this.value)" />
 </div>
-<button type="button" class="btn-del" title="Remover" onclick="removerRegraStake('${casa}',${i})">×</button>
+<button type="button" class="btn-del" title="Remover" data-on-click="removerRegraStake('${casa}',${i})">×</button>
 </div>
 `).join("");
 }
@@ -348,11 +348,11 @@ const ymd = `${ano}-${pad2(mes + 1)}-${pad2(dia)}`;
 let classe = "day";
 if (ymd === hoje) classe += " today";
 if (ymd === selecionada) classe += " selected";
-celulas += `<div class="${classe}" onclick="selecionarDiaPeriodoFechadasConfigurado('${ymd}',event)">${dia}</div>`;
+celulas += `<div class="${classe}" data-on-click="selecionarDiaPeriodoFechadasConfigurado('${ymd}',event)">${dia}</div>`;
 }
 const resto = (primeiroDia + diasNoMes) % 7;
 if (resto) for (let dia = 1; dia <= 7 - resto; dia++) celulas += `<div class="day other">${dia}</div>`;
-popup.innerHTML = `<div class="date-popup-head"><span>${nomesMes[mes]} de ${ano}</span><div class="date-popup-nav"><button type="button" onclick="navegarMesCalendarioPeriodoFechadasConfigurado(-1,event)">‹</button><button type="button" onclick="navegarMesCalendarioPeriodoFechadasConfigurado(1,event)">›</button></div></div><div class="date-grid"><div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" onclick="limparCampoPeriodoFechadasConfigurado(event)">Limpar</button><button type="button" onclick="selecionarDiaPeriodoFechadasConfigurado('${hoje}',event)">Hoje</button></div>`;
+popup.innerHTML = `<div class="date-popup-head"><span>${nomesMes[mes]} de ${ano}</span><div class="date-popup-nav"><button type="button" data-on-click="navegarMesCalendarioPeriodoFechadasConfigurado(-1,event)">‹</button><button type="button" data-on-click="navegarMesCalendarioPeriodoFechadasConfigurado(1,event)">›</button></div></div><div class="date-grid"><div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" data-on-click="limparCampoPeriodoFechadasConfigurado(event)">Limpar</button><button type="button" data-on-click="selecionarDiaPeriodoFechadasConfigurado('${hoje}',event)">Hoje</button></div>`;
 }
 function selecionarDiaPeriodoFechadasConfigurado(ymd, ev) {
 if (ev) ev.stopPropagation();
@@ -799,7 +799,7 @@ const footer = document.querySelector(".sidebar-footer");
 if (footer && !document.getElementById("mybettysUserBox")) {
 const box = document.createElement("div");
 box.id = "mybettysUserBox";
-box.innerHTML = `<span class="sidebar-account-avatar" aria-hidden="true">${escapeHtml(MYBETTYS_USER.name.trim().charAt(0).toUpperCase())}</span><div class="sidebar-account-info"><strong class="sidebar-user-name">${escapeHtml(MYBETTYS_USER.name)}</strong><small>Conta local</small></div><button type="button" class="sidebar-user-logout" aria-label="Sair" onclick="logoutMyBettys()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button>`;
+box.innerHTML = `<span class="sidebar-account-avatar" aria-hidden="true">${escapeHtml(MYBETTYS_USER.name.trim().charAt(0).toUpperCase())}</span><div class="sidebar-account-info"><strong class="sidebar-user-name">${escapeHtml(MYBETTYS_USER.name)}</strong><small>Conta local</small></div><button type="button" class="sidebar-user-logout" aria-label="Sair" data-on-click="logoutMyBettys()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button>`;
 footer.append(box);
 }
 // A configuração passa a ser do usuário logado, não global.
@@ -959,8 +959,8 @@ document.getElementById("connectionGrid").insertAdjacentHTML("beforeend", `
 <h3><img src="/assets/platforms/${casa}.png" alt="" width="28" height="28">${nome}</h3>
 <p class="hint" id="${casa}ConnectionStatus">Não conectada</p>
 <div class="connection-actions">
-<button type="button" class="btn-save" onclick="abrirContaModal('${casa}')">Conectar / alterar</button>
-<button type="button" class="btn-ghost" id="${casa}Disconnect" onclick="desconectarNovaCasa('${casa}')" disabled>Desconectar</button>
+<button type="button" class="btn-save" data-on-click="abrirContaModal('${casa}')">Conectar / alterar</button>
+<button type="button" class="btn-ghost" id="${casa}Disconnect" data-on-click="desconectarNovaCasa('${casa}')" disabled>Desconectar</button>
 </div>
 </section>`);
 document.getElementById("closedRangeGrid").insertAdjacentHTML("beforeend", `
@@ -972,11 +972,11 @@ ${[["Start", "start", "Data inicial"], ["End", "end", "Data final"]].map(([campo
 <label for="cfgClosedRange${campo}-${casa}Button">${label}</label>
 <input type="hidden" id="cfgClosedRange${campo}-${casa}">
 <button type="button" class="config-date-button" id="cfgClosedRange${campo}-${casa}Button"
-  onclick="toggleCalendarioPeriodoFechadasConfigurado('${casa}','${tipo}',event)" aria-haspopup="dialog" aria-expanded="false">
+  data-on-click="toggleCalendarioPeriodoFechadasConfigurado('${casa}','${tipo}',event)" aria-haspopup="dialog" aria-expanded="false">
 <span id="cfgClosedRange${campo}-${casa}Value">dd/mm/aaaa</span>
 </button>
 </div>`).join("")}
-<button type="button" class="closed-range-clear" onclick="limparPeriodoFechadasConfigurado('${casa}')" aria-label="Limpar período de ${nome}">×</button>
+<button type="button" class="closed-range-clear" data-on-click="limparPeriodoFechadasConfigurado('${casa}')" aria-label="Limpar período de ${nome}">×</button>
 </div>
 </section>`);
 document.getElementById("stakeGrid").insertAdjacentHTML("beforeend", `
@@ -988,7 +988,7 @@ document.getElementById("stakeGrid").insertAdjacentHTML("beforeend", `
 </div>
 <label style="display:block;font-size:.72rem;color:var(--muted);margin:4px 0 8px;">Mudanças por data</label>
 <div class="stake-rules" id="stakeRulesList-${casa}"></div>
-<button type="button" class="btn-add-rule" onclick="adicionarRegraStake('${casa}')">+ Adicionar mudança</button>
+<button type="button" class="btn-add-rule" data-on-click="adicionarRegraStake('${casa}')">+ Adicionar mudança</button>
 </section>`);
 }
 organizarConfiguracaoPorCasa();
@@ -2462,7 +2462,7 @@ content.innerHTML = `
 <div class="error">
 Não foi possível carregar os dados.<br>
 <small>Falha de rede ou API bloqueada neste dispositivo.</small><br>
-<button type="button" onclick="carregarAba(abaAtual, {forcar:true})" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;">
+<button type="button" data-on-click="recarregarAbaAtual()" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;">
 Tentar de novo
 </button>
 </div>`;
@@ -4447,7 +4447,7 @@ const ymd = `${ano}-${pad2(mes + 1)}-${pad2(d)}`;
 let cls = "day";
 if (ymd === hojeYmd) cls += " today";
 if (filtroDataDia === ymd) cls += " selected";
-cells += `<div class="${cls}" onclick="selecionarDiaCalendario('${ymd}', event)">${d}</div>`;
+cells += `<div class="${cls}" data-on-click="selecionarDiaCalendario('${ymd}', event)">${d}</div>`;
 }
 const resto = (primeiroDiaSemana + diasNoMes) % 7;
 if (resto !== 0) {
@@ -4457,8 +4457,8 @@ popup.innerHTML = `
 <div class="date-popup-head">
 <span>${nomesMes[mes]} de ${ano}</span>
 <div class="date-popup-nav">
-<button type="button" onclick="navegarMesCalendario(-1, event)">‹</button>
-<button type="button" onclick="navegarMesCalendario(1, event)">›</button>
+<button type="button" data-on-click="navegarMesCalendario(-1, event)">‹</button>
+<button type="button" data-on-click="navegarMesCalendario(1, event)">›</button>
 </div>
 </div>
 <div class="date-grid">
@@ -4466,8 +4466,8 @@ popup.innerHTML = `
 ${cells}
 </div>
 <div class="date-popup-foot">
-<button type="button" class="limpar" onclick="limparFiltroData(event)">Limpar</button>
-<button type="button" onclick="selecionarDiaCalendario('${hojeYmd}', event)">Hoje</button>
+<button type="button" class="limpar" data-on-click="limparFiltroData(event)">Limpar</button>
+<button type="button" data-on-click="selecionarDiaCalendario('${hojeYmd}', event)">Hoje</button>
 </div>
 `;
 }
@@ -4791,14 +4791,14 @@ const sortInd = sortActive ? (sortDir === "asc" ? "▲" : "▼") : "⇅";
 const sortCls = sortActive ? " sorted" : "";
 const tituloData = abaAtual === "fechado" ? "Data de fechamento" : "Data do evento";
 const ajudaData = abaAtual === "fechado" ? ' title="Data da venda ou resolução da aposta"' : ' title="Data e horário da partida ou evento"';
-return `<th class="col-data sortable${sortCls}"${ajudaData} onclick="ordenarPorColuna('data')">${tituloData}<span class="sort-ind">${sortInd}</span></th>`;
+return `<th class="col-data sortable${sortCls}"${ajudaData} data-on-click="ordenarPorColuna('data')">${tituloData}<span class="sort-ind">${sortInd}</span></th>`;
 }
 function montarThead() {
 function th(col, label, extraClass) {
 const active = sortCol === col;
 const ind = active ? (sortDir === "asc" ? "▲" : "▼") : "⇅";
 const sorted = active ? " sorted" : "";
-return `<th class="${extraClass} sortable${sorted}" onclick="ordenarPorColuna('${col}')">${label}<span class="sort-ind">${ind}</span></th>`;
+return `<th class="${extraClass} sortable${sorted}" data-on-click="ordenarPorColuna('${col}')">${label}<span class="sort-ind">${ind}</span></th>`;
 }
 return `<thead><tr>
 ${montarThData()}
@@ -4846,13 +4846,13 @@ texto.innerHTML = `Mostrando ${startIdx + 1} a ${startIdx + sliceLen} de ${total
 <span style="margin-left:10px;color:var(--muted);">·</span>
 <label style="margin-left:10px;display:inline-flex;align-items:center;gap:5px;">
 <span>Por página</span>
-<select onchange="alterarItensPorPagina(this.value)" style="height:28px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);padding:0 6px;font-weight:650;">
+<select data-on-change="alterarItensPorPagina(this.value)" style="height:28px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);padding:0 6px;font-weight:650;">
 <option value="10" ${pageSize===10?'selected':''}>10</option>
 <option value="20" ${pageSize===20?'selected':''}>20</option>
 <option value="50" ${pageSize===50?'selected':''}>50</option>
 </select>
 </label>`;
-let html = `<button type="button" onclick="irParaPagina(${paginaAtual - 1})" ${paginaAtual <= 1 ? "disabled" : ""}>‹</button>`;
+let html = `<button type="button" data-on-click="irParaPagina(${paginaAtual - 1})" ${paginaAtual <= 1 ? "disabled" : ""}>‹</button>`;
 // Mantém o rodapé estável: com cinco ou mais páginas, sempre exibimos cinco
 // números. Somente o grupo central se desloca conforme a página atual.
 const MAX_BOTOES_PAGINA = 5;
@@ -4873,10 +4873,10 @@ let ultimo = 0;
 for (let p = 1; p <= totalPaginas; p++) {
 if (!janelas.has(p)) continue;
 if (p - ultimo > 1) html += `<span class="ellipsis">…</span>`;
-html += `<button type="button" class="${p === paginaAtual ? "active" : ""}" onclick="irParaPagina(${p})">${p}</button>`;
+html += `<button type="button" class="${p === paginaAtual ? "active" : ""}" data-on-click="irParaPagina(${p})">${p}</button>`;
 ultimo = p;
 }
-html += `<button type="button" onclick="irParaPagina(${paginaAtual + 1})" ${paginaAtual >= totalPaginas ? "disabled" : ""}>›</button>`;
+html += `<button type="button" data-on-click="irParaPagina(${paginaAtual + 1})" ${paginaAtual >= totalPaginas ? "disabled" : ""}>›</button>`;
 pager.innerHTML = html;
 }
 function renderizarTabela(lista) {
@@ -4906,7 +4906,7 @@ ${montarThead()}
 <tr>
 <td colspan="${cols}" style="text-align:center;padding:36px 16px;color:var(--muted);height:auto;white-space:normal;">
 ${msg}
-${filtroDataDia ? '<br><button type="button" onclick="limparFiltroData()" style="margin-top:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;">Limpar data</button>' : ""}
+${filtroDataDia ? '<br><button type="button" data-on-click="limparFiltroData()" style="margin-top:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;">Limpar data</button>' : ""}
 </td>
 </tr>
 </tbody>
@@ -5792,11 +5792,11 @@ const ymd = `${ano}-${pad2(mes + 1)}-${pad2(dia)}`;
 let classe = "day";
 if (ymd === hoje) classe += " today";
 if (ymd === selecionada) classe += " selected";
-celulas += `<div class="${classe}" onclick="selecionarDiaPeriodoEstat('${ymd}', event)">${dia}</div>`;
+celulas += `<div class="${classe}" data-on-click="selecionarDiaPeriodoEstat('${ymd}', event)">${dia}</div>`;
 }
 const resto = (primeiroDia + diasNoMes) % 7;
 if (resto) for (let dia = 1; dia <= 7 - resto; dia++) celulas += `<div class="day other">${dia}</div>`;
-popup.innerHTML = `<div class="date-popup-head"><span>${nomesMes[mes]} de ${ano}</span><div class="date-popup-nav"><button type="button" onclick="navegarMesCalendarioPeriodoEstat(-1,event)">‹</button><button type="button" onclick="navegarMesCalendarioPeriodoEstat(1,event)">›</button></div></div><div class="date-grid"><div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" onclick="limparCampoPeriodoEstat(event)">Limpar</button><button type="button" onclick="selecionarDiaPeriodoEstat('${hoje}',event)">Hoje</button></div>`;
+popup.innerHTML = `<div class="date-popup-head"><span>${nomesMes[mes]} de ${ano}</span><div class="date-popup-nav"><button type="button" data-on-click="navegarMesCalendarioPeriodoEstat(-1,event)">‹</button><button type="button" data-on-click="navegarMesCalendarioPeriodoEstat(1,event)">›</button></div></div><div class="date-grid"><div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" data-on-click="limparCampoPeriodoEstat(event)">Limpar</button><button type="button" data-on-click="selecionarDiaPeriodoEstat('${hoje}',event)">Hoje</button></div>`;
 }
 function selecionarDiaPeriodoEstat(ymd, ev) {
 if (ev) ev.stopPropagation();
@@ -6484,7 +6484,7 @@ return `
 <div class="stat-card-title">Desempenho por Site</div>
 <div class="stat-card-sub site-category-filter">
 <span>Posições fechadas${filtroEsporteEstat === "todos" ? "" : " · " + escapeHtml(filtroEsporteEstat)}</span>
-${filtroEsporteEstat === "todos" ? "" : '<button type="button" onclick="alterarFiltroEsporte(\'todos\')">Ver todas as categorias</button>'}
+${filtroEsporteEstat === "todos" ? "" : '<button type="button" data-on-click="alterarFiltroEsporte(\'todos\')">Ver todas as categorias</button>'}
 </div>
 <div style="overflow-x:auto;">
 <table class="stat-table site-table">
@@ -6652,7 +6652,7 @@ emitted.add(group);
 const aggregate = resumo ? metricasResumoDb(BettyMarketBreakdown.aggregateMetrics(resumo.porMercado.filter(raw => {
 const [cat,label] = JSON.parse(raw.chave); return cat === category && BettyMarketBreakdown.expandableGroup(cat,label) === group;
 }))) : computeStatsGerais(dadosEstat().filter(d => classificarAposta(d) === category && BettyMarketBreakdown.expandableGroup(category,BettyMarketBreakdown.describe(tituloExibicao(d),category)) === group));
-summary = `<tr><td><button type="button" data-category="${escapeHtml(category)}" data-group="${group}" aria-expanded="${expanded}" onclick="toggleMercadoMl(this)" style="background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;"><span class="ml-arrow">${expanded ? '▼' : '▶'}</span> ${groupLabels[group]}</button></td>${cells(aggregate)}</tr>`;
+summary = `<tr><td><button type="button" data-category="${escapeHtml(category)}" data-group="${group}" aria-expanded="${expanded}" data-on-click="toggleMercadoMl(this)" style="background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;"><span class="ml-arrow">${expanded ? '▼' : '▶'}</span> ${groupLabels[group]}</button></td>${cells(aggregate)}</tr>`;
 }
 return summary + `<tr${group ? ` data-market-detail="${group}"${group === 'ml' ? ' data-ml-detail' : ''}${expanded ? '' : ' hidden'}` : ''}><td${group ? ' style="padding-left:30px;"' : ''}>${escapeHtml(r.market)}</td>${cells(r)}</tr>`;
 }).join('');
@@ -7316,3 +7316,15 @@ renderizarStats();
 desenharGrafico();
 if (viewAtual === "estatisticas") renderEstatisticas();
 }
+
+// Ações com lógica própria, chamadas pelos atributos data-on-* (o CSP não
+// permite script embutido no HTML; ver acoes.js).
+function aplicarFiltrosSemOrdem() { sortCol = null; aplicarFiltros(); }
+function recarregarAbaAtual() { carregarAba(abaAtual, { forcar: true }); }
+function teclaTrocarView(event, view) {
+  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); trocarView(view); }
+}
+function teclaToggleSyncPanel(event) {
+  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSyncPanel(event); }
+}
+function teclaConfirmarSenhaConfig(event) { if (event.key === 'Enter') confirmarSenhaConfig(); }
