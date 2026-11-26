@@ -202,3 +202,178 @@ html body[data-secao="historico"] #toolbarSection .tabs { display: none !importa
 body[data-secao="conexoes"] #configView > .config-card:not(#connectionsCard),
 body[data-secao="conexoes"] #configView > .config-actions { display: none !important; }
 body[data-secao="config"] #configView > #connectionsCard { display: none !important; }
+
+/* ---------- Visão geral ---------- */
+body:not([data-secao="visao"]) #visaoGeral { display: none !important; }
+.visao { display: flex; flex-direction: column; gap: 16px; margin-bottom: 18px; }
+.visao .k {
+  color: var(--muted-2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.visao .sm { font-size: 0.76rem; }
+.visao .mu { color: var(--muted); }
+.visao .b { font-weight: 650; }
+.visao .pos { color: var(--pos); }
+.visao .neg { color: var(--danger); }
+.visao .grow { flex: 1 1 auto; min-width: 0; }
+.visao .el { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visao .card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 12px 28px -18px #000;
+  min-width: 0;
+}
+.visao .v {
+  margin-top: 4px;
+  font: 700 1.65rem/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+.visao .v2 { margin-top: 2px; font-size: 1.12rem; font-weight: 700; letter-spacing: -0.01em; }
+.visao .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--card-2);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.visao .chip.pos { background: var(--pos-soft); color: var(--pos); }
+.visao .chip.neg { background: var(--danger-soft); color: var(--danger); }
+.visao .chip.wn { background: var(--warn-soft); color: var(--warn); }
+.visao button.card, .visao button.link { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.visao button.card { display: block; width: 100%; transition: border-color 0.12s, background 0.12s; }
+.visao button.card:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--card-2); }
+.visao button.card:focus-visible, .visao button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.visao button.link { padding: 0; border: 0; background: none; color: var(--accent); font-size: 0.76rem; font-weight: 600; }
+.visao button.link:hover { color: var(--text); }
+
+/* Herói: patrimônio e gráfico */
+.visao-split { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
+.visao-hero {
+  flex: 3 1 560px;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(760px 260px at 0 0, color-mix(in srgb, var(--accent) 14%, transparent), transparent 72%),
+    var(--card) !important;
+}
+.hero-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 18px 20px 0; }
+.hero-num .hn {
+  margin-top: 8px;
+  font: 700 3rem/1.02 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+.hero-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.hero-chips b { color: var(--text); }
+.hero-ctrl { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
+.hero-ctrl-linha { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.visao-hero .chart-periods {
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.visao-hero .chart-period-btn {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.visao-hero .chart-period-btn.active {
+  background: var(--card-2);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.visao-hero .chart-plot-wrap { flex: 1 1 auto; padding: 8px 14px 30px; }
+.visao-hero .chart-area { min-height: 260px; }
+.visao-hero #chartDateNotice { padding: 0 20px 6px !important; }
+.hero-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.hero-rodape .chart-title { font-weight: 600; color: var(--muted); }
+.hero-rodape .chart-valorwrap { display: inline-flex; align-items: baseline; gap: 8px; }
+.hero-rodape .chart-valor { font-size: 0.95rem; }
+.hero-rodape .chart-variacao { font-size: 0.76rem; }
+
+/* Cartões das casas */
+.visao-casas { flex: 1 1 300px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.visao-casa { padding: 12px 14px; }
+.visao-casa-topo { display: flex; align-items: center; gap: 10px; }
+.visao-casa .lg.l { flex: none; width: 34px; height: 34px; border-radius: 10px; object-fit: cover; }
+.visao-casa .row-gap { display: flex; align-items: center; gap: 8px; }
+.visao-casa-valor { text-align: right; }
+.visao-casa-valor .v2 { margin: 0; }
+.visao-spark { display: block; width: 100%; height: 26px; margin-top: 8px; color: var(--muted-2); }
+.visao-spark.pos { color: var(--pos); }
+.visao-spark.neg { color: var(--danger); }
+.visao-casa-vazia { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px 18px; }
+.visao .btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Indicadores */
+.visao-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.visao-kpis .kpi { padding: 16px 18px; }
+.kpi-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.kpi-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.kpi-barras { flex: none; width: 150px; height: 44px; }
+.kpi-barras .pos { fill: var(--pos); }
+.kpi-barras .neg { fill: var(--danger); }
+.kpi-barras .base { stroke: var(--border); stroke-width: 1; }
+.visao .pbar { display: flex; gap: 2px; height: 8px; margin-top: 12px; border-radius: 4px; overflow: hidden; }
+.visao .pbar > i, .visao .key { display: block; background: var(--accent); }
+.visao .o1 { opacity: 0.68; } .visao .o2 { opacity: 0.42; } .visao .o3 { opacity: 0.24; }
+.kpi-legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: var(--muted); font-size: 0.76rem; }
+.kpi-legenda .leg { display: inline-flex; align-items: center; gap: 5px; }
+.kpi-legenda .key { width: 8px; height: 8px; border-radius: 2px; }
+.kpi-legenda img { width: 14px; height: 14px; border-radius: 4px; }
+
+/* Resumo rápido em faixa */
+.visao .minis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--border-soft);
+}
+.visao .minis > div { padding: 13px 16px; background: var(--card); }
+.visao .minis .positive { color: var(--pos); }
+.visao .minis .negative { color: var(--danger); }
+
+/* Destaques */
+.visao-destaques { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.visao-destaques .destaque { padding: 16px 18px; }
+.visao-destaques .destaque .k { margin-bottom: 8px; }
+.destaque-titulo { margin-bottom: 4px; }
+.visao-spark-legenda { margin-top: 2px; color: var(--muted-2); font-size: 0.66rem; }

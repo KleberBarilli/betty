@@ -4165,31 +4165,13 @@ function fmtSinalDinheiro(n) {
 const v = Number(n) || 0;
 return (v >= 0 ? "+$" : "-$") + Math.abs(v).toFixed(2);
 }
-function renderDashboardInsights({ abertosF, concMercado, drawdownAtual, pnlPeriodo, pnlAnterior }) {
-const el = document.getElementById("dashboardInsights");
-if (!el) return;
-if (viewAtual !== "dashboard") { el.innerHTML = ""; return; }
-const chips = [];
-if (concMercado) chips.push({ k: "Maior exposição atual", t: concMercado.titulo });
-if (Number.isFinite(drawdownAtual)) chips.push({ k: "Drawdown diário", t: `Drawdown atual: ${drawdownAtual < 0 ? "-" : ""}$${Math.abs(drawdownAtual).toFixed(2)}.` });
-if (Number.isFinite(pnlPeriodo)) chips.push({ k: "Variação (7 dias)", t: `7 Dias atuais: ${fmtSinalDinheiro(pnlPeriodo)} · 7 Dias anteriores: ${pnlAnterior == null ? "—" : fmtSinalDinheiro(pnlAnterior)}` });
-if (!chips.length && !abertosF.length) chips.push({ k: "Posições", t: "Nenhuma posição aberta no momento." });
-el.innerHTML = chips.map(c => `<div class="insight-chip"><div class="k">${escapeHtml(c.k)}</div>${escapeHtml(c.t)}</div>`).join("");
-}
 function renderizarDashboardSincronizandoHistorico() {
 const statsEl = document.getElementById("stats");
 // Um painel já preenchido representa a última leitura confirmada e deve
 // permanecer visível. Já um esqueleto de carregamento ainda não representa
 // números financeiros, então o substituímos pelo estado de sincronização.
-if (!statsEl || (statsEl.innerHTML.trim() && !statsEl.textContent.includes("Carregando..."))) return;
-statsEl.className = "stats-row cols-5";
-statsEl.innerHTML = [
-[ICONS.wallet, "Patrimônio total", "purple"],
-[ICONS.trendUp, "PnL realizado", "green"],
-[ICONS.trendUp, "PnL não realizado", "green"],
-[ICONS.target, "Apostas abertas", "purple"],
-[ICONS.db, "Risco / exposição", "info"]
-].map(([icon, label, tone]) => `<div class="stat-card"><div class="stat-icon ${tone}">${icon}</div><div class="stat-body"><div class="label">${label}</div><div class="value">—</div></div></div>`).join("");
+if (!statsEl || (statsEl.innerHTML.trim() && !statsEl.querySelector(".kpi-vazio"))) return;
+statsEl.innerHTML = kpisVazios("Sincronizando o histórico…");
 }
 async function renderizarStats(opcoes = {}) {
 const pintar = opcoes.pintar ?? dashboardEstaVisivel();
@@ -4215,14 +4197,7 @@ const fechadosF = fechadoDb ? [] : apostasFechadasNoSite();
 if (!snapshotAoVivoConfirmado && !abertosF.length && !fechadoDb && !fechadosF.length) {
 const statsEl = document.getElementById("stats");
 if (pintar && statsEl && !statsEl.innerHTML.trim()) {
-statsEl.className = "stats-row cols-4";
-statsEl.innerHTML = [
-[ICONS.wallet, "Patrimônio", "$0.00"],
-[ICONS.trendUp, "PnL Realizado", "$0.00"],
-[ICONS.trendUp, "PnL não realizado", "$0.00"],
-[ICONS.target, "Apostas abertas", "0"],
-[ICONS.db, "Risco / exposição", "$0.00"]
-].map(([icon,label,value]) => `<div class="stat-card"><div class="stat-icon blue">${icon}</div><div class="stat-body"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">Carregando...</div></div></div>`).join("");
+statsEl.innerHTML = kpisVazios("Carregando…");
 }
 return;
 }
@@ -4252,8 +4227,6 @@ const winRateGeral = fechadoDb ? (Number(fechadoDb.taxaAcerto) || 0) : (nFechada
 const pnlHoje = fechadoDb ? (Number(fechadoDb.pnlHoje) || 0) : 0;
 const pnlPeriodo = periodoDb?.total ? Number(periodoDb.total.lucroD) || 0 : 0;
 const pnlAnterior = periodoDb?.anterior ? Number(periodoDb.anterior.lucroD) || 0 : null;
-const textoPorCasa = formatar => Object.entries(casasAbertas).map(([casa, grupo]) =>
-'<span class="platform-summary-item"><img src="/assets/platforms/'+encodeURIComponent(casa)+'.png" alt="'+escapeHtml(NOMES_CASAS[casa] || casa)+'"><span>'+escapeHtml(String(formatar(grupo)))+'</span></span>').join('');
 const porMercado = {};
 for (const d of abertosF) {
 const k = chaveMercado(d);
@@ -4262,64 +4235,19 @@ porMercado[k].stake += getStake(d);
 }
 const concMercado = Object.values(porMercado).sort((a, b) => b.stake - a.stake)[0] || null;
 const drawdownAtual = Number(resumoDb?.avancadas?.currentDrawdown);
-const cards = `
-<div class="stat-card">
-<div class="stat-icon purple">${ICONS.wallet}</div>
-<div class="stat-body">
-<div class="label">${patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio total"}</div>
-<div class="value value-indent">${patrimonioParcial && !casasPatrimonio.length ? "—" : "$" + patrimonio.toFixed(2)}</div>
-<div class="sub">${patrimonioParcial ? casasPatrimonio.map(casa => NOMES_CASAS[casa]).join(" · ") : `Saldo $${Math.round(saldoPatrimonio)} · Aberto $${Math.round(valorAberto)}`}</div>
-</div>
-</div>
-<div class="stat-card">
-<div class="stat-icon ${pnlRealizado >= 0 ? "green" : "red"}">${pnlRealizado >= 0 ? ICONS.trendUp : ICONS.trendDown}</div>
-<div class="stat-body">
-<div class="label">PnL realizado</div>
-<div class="value ${pnlRealizado >= 0 ? "positive" : "negative"}">${fmtSinalDinheiro(pnlRealizado)}</div>
-<div class="sub ${pnlHoje >= 0 ? "positive" : "negative"}">${pnlHoje >= 0 ? "▲" : "▼"} ${fmtSinalDinheiro(pnlHoje)} hoje</div>
-</div>
-</div>
-<div class="stat-card">
-<div class="stat-icon ${pnlNaoRealizado >= 0 ? "green" : "red"}">${pnlNaoRealizado >= 0 ? ICONS.trendUp : ICONS.trendDown}</div>
-<div class="stat-body">
-<div class="label">PnL não realizado</div>
-<div class="value ${pnlNaoRealizado >= 0 ? "positive" : "negative"}">${abertosF.length && !abertosF.some(d => d._platform !== "sxbet") ? "—" : fmtSinalDinheiro(pnlNaoRealizado)}</div>
-${MYBETTYS_CONNECTIONS?.sxbet ? '<div class="sub">Onde há cotação</div>' : ''}
-</div>
-</div>
-<div class="stat-card">
-<div class="stat-icon purple">${ICONS.target}</div>
-<div class="stat-body">
-<div class="label">Apostas abertas</div>
-<div class="value value-indent">${nAbertas}</div>
-<div class="sub platform-summary">${textoPorCasa(grupo => grupo.count)}</div>
-</div>
-</div>
-<div class="stat-card">
-<div class="stat-icon info">${ICONS.db}</div>
-<div class="stat-body">
-<div class="label">Risco / exposição</div>
-<div class="value value-indent">$${stakeAbertas.toFixed(2)}</div>
-<div class="sub platform-summary">${textoPorCasa(grupo => (stakeAbertas > 0 ? Math.round(grupo.stake / stakeAbertas * 100) : 0) + "%")}</div>
-</div>
-</div>
-`;
-const statsEl = document.getElementById("stats");
-if (pintar && statsEl) {
-statsEl.className = "stats-row cols-5";
-statsEl.innerHTML = cards;
-}
-if (pintar) renderDashboardInsights({
-abertosF, concMercado: concMercado && stakeAbertas > 0 ? concMercado : null,
-drawdownAtual, pnlPeriodo, pnlAnterior
+if (pintar) pintarVisaoGeral({
+abertosF, casasAtivas, casasAbertas, stakeAbertas, patrimonio, patrimonioParcial, casasPatrimonio,
+saldoPatrimonio, valorAberto, pnlNaoRealizado, pnlRealizado, roiGeral, pnlHoje, pnlPeriodo, pnlAnterior,
+periodoDb, nFechadas, drawdownAtual, maxDrawdown: Number(resumoDb?.avancadas?.maxDrawdown),
+concMercado: concMercado && stakeAbertas > 0 ? concMercado : null
 });
 const oddsValidas = fechadoDb ? [] : fechadosF.map(d => getOddNum(d)).filter(o => o > 0);
 const oddMedia = fechadoDb ? (Number(fechadoDb.oddMedia) || 0) : (oddsValidas.length ? (oddsValidas.reduce((s, o) => s + o, 0) / oddsValidas.length) : 0);
 const stakeMedia = nFechadas > 0 ? (stakeFechadas / nFechadas) : 0;
 const roiEl = document.getElementById("resumoRoi");
-if (pintar && roiEl) { roiEl.textContent = (roiGeral >= 0 ? '+' : '') + roiGeral.toFixed(2) + '%'; roiEl.className = "resumo-val " + (roiGeral >= 0 ? "positive" : "negative"); }
+if (pintar && roiEl) { roiEl.textContent = (roiGeral >= 0 ? '+' : '') + roiGeral.toFixed(2) + '%'; roiEl.className = "v2 resumo-val " + (roiGeral >= 0 ? "positive" : "negative"); }
 const lucroEl = document.getElementById("resumoLucro");
-if (pintar && lucroEl) { lucroEl.textContent = (pnlRealizado >= 0 ? '+' : '') + pnlRealizado.toFixed(2) + ' u'; lucroEl.className = "resumo-val " + (pnlRealizado >= 0 ? "positive" : "negative"); }
+if (pintar && lucroEl) { lucroEl.textContent = fmtSinalDinheiro(pnlRealizado); lucroEl.className = "v2 resumo-val " + (pnlRealizado >= 0 ? "positive" : "negative"); }
 const taxaEl = document.getElementById("resumoTaxa");
 if (pintar && taxaEl) taxaEl.textContent = winRateGeral.toFixed(0) + "%";
 const oddEl = document.getElementById("resumoOdd");
@@ -7430,4 +7358,159 @@ function renderSyncCasas() {
     return `<button type="button" class="sync-casa${conectada ? "" : " off"}" data-on-click="irPara('conexoes')" title="${escapeHtml(nome)}: ${escapeHtml(rotuloEstadoSync(estado))}"><img src="/assets/platforms/${id}.png" alt="">${escapeHtml(nome)}<span class="st"><span class="dot ${ponto}"></span>${texto}</span></button>`;
   }).join("");
   if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
+}
+
+// ===== Visão geral (layout v2) =====
+// Usa os mesmos números de renderizarStats; aqui só a apresentação.
+function fmtDolar(v) {
+  const n = Number(v) || 0;
+  return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDolarSinal(v) {
+  const n = Number(v) || 0;
+  return (n >= 0 ? "+" : "") + fmtDolar(n);
+}
+function classeSinal(v) { return (Number(v) || 0) >= 0 ? "pos" : "neg"; }
+function kpisVazios(texto) {
+  return ["PnL realizado", "PnL não realizado", "Exposição"].map(k =>
+    `<div class="card kpi kpi-vazio"><div class="kpi-topo"><span class="k">${k}</span></div><div class="v">—</div><div class="sm mu">${escapeHtml(texto)}</div></div>`).join("");
+}
+function saldoPorCasa() {
+  return { polymarket: POLY_API_BALANCE, kalshi: KALSHI_API_BALANCE, predict: PREDICT_API_BALANCE, sxbet: SXBET_API_BALANCE };
+}
+function pintarVisaoGeral(d) {
+  const rotulo = document.getElementById("heroPatrimonioRotulo");
+  const valor = document.getElementById("heroPatrimonio");
+  const chips = document.getElementById("heroChips");
+  if (rotulo) rotulo.textContent = d.patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio";
+  if (valor) valor.textContent = d.patrimonioParcial && !d.casasPatrimonio.length ? "—" : fmtDolar(d.patrimonio);
+  if (chips) {
+    const partes = [
+      `<span class="chip ${classeSinal(d.pnlHoje)}">${d.pnlHoje >= 0 ? "▲" : "▼"} ${fmtDolarSinal(d.pnlHoje)} hoje</span>`,
+      `<span class="chip ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)} em 7 dias</span>`,
+      d.patrimonioParcial
+        ? `<span class="sm mu">Inclui ${escapeHtml(d.casasPatrimonio.map(c => NOMES_CASAS[c]).join(", ") || "nenhuma casa")}</span>`
+        : `<span class="sm mu">Saldo <b>${fmtDolar(d.saldoPatrimonio)}</b> · em aberto <b>${fmtDolar(d.valorAberto)}</b></span>`,
+    ];
+    chips.innerHTML = partes.join("");
+  }
+  pintarCasasVisao(d);
+  pintarKpisVisao(d);
+  pintarDestaquesVisao(d);
+  carregarSeriesVisao().then(ok => { if (ok) pintarMiniGraficosVisao(); });
+}
+function pintarCasasVisao(d) {
+  const el = document.getElementById("visaoCasas");
+  if (!el) return;
+  const saldos = saldoPorCasa();
+  const pnl7 = new Map((d.periodoDb?.porSite || []).map(r => [r.chave, Number(r.lucroD) || 0]));
+  const casas = d.casasAtivas;
+  if (!casas.length) {
+    el.innerHTML = `<div class="card visao-casa-vazia"><b>Nenhuma casa conectada</b><span class="sm mu">Conecte uma conta para acompanhar saldo e posições.</span><button type="button" class="btn" data-on-click="irPara('conexoes')">Abrir Conexões</button></div>`;
+    return;
+  }
+  el.innerHTML = casas.map(casa => {
+    const nome = NOMES_CASAS[casa] || casa;
+    const grupo = d.casasAbertas[casa] || { count: 0, stake: 0 };
+    const saldo = saldos[casa];
+    const v7 = pnl7.get(casa) || 0;
+    const estado = casaSync[casa]?.state;
+    const aviso = estado === "partial" ? `<span class="chip wn">parcial</span>`
+      : estado === "error" ? `<span class="chip neg">falhou</span>`
+      : estado === "stale" ? `<span class="chip wn">desatualizada</span>` : "";
+    return `<button type="button" class="card visao-casa" data-on-click="abrirCasaNaVisao('${casa}')" aria-label="Ver posições da ${escapeHtml(nome)}">
+<div class="visao-casa-topo"><img class="lg l" src="/assets/platforms/${casa}.png" alt="">
+<div class="grow"><div class="b row-gap">${escapeHtml(nome)}${aviso}</div><div class="sm mu">${grupo.count} ${grupo.count === 1 ? "aberta" : "abertas"} · ${fmtDolar(grupo.stake)} em risco</div></div>
+<div class="visao-casa-valor"><div class="v2">${Number.isFinite(saldo) ? fmtDolar(saldo) : "—"}</div><div class="sm ${classeSinal(v7)}">${fmtDolarSinal(v7)} · 7d</div></div></div>
+<svg class="visao-spark" data-spark="${casa}" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true"></svg><div class="visao-spark-legenda">PnL acumulado · últimos 30 dias</div>
+</button>`;
+  }).join("");
+}
+function abrirCasaNaVisao(casa) {
+  irPara("posicoes");
+  if (viewAtual === "posicoes" && typeof selecionarCasa === "function") selecionarCasa(casa);
+}
+function pintarKpisVisao(d) {
+  const el = document.getElementById("stats");
+  if (!el) return;
+  const soSxBet = d.abertosF.length && !d.abertosF.some(a => a._platform !== "sxbet");
+  const comCotacao = d.abertosF.filter(a => a._platform !== "sxbet").length;
+  const casas = Object.entries(d.casasAbertas).filter(([, g]) => g.stake > 0).sort((a, b) => b[1].stake - a[1].stake);
+  const barra = casas.map(([, g], i) => `<i class="o${Math.min(i, 3)}" style="width:${(g.stake / d.stakeAbertas * 100).toFixed(2)}%"></i>`).join("");
+  const legenda = casas.map(([casa, g], i) => `<span class="leg"><span class="key o${Math.min(i, 3)}"></span><img src="/assets/platforms/${casa}.png" alt="${escapeHtml(NOMES_CASAS[casa] || casa)}">${Math.round(g.stake / d.stakeAbertas * 100)}%</span>`).join("");
+  el.innerHTML = `
+<div class="card kpi">
+<div class="kpi-topo"><span class="k">PnL realizado</span><span class="chip ${classeSinal(d.roiGeral)}">ROI ${(d.roiGeral >= 0 ? "+" : "") + d.roiGeral.toFixed(2)}%</span></div>
+<div class="kpi-linha"><div><div class="v ${classeSinal(d.pnlRealizado)}">${fmtDolarSinal(d.pnlRealizado)}</div><div class="sm mu">${d.nFechadas.toLocaleString("en-US")} apostas fechadas · últimos 14 dias ao lado</div></div>
+<svg class="kpi-barras" id="visaoBarras" viewBox="0 0 222 60" aria-hidden="true"></svg></div>
+</div>
+<div class="card kpi">
+<div class="kpi-topo"><span class="k">PnL não realizado</span>${d.abertosF.length ? `<span class="chip">${comCotacao} de ${d.abertosF.length} com cotação</span>` : ""}</div>
+<div class="v ${soSxBet ? "" : classeSinal(d.pnlNaoRealizado)}">${soSxBet ? "—" : fmtDolarSinal(d.pnlNaoRealizado)}</div>
+<div class="sm mu">${MYBETTYS_CONNECTIONS?.sxbet ? "A SX Bet informa só a exposição, sem valor a mercado" : "Valor a mercado das posições abertas"}</div>
+</div>
+<div class="card kpi">
+<div class="kpi-topo"><span class="k">Exposição · ${d.abertosF.length} ${d.abertosF.length === 1 ? "aberta" : "abertas"}</span><button type="button" class="link" data-on-click="irPara('posicoes')">Ver posições</button></div>
+<div class="v">${fmtDolar(d.stakeAbertas)}</div>
+${casas.length ? `<div class="pbar">${barra}</div><div class="kpi-legenda">${legenda}</div>` : `<div class="sm mu">Nenhuma posição aberta</div>`}
+</div>`;
+}
+function pintarDestaquesVisao(d) {
+  const el = document.getElementById("dashboardInsights");
+  if (!el) return;
+  const cards = [];
+  if (d.concMercado) {
+    const pct = d.stakeAbertas > 0 ? d.concMercado.stake / d.stakeAbertas * 100 : 0;
+    cards.push(`<button type="button" class="card destaque" data-on-click="irPara('posicoes')"><div class="k">Maior exposição atual</div><div class="b el destaque-titulo">${escapeHtml(d.concMercado.titulo)}</div><div class="sm mu">${fmtDolar(d.concMercado.stake)} · ${pct.toFixed(1)}% da exposição</div></button>`);
+  }
+  if (Number.isFinite(d.drawdownAtual)) {
+    cards.push(`<div class="card destaque"><div class="k">Drawdown diário</div><div class="v2 ${d.drawdownAtual < 0 ? "neg" : ""}">${fmtDolar(d.drawdownAtual)} <span class="sm mu">agora</span></div>${Number.isFinite(d.maxDrawdown) ? `<div class="sm mu">Máximo no histórico <b class="neg">${fmtDolar(d.maxDrawdown)}</b></div>` : ""}</div>`);
+  }
+  cards.push(`<div class="card destaque"><div class="k">Variação · 7 dias</div><div class="v2 ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)}</div><div class="sm mu">7 dias anteriores <b>${d.pnlAnterior == null ? "—" : fmtDolarSinal(d.pnlAnterior)}</b></div></div>`);
+  el.innerHTML = cards.join("");
+}
+// Séries diárias dos últimos 30 dias (todas as casas e cada casa) para os mini gráficos.
+let seriesVisao = { chave: "", dados: new Map(), pendente: null };
+function carregarSeriesVisao() {
+  if (!historicoFechadoIndexado || historicoIndiceEmSincronizacao) return Promise.resolve(false);
+  const casas = casasConectadas();
+  const chave = [versaoIndiceHistorico, ymdBrasil(new Date()), chavePeriodoFechadasConfigurado(), casas.join(",")].join("|");
+  if (seriesVisao.chave === chave) return Promise.resolve(true);
+  if (seriesVisao.pendente?.chave === chave) return seriesVisao.pendente.promise;
+  const buscar = casa => fetch("/api/history/closed/pnl?" + new URLSearchParams({ mode: "day", period: "30", platform: casa, now: String(Date.now()) }), { cache: "no-store" })
+    .then(r => r.ok ? r.json() : null)
+    .then(j => [casa, Array.isArray(j?.serie) ? j.serie.map(p => Number(p.v) || 0) : []])
+    .catch(() => [casa, []]);
+  const promise = Promise.all(["todas", ...casas].map(buscar)).then(lista => {
+    if (seriesVisao.pendente?.promise !== promise) return false;
+    seriesVisao = { chave, dados: new Map(lista), pendente: null };
+    return true;
+  });
+  seriesVisao.pendente = { chave, promise };
+  return promise;
+}
+function pintarMiniGraficosVisao() {
+  for (const svg of document.querySelectorAll("svg.visao-spark[data-spark]")) {
+    const diarios = seriesVisao.dados.get(svg.dataset.spark) || [];
+    if (!diarios.length) { svg.innerHTML = ""; continue; }
+    let acc = 0;
+    const pontos = diarios.map(v => (acc += v));
+    const min = Math.min(0, ...pontos), max = Math.max(0, ...pontos), faixa = max - min || 1;
+    const passo = 120 / Math.max(1, pontos.length - 1);
+    const linha = pontos.map((v, i) => `${(i * passo).toFixed(1)},${(24 - (v - min) / faixa * 22).toFixed(1)}`).join(" ");
+    svg.setAttribute("class", "visao-spark " + (acc >= 0 ? "pos" : "neg"));
+    svg.innerHTML = `<polyline points="${linha}" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+  }
+  const barras = document.getElementById("visaoBarras");
+  if (barras) {
+    const dias = (seriesVisao.dados.get("todas") || []).slice(-14);
+    const maior = Math.max(0, ...dias.map(Math.abs)) || 1;
+    barras.innerHTML = dias.map((v, i) => {
+      const h = Math.max(v ? 2 : 0, Math.abs(v) / maior * 26);
+      const x = 1 + i * 16;
+      return v >= 0
+        ? `<rect class="pos" x="${x}" y="${(30 - h).toFixed(1)}" width="10" height="${h.toFixed(1)}" rx="2"/>`
+        : `<rect class="neg" x="${x}" y="30" width="10" height="${h.toFixed(1)}" rx="2"/>`;
+    }).join("") + `<line x1="0" y1="30" x2="222" y2="30" class="base"/>`;
+  }
 }

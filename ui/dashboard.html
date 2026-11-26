@@ -87,24 +87,6 @@ data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <div class="sync-panel" id="syncPanel" role="dialog" aria-label="Estado da sincronização"></div>
 </div>
 </div>
-<div class="balances">
-<div class="b">
-<div class="label"><img src="/assets/platforms/polymarket.png" alt="">Polymarket</div>
-<div class="value" id="saldoPolyFixo">—</div>
-</div>
-<div class="b">
-<div class="label"><img src="/assets/platforms/kalshi.png" alt="">Kalshi</div>
-<div class="value" id="saldoKalshiFixo">—</div>
-</div>
-<div class="b" id="saldoPredictCard" hidden>
-<div class="label"><img src="/assets/platforms/predict.png" alt="">Predict.fun</div>
-<div class="value" id="saldoPredictFixo">—</div>
-</div>
-<div class="b" id="saldoSxBetCard" hidden>
-<div class="label"><img src="/assets/platforms/sxbet.png" alt="">SX Bet</div>
-<div class="value" id="saldoSxBetFixo">—</div>
-</div>
-</div>
 </div>
 </div>
 <div class="stale-banner" id="staleBanner" role="status">
@@ -123,27 +105,27 @@ data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <div class="sync-progress-step"><div class="sync-progress-step-label"><span class="sync-progress-icon">4</span><span>Visualização</span></div><div class="sync-progress-track"></div></div>
 </div>
 </section>
-<div class="stats-row" id="stats"></div>
-<div class="insights-block" id="dashboardInsights"></div>
-<div class="grid-chart" id="chartSection">
-<div class="card chart-card">
-<div class="chart-head">
-<div>
-<div class="chart-type-controls" style="margin-bottom:8px;">
-<div class="chart-periods">
+<div class="visao" id="visaoGeral">
+<div class="visao-split" id="chartSection">
+<section class="card visao-hero" aria-label="Patrimônio e evolução do PnL">
+<div class="hero-topo">
+<div class="hero-num">
+<div class="k" id="heroPatrimonioRotulo">Patrimônio</div>
+<div class="hn" id="heroPatrimonio">—</div>
+<div class="hero-chips" id="heroChips"></div>
+</div>
+<div class="hero-ctrl">
+<div class="chart-periods chart-type-controls seg-like" role="group" aria-label="Tipo de gráfico">
 <button type="button" class="chart-period-btn chart-type-btn active" data-tipo="patrimonio" data-on-click="trocarTipoGrafico('patrimonio',this)">PnL Acumulado</button>
 <button type="button" class="chart-period-btn chart-type-btn" data-tipo="pnldia" data-on-click="trocarTipoGrafico('pnldia',this)">PnL por Dia</button>
 <button type="button" class="chart-period-btn chart-type-btn" data-tipo="pnlmes" data-on-click="trocarTipoGrafico('pnlmes',this)">PnL por Mês</button>
 </div>
-</div>
-<div class="chart-title" id="chartTitleText">Evolução do PnL Acumulado</div>
-<div class="chart-periods" style="margin-top:8px;" id="chartPeriodButtons">
+<div class="hero-ctrl-linha">
+<div class="chart-periods seg-like" id="chartPeriodButtons" role="group" aria-label="Período do gráfico">
 <button type="button" class="chart-period-btn" data-periodo="7" data-on-click="trocarPeriodoGrafico(7)">7 dias</button>
 <button type="button" class="chart-period-btn" data-periodo="30" data-on-click="trocarPeriodoGrafico(30)">30 dias</button>
-<button type="button" class="chart-period-btn active" data-periodo="all" data-on-click="trocarPeriodoGrafico(-1)">All</button>
+<button type="button" class="chart-period-btn active" data-periodo="all" data-on-click="trocarPeriodoGrafico(-1)">Tudo</button>
 </div>
-</div>
-<div class="chart-side">
 <div class="chart-house-menu" id="graficoCasaMenu">
 <button type="button" class="chart-house-trigger" id="graficoCasaTrigger" data-on-click="toggleCasaGraficoMenu()" aria-label="Filtrar gráficos por casa" aria-haspopup="listbox" aria-expanded="false">
 <span class="chart-house-caption">Casa</span><span class="chart-house-value" id="graficoCasaValor">Todas</span><span class="chart-house-chevron" aria-hidden="true"></span>
@@ -156,10 +138,6 @@ data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <button type="button" class="chart-house-option" data-casa="sxbet" data-on-click="alterarCasaGrafico('sxbet')">SX Bet</button>
 </div>
 </div>
-<div class="chart-valorwrap">
-<div class="chart-valor" id="chartValorAtual">—</div>
-<div class="chart-variacao" id="chartVariacao"></div>
-<div class="chart-variacao-label" id="chartValorLabel">PnL Acumulado</div>
 </div>
 </div>
 </div>
@@ -170,30 +148,22 @@ data-on-keydown="teclaConfirmarSenhaConfig(event)">
 <div class="chart-tooltip" id="chartTooltip"></div>
 </div>
 <div id="chartDateNotice" hidden style="color:var(--muted);font-size:.78rem;padding:8px 0;"></div>
+<div class="hero-rodape">
+<span class="chart-title" id="chartTitleText">Evolução do PnL Acumulado</span>
+<span class="chart-valorwrap"><span class="chart-variacao-label" id="chartValorLabel">PnL Acumulado</span> <span class="chart-valor" id="chartValorAtual">—</span> <span class="chart-variacao" id="chartVariacao"></span></span>
 </div>
-<div class="card resumo-card">
-<div class="resumo-title">Resumo Rápido</div>
-<div class="resumo-item">
-<div class="resumo-left"><span class="ic-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>ROI</div>
-<div class="resumo-val" id="resumoRoi">—</div>
+</section>
+<section class="visao-casas" id="visaoCasas" aria-label="Casas"></section>
 </div>
-<div class="resumo-item">
-<div class="resumo-left"><span class="ic-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span>Lucro Realizado</div>
-<div class="resumo-val" id="resumoLucro">—</div>
-</div>
-<div class="resumo-item">
-<div class="resumo-left"><span class="ic-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.5" fill="currentColor"/></svg></span>Taxa de Acerto</div>
-<div class="resumo-val" id="resumoTaxa">—</div>
-</div>
-<div class="resumo-item">
-<div class="resumo-left"><span class="ic-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-5 4 4 8-8M20 8h-4v4"/></svg></span>Odd Média</div>
-<div class="resumo-val" id="resumoOdd">—</div>
-</div>
-<div class="resumo-item">
-<div class="resumo-left"><span class="ic-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg></span>Stake Média</div>
-<div class="resumo-val" id="resumoStakeMedia">—</div>
-</div>
-</div>
+<section class="visao-kpis" id="stats" aria-label="Indicadores"></section>
+<section class="minis" aria-label="Resumo rápido">
+<div><div class="k">Lucro realizado</div><div class="v2 resumo-val" id="resumoLucro">—</div></div>
+<div><div class="k">ROI</div><div class="v2 resumo-val" id="resumoRoi">—</div></div>
+<div><div class="k">Taxa de acerto</div><div class="v2 resumo-val" id="resumoTaxa">—</div></div>
+<div><div class="k">Odd média</div><div class="v2 resumo-val" id="resumoOdd">—</div></div>
+<div><div class="k">Stake média</div><div class="v2 resumo-val" id="resumoStakeMedia">—</div></div>
+</section>
+<section class="visao-destaques" id="dashboardInsights" aria-label="Destaques"></section>
 </div>
 <!-- Tabs + Search + filtros (só Posições) -->
 <div class="toolbar" id="toolbarSection" style="display:none;">
