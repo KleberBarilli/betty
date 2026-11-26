@@ -1,0 +1,321 @@
+//! Conversões com a mesma semântica do JavaScript do `server.js`. As validações
+//! do backend antigo dependem delas (`Number(x) > 0`, `String(x)`, ...), e o
+//! JSON gravado no banco precisa sair igual ao do Node.
+
+use serde_json::Value;
+
+/// `Number(valor)`; `None` representa `undefined`.
+pub fn number(valor: Option<&Value>) -> f64 {
+    match valor {
+        None => f64::NAN,
+        Some(Value::Null) => 0.0,
+        Some(Value::Bool(b)) => f64::from(u8::from(*b)),
+        Some(Value::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
+        Some(Value::String(s)) => texto_para_numero(s),
+        // Number([]) = 0, Number([x]) = Number(String(x)), demais = NaN.
+        Some(Value::Array(a)) => match a.as_slice() {
+            [] => 0.0,
+            [unico] => match unico {
+                Value::Array(_) | Value::Object(_) => f64::NAN,
+                Value::Null => 0.0,
+                outro => texto_para_numero(&string(Some(outro))),
+            },
+            _ => f64::NAN,
+        },
+        Some(Value::Object(_)) => f64::NAN,
+    }
+}
+
+fn texto_para_numero(s: &str) -> f64 {
+    let t = s.trim();
+    if t.is_empty() {
+        return 0.0;
+    }
+    match t {
+        "Infinity" | "+Infinity" => return f64::INFINITY,
+        "-Infinity" => return f64::NEG_INFINITY,
+        _ => {}
+    }
+    for (prefixo, base) in [("0x", 16), ("0X", 16), ("0o", 8), ("0O", 8), ("0b", 2), ("0B", 2)] {
+        if let Some(resto) = t.strip_prefix(prefixo) {
+            return u64::from_str_radix(resto, base).map(|n| n as f64).unwrap_or(f64::NAN);
+        }
+    }
+    // O Rust aceita "inf"/"nan" e o JavaScript não.
+    if t.bytes().any(|b| b.is_ascii_alphabetic() && b != b'e' && b != b'E') {
+        return f64::NAN;
+    }
+    t.parse::<f64>().unwrap_or(f64::NAN)
+}
+
+/// `String(valor)` para os tipos simples.
+pub fn string(valor: Option<&Value>) -> String {
+    match valor {
+        None => "undefined".into(),
+        Some(Value::Null) => "null".into(),
+        Some(Value::Bool(b)) => b.to_string(),
+        Some(Value::Number(n)) => match (n.as_i64(), n.as_u64()) {
+            (Some(i), _) => i.to_string(),
+            (_, Some(u)) => u.to_string(),
+            _ => numero_texto(n.as_f64().unwrap_or(f64::NAN)).unwrap_or_else(|| "NaN".into()),
+        },
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Array(_)) => String::new(),
+        Some(Value::Object(_)) => "[object Object]".into(),
+    }
+}
+
+/// `Number.prototype.toString()` (ECMAScript Number::toString): mesmos
+/// dígitos mínimos e as mesmas regras de quando usar expoente.
+pub fn numero_texto(n: f64) -> Option<String> {
+    if !n.is_finite() {
+        return None;
+    }
+    if n == 0.0 {
+        return Some("0".into());
+    }
+    // `{:e}` do Rust dá os dígitos mínimos que fazem ida e volta, como o JS.
+    let cientifico = format!("{:e}", n.abs());
+    let (mantissa, expoente) = cientifico.split_once('e')?;
+    let digitos: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let k = digitos.len() as i32;
+    let pos = expoente.parse::<i32>().ok()? + 1;
+    let corpo = if k <= pos && pos <= 21 {
+        format!("{digitos}{}", "0".repeat((pos - k) as usize))
+    } else if 0 < pos && pos <= 21 {
+        format!("{}.{}", &digitos[..pos as usize], &digitos[pos as usize..])
+    } else if -6 < pos && pos <= 0 {
+        format!("0.{}{digitos}", "0".repeat((-pos) as usize))
+    } else {
+        let e = pos - 1;
+        let resto = if k > 1 { format!(".{}", &digitos[1..]) } else { String::new() };
+        format!("{}{resto}e{}{}", &digitos[..1], if e >= 0 { "+" } else { "-" }, e.abs())
+    };
+    Some(if n < 0.0 { format!("-{corpo}") } else { corpo })
+}
+
+/// Número como valor JSON, com o texto que o `JSON.stringify` escreveria
+/// (com `arbitrary_precision` o texto fica guardado no próprio número).
+pub fn numero_json(n: f64) -> Value {
+    if !n.is_finite() {
+        Value::Null
+    } else if n.fract() == 0.0 && n.abs() < 9_007_199_254_740_992.0 {
+        Value::from(n as i64)
+    } else {
+        numero_texto(n).and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
+    }
+}
+
+/// Formatador do serde_json que escreve números com as regras do
+/// `JSON.stringify` (0.000001, 1e-7, 1e+21...).
+pub struct FormatoJs;
+
+impl serde_json::ser::Formatter for FormatoJs {
+    fn write_f64<W: ?Sized + std::io::Write>(&mut self, w: &mut W, v: f64) -> std::io::Result<()> {
+        w.write_all(numero_texto(v).as_deref().unwrap_or("null").as_bytes())
+    }
+
+    fn write_f32<W: ?Sized + std::io::Write>(&mut self, w: &mut W, v: f32) -> std::io::Result<()> {
+        self.write_f64(w, f64::from(v))
+    }
+}
+
+/// `JSON.stringify(v)` em bytes.
+pub fn para_vec<T: serde::Serialize + ?Sized>(v: &T) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(256);
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, FormatoJs);
+    v.serialize(&mut ser).expect("serialização JSON");
+    buf
+}
+
+/// `JSON.stringify(v)`.
+pub fn para_texto<T: serde::Serialize + ?Sized>(v: &T) -> String {
+    String::from_utf8(para_vec(v)).expect("JSON é UTF-8")
+}
+
+/// Valor bruto (texto JSON) com a mesma formatação.
+pub fn bruto<T: serde::Serialize + ?Sized>(v: &T) -> Box<serde_json::value::RawValue> {
+    serde_json::value::RawValue::from_string(para_texto(v)).expect("JSON válido")
+}
+
+/// Regex escrita na sintaxe do JavaScript: lá `\b` e `\d` são ASCII; no crate
+/// `regex` seriam Unicode.
+pub fn re(padrao: &str) -> regex::Regex {
+    let traduzido = padrao.replace(r"\b", r"(?-u:\b)").replace(r"\d", "[0-9]");
+    regex::Regex::new(&traduzido).unwrap_or_else(|e| panic!("regex inválida {padrao}: {e}"))
+}
+
+/// Declara uma regex estática compilada na primeira utilização.
+#[macro_export]
+macro_rules! regex_js {
+    ($nome:ident, $padrao:expr) => {
+        static $nome: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| $crate::js::re($padrao));
+    };
+}
+
+/// `str.slice(0, n)` do JavaScript, que conta unidades UTF-16.
+pub fn fatia_utf16(s: &str, n: usize) -> &str {
+    let mut unidades = 0;
+    for (i, c) in s.char_indices() {
+        unidades += c.len_utf16();
+        if unidades > n {
+            return &s[..i];
+        }
+    }
+    s
+}
+
+/// `Date.parse()` para os formatos que as APIs usam (ISO 8601, data simples,
+/// data e hora sem fuso = horário local, RFC 2822). `None` = NaN.
+pub fn data_ms(texto: &str) -> Option<f64> {
+    use chrono::{DateTime, NaiveDate, TimeZone};
+    static DATA: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(
+            r"(?i)^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?\s*(Z|[+-]\d{2}(?::?\d{2})?)?$",
+        )
+        .expect("regex de data")
+    });
+    let t = texto.trim();
+    if t.is_empty() {
+        return None;
+    }
+    if let Some(c) = DATA.captures(t) {
+        let n = |i: usize| c.get(i).map_or(Some(0), |m| m.as_str().parse::<u32>().ok());
+        let data = NaiveDate::from_ymd_opt(c[1].parse().ok()?, n(2)?, n(3)?)?;
+        // Fração: só os milissegundos contam (o V8 trunca o resto).
+        let ms = c.get(7).map_or(0, |m| {
+            let f: String = m.as_str().chars().chain(std::iter::repeat('0')).take(3).collect();
+            f.parse::<u32>().unwrap_or(0)
+        });
+        let local = data.and_hms_milli_opt(n(4)?, n(5)?, n(6)?, ms)?;
+        let tem_hora = c.get(4).is_some();
+        return match c.get(8).map(|m| m.as_str()) {
+            Some(z) if z.eq_ignore_ascii_case("z") => Some(local.and_utc().timestamp_millis() as f64),
+            Some(fuso) => {
+                let sinal = if fuso.starts_with('-') { -1 } else { 1 };
+                let digitos: String = fuso[1..].chars().filter(char::is_ascii_digit).collect();
+                let horas: i32 = digitos.get(..2)?.parse().ok()?;
+                let minutos: i32 = digitos.get(2..).filter(|s| !s.is_empty()).map_or(Some(0), |s| s.parse().ok())?;
+                let deslocamento = chrono::FixedOffset::east_opt(sinal * (horas * 3600 + minutos * 60))?;
+                deslocamento.from_local_datetime(&local).single().map(|d| d.timestamp_millis() as f64)
+            }
+            // Data ISO pura (AAAA-MM-DD) é UTC; com hora ou fora do formato estrito, horário local.
+            None if !tem_hora && c[2].len() == 2 && c[3].len() == 2 => Some(local.and_utc().timestamp_millis() as f64),
+            None => chrono::Local.from_local_datetime(&local).earliest().map(|d| d.timestamp_millis() as f64),
+        };
+    }
+    DateTime::parse_from_rfc2822(t).ok().map(|d| d.timestamp_millis() as f64)
+}
+
+/// `new Date(ms).toISOString()`.
+pub fn iso(ms: f64) -> Option<String> {
+    use chrono::TimeZone;
+    if !ms.is_finite() || ms.abs() > 8.64e15 {
+        return None;
+    }
+    chrono::Utc
+        .timestamp_millis_opt(ms.trunc() as i64)
+        .single()
+        .map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+}
+
+/// `/^\d{4}-\d{2}-\d{2}$/`.
+pub fn e_data_ymd(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 10
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && b.iter().enumerate().all(|(i, c)| i == 4 || i == 7 || c.is_ascii_digit())
+}
+
+/// Truthiness do JavaScript.
+pub fn truthy(valor: Option<&Value>) -> bool {
+    match valor {
+        None | Some(Value::Null) => false,
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_f64().is_some_and(|f| f != 0.0 && !f.is_nan()),
+        Some(Value::String(s)) => !s.is_empty(),
+        Some(Value::Array(_)) | Some(Value::Object(_)) => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn number_segue_o_javascript() {
+        assert!(number(None).is_nan());
+        assert_eq!(number(Some(&json!(null))), 0.0);
+        assert_eq!(number(Some(&json!(""))), 0.0);
+        assert_eq!(number(Some(&json!("  2.5 "))), 2.5);
+        assert_eq!(number(Some(&json!("1e2"))), 100.0);
+        assert_eq!(number(Some(&json!("0x10"))), 16.0);
+        assert!(number(Some(&json!("inf"))).is_nan());
+        assert!(number(Some(&json!("abc"))).is_nan());
+        assert_eq!(number(Some(&json!("Infinity"))), f64::INFINITY);
+        assert_eq!(number(Some(&json!(true))), 1.0);
+        assert_eq!(number(Some(&json!([]))), 0.0);
+        assert_eq!(number(Some(&json!(["7"]))), 7.0);
+        assert!(number(Some(&json!({}))).is_nan());
+    }
+
+    #[test]
+    fn json_numerico_igual_ao_node() {
+        let casos = [
+            (1.0, "1"),
+            (1.5, "1.5"),
+            (-0.0, "0"),
+            (0.56, "0.56"),
+            (0.000001, "0.000001"),
+            (0.0000001, "1e-7"),
+            (0.00001234, "0.00001234"),
+            (1e21, "1e+21"),
+            (123456789012345680000.0, "123456789012345680000"),
+            (1.0 / 3.0, "0.3333333333333333"),
+            (-2.5e-10, "-2.5e-10"),
+            (1795714000000.0, "1795714000000"),
+            (0.1 + 0.2, "0.30000000000000004"),
+        ];
+        for (n, esperado) in casos {
+            assert_eq!(para_texto(&numero_json(n)), esperado, "{n}");
+        }
+        // Texto do Node relido e reescrito sem mudar.
+        let original = r#"{"a":0.000001,"b":1e-7,"c":1795714000000,"d":0.30000000000000004,"e":1e+21,"f":100000000000000000000,"g":0.9199999999999999}"#;
+        assert_eq!(para_texto(&serde_json::from_str::<Value>(original).unwrap()), original);
+        assert_eq!(numero_json(f64::NAN), Value::Null);
+    }
+
+    #[test]
+    fn datas_como_no_javascript() {
+        // Valores de referência calculados com Date.parse do Node 24.
+        assert_eq!(data_ms("2026-11-20T23:00:00Z"), Some(1795215600000.0));
+        assert_eq!(data_ms("2026-11-20T23:00:00.123456Z"), Some(1795215600123.0));
+        assert_eq!(data_ms("2026-11-20"), Some(1795132800000.0));
+        assert_eq!(data_ms(""), None);
+        assert_eq!(data_ms("abc"), None);
+        assert_eq!(data_ms("2026-09-15 23:49:18+00"), Some(1789516158000.0));
+        assert_eq!(data_ms("2026-09-15T23:49:18+0300"), Some(1789505358000.0));
+        assert_eq!(data_ms("2026-09-15T23:49:18+03:00"), Some(1789505358000.0));
+        assert_eq!(data_ms("2026-09-15 23:49:18Z"), Some(1789516158000.0));
+        assert_eq!(data_ms("2026-09-15T23:49:18.5Z"), Some(1789516158500.0));
+        assert_eq!(data_ms("2026-09-15T23:49:18.123456+00:00"), Some(1789516158123.0));
+        assert_eq!(data_ms("2026-09-15 23:49:18.123+00"), Some(1789516158123.0));
+        assert_eq!(data_ms("2026-09-15T23:49Z"), Some(1789516140000.0));
+        assert_eq!(data_ms("2026-09-15 23:49:18 +00:00"), Some(1789516158000.0));
+        assert_eq!(data_ms("Tue, 15 Sep 2026 23:49:18 GMT"), Some(1789516158000.0));
+        assert_eq!(iso(1795215600123.0).as_deref(), Some("2026-11-20T23:00:00.123Z"));
+        assert_eq!(fatia_utf16("ação😀x", 4), "ação");
+        assert_eq!(fatia_utf16("ação😀x", 5), "ação");
+        assert_eq!(fatia_utf16("ação😀x", 6), "ação😀");
+    }
+
+    #[test]
+    fn datas_ymd() {
+        assert!(e_data_ymd("2026-11-26"));
+        assert!(!e_data_ymd("2026-1-26"));
+        assert!(!e_data_ymd("2026/11/26"));
+        assert!(!e_data_ymd("2026-11-26T00"));
+    }
+}

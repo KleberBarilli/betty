@@ -1,0 +1,120 @@
+.profit-calendar { min-width: 0; }
+.profit-calendar-toolbar, .profit-calendar-navigation, .profit-calendar-filters { display: flex; align-items: center; gap: 10px; }
+.profit-calendar-toolbar { justify-content: space-between; flex-wrap: wrap; gap: 18px; margin-bottom: 22px; }
+.profit-calendar-navigation h2 { font-size: .98rem; font-weight: 700; min-width: 175px; text-align: center; }
+.profit-calendar-filters { flex-wrap: wrap; }
+.profit-calendar-month-field { display: grid; gap: 5px; min-width: 0; }
+.profit-calendar-filters .profit-calendar-month-button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; height: 34px; padding: 0 9px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; }
+#profitCalendarMonthLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profit-calendar-month-button svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted); }
+.profit-calendar .profit-calendar-month-popup[hidden] { display: none; }
+.profit-calendar-month-popup .profit-calendar-month-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.profit-calendar-month-popup .day { border: 0; background: transparent; font-family: inherit; text-transform: capitalize; }
+.profit-calendar-month-popup .date-popup-foot { justify-content: flex-end; }
+.profit-calendar-filters label { display: grid; gap: 5px; color: var(--muted); font-size: .65rem; font-weight: 650; text-transform: uppercase; letter-spacing: .03em; }
+.profit-calendar-filters select, .profit-calendar-filters input { color-scheme: dark; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 34px; padding: 0 9px; font: inherit; font-size: .78rem; font-weight: 600; text-transform: none; letter-spacing: normal; min-width: 0; }
+.calendar-control { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; min-height: 34px; padding: 5px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; }
+.profit-calendar-navigation > .calendar-control:not(.calendar-today) { font-size: 1.45rem; line-height: 1; }
+.calendar-control:hover:not(:disabled) { background: var(--card-2); border-color: var(--muted-2); }
+.calendar-control:disabled { opacity: .35; cursor: default; }
+.profit-calendar :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.profit-calendar-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.calendar-metric .stat-body { flex: 1; }
+.calendar-metric .value { overflow-wrap: anywhere; }
+.calendar-metric .sub { margin-top: 5px; font-size: .67rem; }
+.profit-calendar .positive { color: var(--accent); }
+.profit-calendar .negative { color: var(--danger); }
+.profit-calendar .neutral { color: var(--muted); }
+.profit-calendar-status { color: var(--muted); font-size: .76rem; min-height: 24px; margin-bottom: 10px; }
+.profit-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(110px, .85fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
+.calendar-weekday { text-align: center; padding: 12px 4px; color: var(--muted); background: var(--card-2); font-size: .7rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
+.calendar-day, .calendar-blank, .calendar-week-summary { min-height: 115px; background: var(--card); }
+.calendar-day { border: 0; border-radius: 0; padding: 10px 12px; display: flex; flex-direction: column; align-items: stretch; gap: 7px; color: var(--muted); font: inherit; text-align: left; cursor: pointer; min-width: 0; position: relative; font-variant-numeric: tabular-nums; }
+.calendar-day.positive { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.calendar-day.negative { background: color-mix(in srgb, var(--danger) 10%, var(--card)); }
+.calendar-day.neutral { background: var(--card-2); }
+.calendar-day:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--muted); }
+.calendar-day.is-selected { box-shadow: inset 0 0 0 2px var(--accent); z-index: 1; }
+.calendar-day.is-selected:hover { box-shadow: inset 0 0 0 2px var(--accent); }
+.calendar-day:focus-visible { outline-offset: -4px; z-index: 2; }
+.calendar-day:disabled { cursor: default; }
+.calendar-day-number { display: flex; justify-content: space-between; align-items: center; gap: 3px; font-size: .79rem; color: var(--muted); }
+.calendar-day.is-today .calendar-day-number { color: var(--text); font-weight: 750; }
+.calendar-today-label { font-size: .65rem; color: var(--accent); }
+.calendar-day-profit { font-size: clamp(.8rem, 1.1vw, 1.02rem); font-weight: 750; letter-spacing: -.01em; margin-top: auto; white-space: nowrap; }
+.calendar-day small { font-size: .69rem; color: var(--muted); min-height: 16px; }
+.calendar-short-amount { display: none; }
+.calendar-blank { background: var(--bg); }
+.calendar-week-summary { display: flex; justify-content: center; flex-direction: column; align-items: center; gap: 6px; background: var(--sidebar-bg); font-variant-numeric: tabular-nums; }
+.calendar-week-summary > span, .calendar-week-summary > small { color: var(--muted); font-size: .7rem; }
+.calendar-week-summary > strong { font-size: .95rem; }
+.profit-calendar-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; margin-top: 12px; color: var(--muted); font-size: .71rem; }
+.profit-calendar-caption > span { display: flex; align-items: center; gap: 6px; }
+.profit-calendar-caption > span:last-child { margin-left: auto; }
+.calendar-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.profit-calendar-detail { margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-sm); overflow: hidden; }
+.profit-calendar-detail:empty { display: none; }
+.calendar-detail-heading { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; gap: 14px; cursor: pointer; list-style: none; }
+.calendar-detail-heading::-webkit-details-marker { display: none; }
+.calendar-day-details[open] > .calendar-detail-heading { border-bottom: 1px solid var(--border); }
+.calendar-detail-heading:hover { background: var(--card-2); }
+.calendar-detail-heading > div { flex: 1; min-width: 0; }
+.calendar-detail-chevron { font-size: 1.35rem; color: var(--muted); line-height: 1; }
+.calendar-day-details[open] .calendar-detail-chevron { transform: rotate(90deg); }
+.calendar-detail-toggle { color: var(--muted); font-size: .7rem; white-space: nowrap; }
+.calendar-day-details[open] .calendar-expand-label, .calendar-day-details:not([open]) .calendar-collapse-label { display: none; }
+.calendar-detail-heading h3 { font-size: .9rem; font-weight: 700; }
+.calendar-detail-heading p { color: var(--muted); font-size: .76rem; margin-top: 5px; }
+.calendar-detail-heading > strong { font-size: 1.28rem; font-weight: 750; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#profitCalendarDayRows { color: var(--muted); font-size: .82rem; }
+#profitCalendarDayRows:not(:has(.calendar-bet-list)) { padding: 14px 18px; }
+.calendar-detail-empty { padding-top: 12px; }
+.calendar-bet-list { list-style: none; }
+.calendar-bet-list li { display: flex; justify-content: space-between; align-items: center; gap: 16px; height: 46px; box-sizing: border-box; padding: 6px 12px; border-bottom: 1px solid var(--border-soft); }
+.calendar-bet-list li:nth-child(even) { background: rgba(255,255,255,.012); }
+.calendar-bet-description { flex: 1; min-width: 0; }
+.calendar-bet-list li > strong { white-space: nowrap; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.calendar-bet-top { display: flex; align-items: center; gap: 6px; height: 18px; min-width: 0; }
+.calendar-bet-house { flex-shrink: 0; font-size: .7rem; line-height: 15px; }
+.calendar-house-polymarket { color: color-mix(in srgb, var(--blue) 45%, var(--muted)); }
+.calendar-house-kalshi { color: color-mix(in srgb, var(--accent) 45%, var(--muted)); }
+.calendar-house-predict { color: #c084fc; }
+.calendar-house-sxbet { color: #fbbf24; }
+.calendar-bet-meta { color: var(--muted); font-size: .7rem; font-weight: 500; line-height: 15px; }
+.calendar-bet-game { display: flex; align-items: center; min-width: 0; color: var(--text); font-size: .82rem; font-weight: 550; line-height: 18px; }
+.calendar-bet-divider { flex-shrink: 0; color: var(--muted); font-size: .7rem; }
+.calendar-bet-game .category-icon { margin-right: 3px; }
+.calendar-bet-game > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-bet-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; height: 15px; line-height: 15px; }
+.calendar-bet-selection { color: var(--text); font-size: .82rem; font-weight: 550; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-bet-meta { flex-shrink: 0; white-space: nowrap; }
+.calendar-day-pager { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 12px 16px; }
+@media (max-width: 1100px) {
+  .profit-calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .calendar-week-total { display: none; }
+}
+@media (max-width: 600px) {
+  .profit-calendar-toolbar { gap: 14px; }
+  .profit-calendar-navigation { width: 100%; gap: 7px; }
+  .profit-calendar-navigation h2 { min-width: 0; flex: 1; font-size: 1.05rem; }
+  .profit-calendar-filters { display: grid; grid-template-columns: 1fr 1fr 75px; width: 100%; gap: 7px; }
+  .profit-calendar-filters select, .profit-calendar-filters input { width: 100%; padding: 0 4px; font-size: .71rem; }
+  .profit-calendar-summary { grid-template-columns: 1fr 1fr; }
+  .calendar-metric .sub { width: 100%; margin-left: 0; text-align: left; }
+  .calendar-weekday { font-size: .65rem; padding: 9px 2px; }
+  .calendar-day, .calendar-blank { min-height: 82px; }
+  .calendar-day { padding: 5px 2px; gap: 4px; text-align: center; }
+  .calendar-day-number { font-size: .69rem; justify-content: center; }
+  .calendar-today-label, .calendar-full-amount, .calendar-bets-label { display: none; }
+  .calendar-short-amount { display: inline; }
+  .calendar-day-profit { font-size: .62rem; letter-spacing: -.04em; }
+  .calendar-day small { font-size: .6rem; }
+  .profit-calendar-caption { gap: 10px; font-size: .64rem; }
+  .profit-calendar-caption > span:last-child { width: 100%; margin-left: 0; }
+  .calendar-detail-heading { padding: 14px; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+  .calendar-detail-heading h3 { font-size: .85rem; }
+  .calendar-detail-heading > strong { font-size: 1.2rem; }
+  .calendar-detail-heading > div { flex-basis: calc(100% - 24px); }
+  .calendar-detail-toggle { margin-left: 20px; margin-right: auto; }
+  #profitCalendarDayRows:not(:has(.calendar-bet-list)) { padding: 12px 14px; }
+}

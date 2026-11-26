@@ -1,0 +1,11 @@
+# Build do Rust/Tauri
+/src-tauri/target/
+/src-tauri/gen/
+
+# Dados locais e segredos: nunca versionar
+*.db
+*.db-wal
+*.db-shm
+local-config.json
+.env
+*.log

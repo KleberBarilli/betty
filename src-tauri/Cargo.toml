@@ -1,0 +1,62 @@
+[package]
+name = "mybettys"
+version = "0.1.0"
+description = "MyBettys: acompanhamento de apostas na Polymarket, Kalshi, Predict.fun e SX Bet"
+authors = ["Kleber Barilli"]
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[lib]
+name = "mybettys_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+# preserve_order: o JSON regravado no ledger mantém a ordem das chaves do
+# Node, então comparações de texto entre versões continuam válidas.
+# arbitrary_precision: cada número relido guarda o texto original gravado pelo
+# Node, então o JSON regravado no ledger sai idêntico (e é mais rápido que
+# reformatar floats). Números novos usam as regras do JSON.stringify (js.rs).
+serde_json = { version = "1", features = ["preserve_order", "raw_value", "arbitrary_precision"] }
+indexmap = { version = "2", features = ["serde"] }
+anyhow = "1"
+rusqlite = { version = "0.43", features = ["bundled", "backup", "functions"] }
+regex = "1"
+url = "2"
+# HTTP com rustls + ring (sem aws-lc, que exige CMake/NASM no Windows) e
+# verificação pelo repositório de certificados do sistema. Sem proxy do
+# sistema, como o Electron (`no-proxy-server`).
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json", "gzip", "http2", "charset"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+ring = "0.17"
+futures = "0.3"
+# Alocador muito mais rápido que o padrão do Windows para JSON com milhares de
+# objetos pequenos (histórico da Polymarket).
+mimalloc = { version = "0.1", default-features = false }
+tokio = { version = "1", features = ["time"] }
+unicode-normalization = "0.1"
+chrono-tz = { version = "0.10", default-features = false }
+aes-gcm = { version = "0.10", features = ["zeroize"] }
+base64 = "0.22"
+getrandom = "0.3"
+hex = "0.4"
+zeroize = "1"
+keyring = { version = "3.6", features = ["windows-native"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
