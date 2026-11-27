@@ -190,6 +190,174 @@ pub fn merge(antiga: &Value, nova: &Value) -> Result<Value, ()> {
     Ok(audit::protect_closed_date(Some(antiga), Value::Object(m)))
 }
 
+/// `String.prototype.trim()`: o conjunto de espaços do JS, que inclui o BOM e
+/// não inclui o U+0085 (o `str::trim` do Rust faz o contrário nos dois).
+fn aparar_js(s: &str) -> &str {
+    s.trim_matches(|c: char| {
+        matches!(
+            c,
+            '\u{9}'..='\u{d}' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}'
+                | '\u{3000}' | '\u{feff}'
+        )
+    })
+}
+
+/// `.replace(/^"|"$/g, '')`: uma aspa no início e uma no fim.
+fn sem_aspas(s: &str) -> &str {
+    let s = s.strip_prefix('"').unwrap_or(s);
+    s.strip_suffix('"').unwrap_or(s)
+}
+
+/// Índice do `selectedMarket` de `normalizarNomeMercadoPolymarket()`, que
+/// procura o mercado com `String(...).trim()` em vez do `clean()` do
+/// `exactMarket()`.
+fn mercado_selecionado_js(aposta: &Value, mercados: &[Value]) -> Option<usize> {
+    // `String(a || b || "").trim()`.
+    let campo = |v: Option<&Value>| aparar_js(&texto_truthy(v)).to_string();
+    let asset = campo(ou3(aposta, ["asset", "assetId", "tokenId"]));
+    let condicao = campo(titles::ou(aposta.get("conditionId"), aposta.get("condition_id"))).to_lowercase();
+    let slug = campo(aposta.get("slug")).to_lowercase();
+    let unico = |achados: Vec<usize>| if achados.len() == 1 { Some(achados[0]) } else { None };
+    let mut escolhido = None;
+    if !asset.is_empty() {
+        let alvo = sem_aspas(&asset);
+        // `(Array.isArray(m?.tokenIds) ? m.tokenIds : []).some(t => String(t).trim()...)`.
+        let tem_token = |m: &Value| {
+            m.get("tokenIds")
+                .and_then(Value::as_array)
+                .is_some_and(|ids| ids.iter().any(|t| sem_aspas(aparar_js(&js::string(Some(t)))) == alvo))
+        };
+        escolhido = unico((0..mercados.len()).filter(|&i| tem_token(&mercados[i])).collect());
+    }
+    if escolhido.is_none() && !condicao.is_empty() {
+        let condicao_de = |m: &Value| campo(titles::ou(m.get("conditionId"), m.get("condition_id"))).to_lowercase();
+        escolhido = unico((0..mercados.len()).filter(|&i| condicao_de(&mercados[i]) == condicao).collect());
+    }
+    if escolhido.is_none() && !slug.is_empty() {
+        escolhido = unico((0..mercados.len()).filter(|&i| campo(mercados[i].get("slug")).to_lowercase() == slug).collect());
+    }
+    escolhido
+}
+
+/// `a || b || c` sobre campos de um objeto.
+fn ou3<'a>(v: &'a Value, chaves: [&str; 3]) -> Option<&'a Value> {
+    chaves.iter().map(|k| v.get(*k)).find(|c| js::truthy(*c)).flatten()
+}
+
+/// Reduz o `_sportMeta` de uma aposta ao mercado exato dela.
+///
+/// O Gamma devolve o evento inteiro: centenas de mercados irmãos, cada um com
+/// a descrição completa. Depois de achado o mercado exato, ninguém lê os
+/// irmãos de novo. Eles só entram em `eventTexts`, que passa a ser gravado já
+/// calculado (os textos do evento sem os textos dos mercados, como
+/// `sinaisDaAposta()` e `history::compactar` fazem). `texts` e o resto do
+/// metadado ficam como estão.
+///
+/// Só compacta quando os dois jeitos de achar o mercado (o `exactMarket()` e o
+/// `selectedMarket` dos títulos) apontam para o mesmo mercado e a forma que a
+/// tabela recebe não muda. Em qualquer outro caso a aposta fica intacta.
+/// Devolve `true` quando mudou.
+pub fn compactar_meta_esporte(aposta: &mut Value) -> bool {
+    let Some(meta) = aposta.get("_sportMeta").filter(|m| m.is_object()) else { return false };
+    let Some(mercados) = meta.get("markets").and_then(Value::as_array) else { return false };
+    if mercados.len() <= 1 || !mercados.iter().all(Value::is_object) {
+        return false;
+    }
+    let Ok(Some(exato)) = titles::exact_market(aposta, Some(meta)) else { return false };
+    let Some(indice) = mercados.iter().position(|m| std::ptr::eq(m, exato)) else { return false };
+    if mercado_selecionado_js(aposta, mercados) != Some(indice) {
+        return false;
+    }
+    let textos_evento = match meta.get("eventTexts") {
+        Some(Value::Array(_)) => None,
+        _ => {
+            let textos_mercado: HashSet<String> = mercados
+                .iter()
+                .flat_map(|m| ["slug", "question", "groupItemTitle", "sportsMarketType"].map(|k| m.get(k)))
+                .filter(|v| js::truthy(*v))
+                .map(|v| js::string(v).to_lowercase())
+                .collect();
+            let lista = match meta.get("texts") {
+                Some(Value::Array(a)) => {
+                    a.iter().filter(|v| !textos_mercado.contains(&js::string(Some(v)).to_lowercase())).cloned().collect()
+                }
+                _ => Vec::new(),
+            };
+            Some(Value::Array(lista))
+        }
+    };
+    let mut novo = meta.clone();
+    if let Some(o) = novo.as_object_mut() {
+        o.insert("markets".into(), Value::Array(vec![exato.clone()]));
+        if let Some(t) = textos_evento {
+            o.insert("eventTexts".into(), t);
+        }
+    }
+    let tabela_antes = history::meta_da_tabela(aposta);
+    let antigo = std::mem::replace(aposta.get_mut("_sportMeta").expect("_sportMeta conferido acima"), novo);
+    if tabela_antes.is_none() || history::meta_da_tabela(aposta) != tabela_antes {
+        aposta["_sportMeta"] = antigo;
+        return false;
+    }
+    true
+}
+
+/// Resultado da compactação única dos metadados já gravados.
+#[derive(Debug, Default)]
+pub struct Compactacao {
+    pub apostas: usize,
+    pub compactadas: usize,
+    pub bytes_antes: usize,
+    pub bytes_depois: usize,
+}
+
+const MANUTENCAO_COMPACTACAO: &str = "compact_polymarket_sport_meta_v1";
+
+/// Compacta, uma única vez, o `_sportMeta` das apostas gravadas antes de a
+/// escrita compactar. Tudo numa transação: se o app fechar no meio, a próxima
+/// abertura repete. `updated_at` não muda, porque a aposta continua a mesma.
+pub fn compactar_ledger_uma_vez(c: &mut Connection) -> Result<Option<Compactacao>> {
+    let feito = c
+        .query_row("SELECT 1 FROM database_maintenance WHERE maintenance_key=?", [MANUTENCAO_COMPACTACAO], |_| Ok(()))
+        .optional()?
+        .is_some();
+    if feito {
+        return Ok(None);
+    }
+    let ids: Vec<i64> = {
+        let mut s = c.prepare("SELECT rowid FROM closed_bets_ledger WHERE platform='polymarket' ORDER BY rowid")?;
+        s.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?
+    };
+    let mut r = Compactacao::default();
+    let tx = c.transaction()?;
+    {
+        let mut ler = tx.prepare("SELECT data_json FROM closed_bets_ledger WHERE rowid=?")?;
+        let mut regravar = tx.prepare("UPDATE closed_bets_ledger SET data_json=? WHERE rowid=?")?;
+        for id in ids {
+            let texto: String = ler.query_row([id], |l| l.get(0))?;
+            r.apostas += 1;
+            r.bytes_antes += texto.len();
+            let novo = serde_json::from_str::<Value>(&texto)
+                .ok()
+                .and_then(|mut v| compactar_meta_esporte(&mut v).then(|| js::para_texto(&v)));
+            match novo {
+                Some(n) => {
+                    r.bytes_depois += n.len();
+                    r.compactadas += 1;
+                    regravar.execute(params![n, id])?;
+                }
+                None => r.bytes_depois += texto.len(),
+            }
+        }
+    }
+    tx.execute(
+        "INSERT OR REPLACE INTO database_maintenance(maintenance_key,completed_at) VALUES(?,?)",
+        params![MANUTENCAO_COMPACTACAO, agora()],
+    )?;
+    tx.commit()?;
+    Ok(Some(r))
+}
+
 /// Campos de transporte que nunca entram no JSON canônico do ledger.
 const CAMPOS_TRANSITORIOS: [&str; 4] = ["_ledgerSourceSignature", "_kalshiTitleMeta", "_titleDisplay", "_titleDisplayVersion"];
 
@@ -285,10 +453,11 @@ pub fn gravar(c: &mut Connection, user_id: &str, linhas: Vec<Value>, incremental
                 .as_deref()
                 .and_then(|texto| serde_json::from_str::<Value>(texto).ok())
                 .and_then(|antiga| merge(&antiga, &linha).ok());
-            let dado = match mesclada {
+            let mut dado = match mesclada {
                 Some(m) => m,
                 None => audit::protect_closed_date(None, linha),
             };
+            compactar_meta_esporte(&mut dado);
             let texto = js::para_texto(&dado);
             // Resultado idêntico ao salvo: não regrava.
             if json_existente.as_deref() == Some(texto.as_str()) {
@@ -642,6 +811,148 @@ pub fn preparar_titulos_kalshi(c: &Connection, user_id: &str, linhas: Vec<Value>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Aposta da Polymarket com o evento inteiro no `_sportMeta`.
+    fn aposta_com_evento() -> Value {
+        json!({
+            "_platform": "polymarket", "conditionId": "0xC2", "asset": "222", "outcome": "Over", "slug": "jogo-total-2pt5",
+            "title": "Time A vs. Time B: O/U 2.5",
+            "_sportMeta": {
+                "texts": ["Time A vs. Time B", "Soccer", "jogo-ml", "Will Time A win?", "jogo-total-2pt5", "Time A vs. Time B: O/U 2.5", "soccer_totals"],
+                "sportsMarketTypes": ["moneyline", "soccer_totals"],
+                "markets": [
+                    { "conditionId": "0xC1", "slug": "jogo-ml", "question": "Will Time A win?", "description": "longa".repeat(50), "tokenIds": ["111", "112"] },
+                    { "conditionId": "0xC2", "slug": "jogo-total-2pt5", "question": "Time A vs. Time B: O/U 2.5", "description": "regras",
+                      "sportsMarketType": "soccer_totals", "line": 2.5, "tokenIds": ["222", "223"] }
+                ],
+                "eventId": "77", "seriesSlug": null
+            }
+        })
+    }
+
+    #[test]
+    fn compacta_o_evento_no_mercado_exato() {
+        let mut a = aposta_com_evento();
+        let tabela_antes = history::meta_da_tabela(&a);
+        assert!(compactar_meta_esporte(&mut a));
+        let meta = &a["_sportMeta"];
+        assert_eq!(meta["markets"].as_array().unwrap().len(), 1);
+        assert_eq!(meta["markets"][0]["conditionId"], "0xC2");
+        assert_eq!(meta["markets"][0]["description"], "regras", "o mercado exato fica inteiro");
+        assert_eq!(meta["texts"].as_array().unwrap().len(), 7, "texts não muda");
+        assert_eq!(meta["eventTexts"], json!(["Time A vs. Time B", "Soccer"]), "textos do evento sem os dos mercados");
+        assert_eq!(meta["sportsMarketTypes"], json!(["moneyline", "soccer_totals"]));
+        assert_eq!(meta["eventId"], "77");
+        assert!(meta.as_object().unwrap().contains_key("seriesSlug"));
+        assert_eq!(history::meta_da_tabela(&a), tabela_antes, "a tabela recebe o mesmo metadado");
+        let uma_vez = js::para_texto(&a);
+        assert!(!compactar_meta_esporte(&mut a), "compactar de novo não muda nada");
+        assert_eq!(js::para_texto(&a), uma_vez);
+    }
+
+    #[test]
+    fn eventtexts_existente_e_mantido() {
+        let mut a = aposta_com_evento();
+        a["_sportMeta"]["eventTexts"] = json!(["Futebol"]);
+        assert!(compactar_meta_esporte(&mut a));
+        assert_eq!(a["_sportMeta"]["eventTexts"], json!(["Futebol"]));
+    }
+
+    #[test]
+    fn sem_mercado_unico_a_aposta_fica_intacta() {
+        type Mudanca = Box<dyn Fn(&mut Value)>;
+        let casos: Vec<Mudanca> = vec![
+            // Nenhum mercado com o asset, a condição ou o slug da aposta.
+            Box::new(|a| {
+                a["asset"] = json!("999");
+                a["conditionId"] = json!("0xZZ");
+                a["slug"] = json!("outro");
+            }),
+            // Dois mercados com o mesmo asset e a mesma condição.
+            Box::new(|a| {
+                a["_sportMeta"]["markets"][0]["tokenIds"] = json!(["222"]);
+                a["_sportMeta"]["markets"][0]["conditionId"] = json!("0xC2");
+                a["_sportMeta"]["markets"][0]["slug"] = json!("jogo-total-2pt5");
+            }),
+            // Mercado nulo: o JS lançaria exceção.
+            Box::new(|a| a["_sportMeta"]["markets"][0] = Value::Null),
+            // Um só mercado: não há o que tirar.
+            Box::new(|a| {
+                a["_sportMeta"]["markets"].as_array_mut().unwrap().remove(0);
+            }),
+            // `clean()` acha o mercado 1 pelo asset; o `String().trim()` dos
+            // títulos não acha e cai na condição, que é a do mercado 0.
+            Box::new(|a| {
+                a["asset"] = json!("22 2");
+                a["conditionId"] = json!("0xC1");
+                a["_sportMeta"]["markets"][1]["tokenIds"] = json!(["22  2"]);
+            }),
+            Box::new(|a| a["_sportMeta"] = json!("texto")),
+        ];
+        for (i, mudar) in casos.iter().enumerate() {
+            let mut a = aposta_com_evento();
+            mudar(&mut a);
+            let antes = js::para_texto(&a);
+            assert!(!compactar_meta_esporte(&mut a), "caso {i}");
+            assert_eq!(js::para_texto(&a), antes, "caso {i}");
+        }
+    }
+
+    #[test]
+    fn gravar_compacta_e_o_merge_mantem_compactado() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        let u = crate::db::usuario_local(&mut c).unwrap();
+        let g = gravar(&mut c, &u.id, vec![aposta_com_evento()], true).unwrap();
+        assert_eq!(g.gravadas, 1);
+        assert_eq!(g.processadas[0]["_sportMeta"]["markets"].as_array().unwrap().len(), 1, "a resposta já vem compactada");
+        let salvo: String = c.query_row("SELECT data_json FROM closed_bets_ledger", [], |r| r.get(0)).unwrap();
+        assert!(!salvo.contains("longa"));
+        // A fonte manda o evento inteiro de novo: nada muda no ledger.
+        let g = gravar(&mut c, &u.id, vec![aposta_com_evento()], true).unwrap();
+        assert_eq!((g.gravadas, g.inalteradas), (0, 1));
+        let depois: String = c.query_row("SELECT data_json FROM closed_bets_ledger", [], |r| r.get(0)).unwrap();
+        assert_eq!(depois, salvo);
+    }
+
+    #[test]
+    fn compacta_o_ledger_existente_uma_vez() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        let u = crate::db::usuario_local(&mut c).unwrap();
+        let cheio = js::para_texto(&aposta_com_evento());
+        let t = agora();
+        c.execute(
+            "INSERT INTO closed_bets_ledger(user_id,platform,bet_key,data_json,first_seen_at,updated_at) VALUES(?,?,?,?,?,?)",
+            params![u.id, "polymarket", "0xC2|222|Over", cheio, t, t],
+        )
+        .unwrap();
+        let r = compactar_ledger_uma_vez(&mut c).unwrap().expect("primeira vez compacta");
+        assert_eq!((r.apostas, r.compactadas), (1, 1));
+        assert!(r.bytes_depois < r.bytes_antes);
+        let (salvo, atualizado): (String, String) =
+            c.query_row("SELECT data_json, updated_at FROM closed_bets_ledger", [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!(atualizado, t, "a compactação não conta como mudança da aposta");
+        let mut esperado = aposta_com_evento();
+        compactar_meta_esporte(&mut esperado);
+        assert_eq!(salvo, js::para_texto(&esperado));
+        assert!(compactar_ledger_uma_vez(&mut c).unwrap().is_none(), "só roda uma vez");
+    }
+
+    /// Roda a compactação única numa CÓPIA do banco real, para o oráculo
+    /// comparar a cópia original com a compactada.
+    /// `BETTY_COMPACTAR_DB=<cópia> cargo test --release -- --ignored compactar_copia_real`.
+    #[test]
+    #[ignore]
+    fn compactar_copia_real() {
+        let caminho = std::env::var("BETTY_COMPACTAR_DB").unwrap();
+        let mut c = crate::db::abrir(std::path::Path::new(&caminho)).unwrap();
+        let inicio = std::time::Instant::now();
+        let r = compactar_ledger_uma_vez(&mut c).unwrap();
+        let meio = inicio.elapsed();
+        let livre = crate::db::recuperar_espaco(&c).unwrap();
+        println!("{r:?} compactação={meio:?} vacuum={:?} livre={livre:?}", inicio.elapsed() - meio);
+    }
 
     /// Compara com o JS original pelo TEXTO JSON resultante.
     /// `BETTY_ORACULO_LEDGER=<jsonl> cargo test -- --ignored oraculo_ledger`.

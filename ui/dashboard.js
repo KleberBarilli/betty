@@ -1932,26 +1932,55 @@ return "betty:titleIndexVersion:" + (BETTY_USER?.id || "local");
 function chaveVersaoIndiceData() {
 return "betty:dateIndexVersion:" + (BETTY_USER?.id || "local");
 }
-function categoriaIndicePrecisaReindexar() {
-try { return localStorage.getItem(chaveVersaoIndiceCategoria()) !== VERSAO_INDICE_CATEGORIA; }
-catch (_) { return true; }
+// As versões com que o índice foi montado ficam no SQLite, junto do índice
+// (`/index/status`). No localStorage, um perfil novo do WebView fazia o índice
+// inteiro ser refeito. O navegador só é lido quando o banco ainda não tem a
+// versão, para trazer a marca de quem já tinha o índice montado.
+let versoesIndiceHistoricoDb = null;
+const VERSOES_INDICE_HISTORICO = {
+category: () => [chaveVersaoIndiceCategoria(), VERSAO_INDICE_CATEGORIA],
+title: () => [chaveVersaoIndiceTitulo(), VERSAO_INDICE_TITULO],
+date: () => [chaveVersaoIndiceData(), VERSAO_INDICE_DATA]
+};
+function versaoIndiceRegistrada(tipo) {
+const doBanco = versoesIndiceHistoricoDb?.[tipo];
+if (doBanco) return doBanco;
+try { return localStorage.getItem(VERSOES_INDICE_HISTORICO[tipo]()[0]); }
+catch (_) { return null; }
 }
-function tituloIndicePrecisaReindexar() {
-try { return localStorage.getItem(chaveVersaoIndiceTitulo()) !== VERSAO_INDICE_TITULO; }
-catch (_) { return true; }
+function categoriaIndicePrecisaReindexar() { return versaoIndiceRegistrada("category") !== VERSAO_INDICE_CATEGORIA; }
+function tituloIndicePrecisaReindexar() { return versaoIndiceRegistrada("title") !== VERSAO_INDICE_TITULO; }
+function dataIndicePrecisaReindexar() { return versaoIndiceRegistrada("date") !== VERSAO_INDICE_DATA; }
+async function registrarVersoesIndiceHistorico(tipos) {
+if (!tipos.length) return;
+const versions = Object.fromEntries(tipos.map(tipo => [tipo, VERSOES_INDICE_HISTORICO[tipo]()[1]]));
+try {
+const res = await fetch('/api/history/closed/index/versions', {
+method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+body: JSON.stringify({ versions }), cache: 'no-store'
+});
+const data = res.ok ? await res.json() : null;
+if (data?.ok && data.versions && typeof data.versions === 'object') {
+versoesIndiceHistoricoDb = data.versions;
+return;
 }
-function dataIndicePrecisaReindexar() {
-try { return localStorage.getItem(chaveVersaoIndiceData()) !== VERSAO_INDICE_DATA; }
-catch (_) { return true; }
+} catch (_) {}
+// Sem o banco, guarda no navegador como antes; a próxima abertura leva ao SQLite.
+for (const tipo of tipos) {
+const [chave, versao] = VERSOES_INDICE_HISTORICO[tipo]();
+try { localStorage.setItem(chave, versao); } catch (_) {}
 }
-function registrarVersaoIndiceCategoria() {
-try { localStorage.setItem(chaveVersaoIndiceCategoria(), VERSAO_INDICE_CATEGORIA); } catch (_) {}
 }
-function registrarVersaoIndiceTitulo() {
-try { localStorage.setItem(chaveVersaoIndiceTitulo(), VERSAO_INDICE_TITULO); } catch (_) {}
-}
-function registrarVersaoIndiceData() {
-try { localStorage.setItem(chaveVersaoIndiceData(), VERSAO_INDICE_DATA); } catch (_) {}
+// Quem já tinha o índice montado com as regras atuais antes de as versões irem
+// para o SQLite leva a marca do navegador para o banco, sem refazer o índice.
+async function trazerVersoesIndiceDoNavegador() {
+if (!versoesIndiceHistoricoDb) return;
+const tipos = Object.keys(VERSOES_INDICE_HISTORICO).filter(tipo => {
+if (versoesIndiceHistoricoDb[tipo]) return false;
+const [chave, versao] = VERSOES_INDICE_HISTORICO[tipo]();
+try { return localStorage.getItem(chave) === versao; } catch (_) { return false; }
+});
+await registrarVersoesIndiceHistorico(tipos);
 }
 async function sincronizarTitulosIndiceHistorico() {
 const base = await carregarLedgerFechadasParaMigracao();
@@ -2016,6 +2045,8 @@ async function sincronizarIndiceHistoricoFechado(alteradas = []) {
 try {
 const statusRes = await fetch('/api/history/closed/index/status', { cache: 'no-store' });
 const status = statusRes.ok ? await statusRes.json() : null;
+versoesIndiceHistoricoDb = status?.versions && typeof status.versions === 'object' ? status.versions : null;
+await trazerVersoesIndiceDoNavegador();
 // Uma instalação que ainda não possui o índice faz UMA migração compatível.
 // Depois disso, cada refresh indexa só as linhas confirmadamente alteradas.
 // Uma nova versão das regras de categoria também reindexa tudo uma única vez.
@@ -2037,9 +2068,11 @@ if (reindexarTitulos && !migracaoCompleta) await sincronizarTitulosIndiceHistori
 const finalRes = await fetch('/api/history/closed/index/status', { cache: 'no-store' });
 const finalStatus = finalRes.ok ? await finalRes.json() : null;
 const completo = Boolean(finalStatus?.complete);
-if (completo && reindexarCategorias) registrarVersaoIndiceCategoria();
-if (completo && reindexarTitulos) registrarVersaoIndiceTitulo();
-if (completo && reindexarDatas) registrarVersaoIndiceData();
+if (completo) {
+await registrarVersoesIndiceHistorico([
+reindexarCategorias && "category", reindexarTitulos && "title", reindexarDatas && "date"
+].filter(Boolean));
+}
 return completo;
 } catch (e) {
 // O índice é derivado e nunca é autorizado a interromper a sincronização
@@ -2925,19 +2958,17 @@ d?.avgPrice ?? "", d?.initialValue ?? "", d?.totalBought ?? "", d?.size ?? "",
 d?.realizedPnl ?? "", d?.cashPnl ?? "", d?.timestamp ?? "", d?.endDate ?? ""
 ].join("|");
 }
+// Fica só na memória, durante a sessão. No localStorage as linhas inteiras,
+// com os metadados do evento, passavam da cota do navegador: a gravação falhava
+// sem aviso depois de serializar dezenas de MB. Na abertura seguinte quem
+// devolve esses metadados é o SQLite (`/api/history/closed/metadata`).
 function cacheFechadasPolymarket() {
 const userId = BETTY_USER?.id || "local";
 if (polyClosedEnrichmentCache?.userId === userId) return polyClosedEnrichmentCache;
-let entries = {};
-try {
-const saved = JSON.parse(localStorage.getItem(POLY_CLOSED_ENRICH_CACHE_PREFIX + userId) || "null");
-if (saved && saved.entries && typeof saved.entries === "object") entries = saved.entries;
-} catch (_) {}
-polyClosedEnrichmentCache = { userId, entries };
+// Apaga o que versões antigas chegaram a gravar.
+try { localStorage.removeItem(POLY_CLOSED_ENRICH_CACHE_PREFIX + userId); } catch (_) {}
+polyClosedEnrichmentCache = { userId, entries: {} };
 return polyClosedEnrichmentCache;
-}
-function salvarCacheFechadasPolymarket(cache) {
-try { localStorage.setItem(POLY_CLOSED_ENRICH_CACHE_PREFIX + cache.userId, JSON.stringify({ entries: cache.entries })); } catch (_) {}
 }
 function fechadaPolymarketIncompleta(row) {
 // Esta função valida METADADOS, não o cálculo financeiro posterior. A API de
@@ -3045,7 +3076,6 @@ at: Date.now(),
 dateResolverVersion: revalidacaoLegada || !cached ? POLY_CLOSED_DATE_RESOLVER_VERSION : cached.dateResolverVersion
 };
 }
-salvarCacheFechadasPolymarket(cache);
 }
 return (todas || []).map((d, i) => {
 const cached = cache.entries[chaveFonteFechadaPolymarket(d)]?.row;

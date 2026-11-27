@@ -55,6 +55,8 @@ pub fn run() {
         .setup(|app| {
             let pastas = Pastas::resolver(app)?;
             let estado = inicializar(&pastas).inspect_err(|e| registrar_falha(&pastas, e))?;
+            manutencao_do_banco(estado.db.clone());
+            limpar_caches_periodicamente(&estado);
             app.manage(estado);
 
             let url = protocol::app_url("dashboard.html")?;
@@ -195,6 +197,54 @@ fn inicializar(pastas: &Pastas) -> anyhow::Result<api::Estado> {
     eprintln!("[início] pronto em {} ms", inicio.elapsed().as_millis());
 
     Ok(api::Estado { db: db::Db::new(conn), chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() })
+}
+
+/// Manutenção que pode levar alguns segundos, fora do caminho de abertura: a
+/// janela já aparece e as consultas ao banco esperam a vez. Hoje é a
+/// compactação única dos metadados do ledger, seguida do `VACUUM` que devolve
+/// o espaço liberado ao disco.
+fn manutencao_do_banco(db: db::Db) {
+    tauri::async_runtime::spawn(async move {
+        let inicio = Instant::now();
+        let r = db
+            .call(|c| {
+                let compactacao = ledger::compactar_ledger_uma_vez(c)?;
+                let livre = db::recuperar_espaco(c)?;
+                Ok((compactacao, livre))
+            })
+            .await;
+        match r {
+            Ok((compactacao, livre)) => {
+                if let Some(c) = compactacao {
+                    eprintln!(
+                        "[manutenção] metadados do ledger: {}/{} apostas compactadas, {} MB -> {} MB",
+                        c.compactadas,
+                        c.apostas,
+                        c.bytes_antes / 1_048_576,
+                        c.bytes_depois / 1_048_576
+                    );
+                }
+                if let Some(bytes) = livre {
+                    eprintln!("[manutenção] VACUUM devolveu {} MB ao disco", bytes / 1_048_576);
+                }
+                eprintln!("[manutenção] concluída em {} ms", inicio.elapsed().as_millis());
+            }
+            Err(e) => eprintln!("[manutenção] falhou (o app segue normalmente): {e:#}"),
+        }
+    });
+}
+
+/// Os caches em memória só servem dentro do prazo de cada um, mas os vencidos
+/// ficavam guardados até chegar uma consulta igual. A cada minuto eles saem.
+fn limpar_caches_periodicamente(estado: &api::Estado) {
+    let (kalshi, poly) = (estado.kalshi.clone(), estado.poly.clone());
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            kalshi.limpar_vencidos();
+            poly.limpar_vencidos();
+        }
+    });
 }
 
 fn registrar_falha(pastas: &Pastas, erro: &anyhow::Error) {

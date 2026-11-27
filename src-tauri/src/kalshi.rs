@@ -53,6 +53,14 @@ impl EstadoKalshi {
         }
     }
 
+    /// Tira as respostas vencidas, que `endpoint_get` já não devolve.
+    /// Liquidações e revisões ficam: valem a sessão inteira.
+    pub fn limpar_vencidos(&self) {
+        if let Ok(mut m) = self.endpoint.lock() {
+            m.retain(|_, (em, _)| em.elapsed() < TTL_ENDPOINT);
+        }
+    }
+
     /// `clearKalshiUserCaches()` (a parte em memória).
     fn limpar_usuario(&self, user_id: &str) {
         if let Ok(mut m) = self.endpoint.lock() {

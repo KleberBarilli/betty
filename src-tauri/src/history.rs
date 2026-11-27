@@ -1081,6 +1081,14 @@ fn compactar(mut aposta: Linha) -> Result<Linha, ()> {
     Ok(aposta)
 }
 
+/// O `_sportMeta` que a tabela recebe de `compactar`, como texto. `None` quando
+/// a linha seria descartada (onde o JS lançaria exceção). O ledger usa isto
+/// para conferir que reduzir os mercados gravados não muda o que a tabela mostra.
+pub(crate) fn meta_da_tabela(aposta: &Value) -> Option<String> {
+    let compacta = compactar(ler_linha(&js::para_texto(aposta)).ok()?).ok()?;
+    Some(compacta.get("_sportMeta").map_or_else(String::new, |r| r.get().to_string()))
+}
+
 fn chave_kalshi(aposta: &Linha) -> Option<Value> {
     ["slug", "ticker", "market_ticker"].iter().filter_map(|k| campo(aposta, k)).find(|v| js::truthy(Some(v)))
 }
@@ -1304,7 +1312,14 @@ pub fn status_indice(c: &Connection, user_id: &str) -> Result<Value> {
     ON i.user_id=l.user_id AND i.platform=l.platform AND i.bet_key=l.bet_key
     WHERE l.user_id=? AND (i.bet_key IS NULL OR i.metrics_ready=0)",
     )?;
-    Ok(json!({ "ok": true, "ledger": ledger, "indexed": indexado, "pending": pendente, "complete": ledger == indexado && pendente == 0 }))
+    Ok(json!({
+        "ok": true,
+        "ledger": ledger,
+        "indexed": indexado,
+        "pending": pendente,
+        "complete": ledger == indexado && pendente == 0,
+        "versions": crate::db::versoes_indice(c, user_id)?
+    }))
 }
 
 /// `GET .../index/pending`. `None` quando o cursor é inválido.

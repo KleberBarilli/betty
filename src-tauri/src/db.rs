@@ -114,7 +114,19 @@ CREATE TABLE IF NOT EXISTS polymarket_activity_cache (
   user_id TEXT NOT NULL, cache_key TEXT NOT NULL, data_json TEXT NOT NULL,
   updated_at INTEGER NOT NULL, PRIMARY KEY(user_id,cache_key)
 );
+CREATE TABLE IF NOT EXISTS history_index_versions (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  version TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, kind)
+);
 "#;
+
+/// Regras derivadas do índice do histórico cuja versão a interface confere
+/// (categoria, título e data). No Electron ficavam no localStorage: um perfil
+/// novo do WebView fazia o índice inteiro ser refeito.
+pub const VERSOES_INDICE: [&str; 3] = ["category", "title", "date"];
 
 /// Colunas acrescentadas ao longo das versões do Electron. Bancos antigos
 /// recebem cada uma só se ainda não existir.
@@ -244,6 +256,56 @@ fn analisar_indices_uma_vez(conn: &Connection) -> Result<()> {
         params![CHAVE, agora()],
     )?;
     Ok(())
+}
+
+/// Versões das regras com que o índice do histórico foi montado.
+pub fn versoes_indice(conn: &Connection, user_id: &str) -> Result<serde_json::Map<String, serde_json::Value>> {
+    let mut s = conn.prepare("SELECT kind, version FROM history_index_versions WHERE user_id=? ORDER BY kind")?;
+    let linhas = s.query_map([user_id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    let mut mapa = serde_json::Map::new();
+    for linha in linhas {
+        let (tipo, versao) = linha?;
+        mapa.insert(tipo, serde_json::Value::String(versao));
+    }
+    Ok(mapa)
+}
+
+/// Grava as versões recebidas; tipos desconhecidos e valores vazios são ignorados.
+pub fn salvar_versoes_indice(conn: &mut Connection, user_id: &str, versoes: Option<&serde_json::Value>) -> Result<usize> {
+    let Some(mapa) = versoes.and_then(serde_json::Value::as_object) else { return Ok(0) };
+    let tx = conn.transaction()?;
+    let mut gravadas = 0;
+    for tipo in VERSOES_INDICE {
+        let Some(versao) = mapa.get(tipo).and_then(serde_json::Value::as_str).map(str::trim).filter(|v| !v.is_empty()) else {
+            continue;
+        };
+        tx.execute(
+            "INSERT INTO history_index_versions(user_id,kind,version,updated_at) VALUES(?,?,?,?)
+             ON CONFLICT(user_id,kind) DO UPDATE SET version=excluded.version,updated_at=excluded.updated_at",
+            params![user_id, tipo, crate::js::fatia_utf16(versao, 40), agora()],
+        )?;
+        gravadas += 1;
+    }
+    tx.commit()?;
+    Ok(gravadas)
+}
+
+/// Espaço livre a partir do qual vale reescrever o arquivo do banco.
+const LIVRE_PARA_VACUUM: i64 = 32 * 1024 * 1024;
+
+/// Devolve ao disco o espaço livre do arquivo (`VACUUM`) quando ele passa de
+/// 32 MB, por exemplo depois de compactar o ledger, e encolhe o WAL. Devolve
+/// quantos bytes estavam livres, ou `None` quando não foi preciso.
+pub fn recuperar_espaco(conn: &Connection) -> Result<Option<i64>> {
+    let livres: i64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0))?;
+    let pagina: i64 = conn.query_row("PRAGMA page_size", [], |r| r.get(0))?;
+    let bytes = livres * pagina;
+    if bytes < LIVRE_PARA_VACUUM {
+        return Ok(None);
+    }
+    conn.execute_batch("VACUUM;")?;
+    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
+    Ok(Some(bytes))
 }
 
 /// Ajustes de segurança herdados do Electron:

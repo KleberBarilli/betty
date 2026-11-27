@@ -25,6 +25,8 @@ const POLYGON_RPC: &str = "https://polygon-bor-rpc.publicnode.com";
 const PUSD: &str = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB";
 const TTL_SNAPSHOT_MS: f64 = 60_000.0;
 const MAX_SNAPSHOTS_BYTES: usize = 64 * 1024 * 1024;
+/// Teto das respostas do Gamma guardadas pelo proxy.
+const MAX_PROXY_BYTES: usize = 16 * 1024 * 1024;
 const TTL_PROXY: Duration = Duration::from_secs(45);
 const TTL_SALDO: Duration = Duration::from_secs(30);
 const RECHECAGEM_ATIVIDADE_MS: f64 = 10.0 * 60_000.0;
@@ -362,6 +364,43 @@ impl EstadoPoly {
         self.geracoes.lock().ok().and_then(|g| g.get(user).copied()).unwrap_or(0)
     }
 
+    /// Guarda uma resposta do Gamma, sem passar de `MAX_PROXY_BYTES` no total:
+    /// saem primeiro as vencidas e depois as mais antigas.
+    fn guardar_proxy(&self, chave: String, status: u16, corpo: Vec<u8>) {
+        if corpo.len() > MAX_PROXY_BYTES {
+            return;
+        }
+        let Ok(mut p) = self.proxy.lock() else { return };
+        p.remove(&chave);
+        p.retain(|_, (em, _, _)| em.elapsed() < TTL_PROXY);
+        let mut total: usize = p.values().map(|(_, _, c)| c.len()).sum();
+        while total + corpo.len() > MAX_PROXY_BYTES {
+            let Some(antiga) = p.iter().min_by_key(|(_, (em, _, _))| *em).map(|(k, _)| k.clone()) else { break };
+            if let Some((_, _, c)) = p.remove(&antiga) {
+                total -= c.len();
+            }
+        }
+        p.insert(chave, (Instant::now(), status, corpo));
+    }
+
+    /// Tira o que já venceu e nunca mais seria devolvido: snapshots, respostas
+    /// do Gamma e saldos.
+    pub fn limpar_vencidos(&self) {
+        if let Ok(mut s) = self.snapshots.lock() {
+            let agora = agora_ms();
+            let vencidas: Vec<String> = s.mapa.iter().filter(|(_, v)| agora - v.em >= TTL_SNAPSHOT_MS).map(|(k, _)| k.clone()).collect();
+            for k in vencidas {
+                s.remover(&k);
+            }
+        }
+        if let Ok(mut p) = self.proxy.lock() {
+            p.retain(|_, (em, _, _)| em.elapsed() < TTL_PROXY);
+        }
+        if let Ok(mut s) = self.saldos.lock() {
+            s.retain(|_, (em, _)| em.elapsed() < TTL_SALDO);
+        }
+    }
+
     /// `clearUser()` + caches do proxy e do saldo.
     pub fn limpar_usuario(&self, user: &str) {
         if let Ok(mut g) = self.geracoes.lock() {
@@ -604,9 +643,7 @@ pub async fn proxy(estado: &Estado, gamma: bool, resto: &str, query: Option<&str
                 Ok(corpo) => {
                     let corpo = corpo.to_vec();
                     if (200..300).contains(&status) {
-                        if let Ok(mut p) = estado.poly.proxy.lock() {
-                            p.insert(chave, (Instant::now(), status, corpo.clone()));
-                        }
+                        estado.poly.guardar_proxy(chave, status, corpo.clone());
                     }
                     bytes_json(StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_GATEWAY), corpo)
                 }
@@ -947,6 +984,39 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn caches_vencidos_saem_e_o_gamma_tem_teto() {
+        let p = EstadoPoly::default();
+        let ha = |s: u64| Instant::now().checked_sub(Duration::from_secs(s)).unwrap();
+        let mb = |n: usize| vec![b'x'; n * 1024 * 1024];
+        p.guardar_proxy("u|a".into(), 200, mb(7));
+        p.guardar_proxy("u|b".into(), 200, mb(7));
+        p.guardar_proxy("u|c".into(), 200, mb(7));
+        {
+            let mapa = p.proxy.lock().unwrap();
+            assert!(!mapa.contains_key("u|a"), "a mais antiga sai para caber no teto");
+            assert!(mapa.contains_key("u|b") && mapa.contains_key("u|c"));
+        }
+        p.guardar_proxy("u|enorme".into(), 200, mb(17));
+        assert!(!p.proxy.lock().unwrap().contains_key("u|enorme"), "maior que o teto não é guardada");
+
+        p.proxy.lock().unwrap().get_mut("u|b").unwrap().0 = ha(46);
+        p.saldos.lock().unwrap().insert("u".into(), (ha(31), 1.0));
+        p.saldos.lock().unwrap().insert("v".into(), (Instant::now(), 2.0));
+        {
+            let mut s = p.snapshots.lock().unwrap();
+            s.mapa.insert("velho".into(), Snapshot { em: agora_ms() - 61_000.0, linhas: Arc::new(vec![]), bytes: 10 });
+            s.mapa.insert("novo".into(), Snapshot { em: agora_ms(), linhas: Arc::new(vec![]), bytes: 5 });
+            s.bytes = 15;
+        }
+        p.limpar_vencidos();
+        assert_eq!(p.proxy.lock().unwrap().keys().collect::<Vec<_>>(), vec!["u|c"]);
+        assert_eq!(p.saldos.lock().unwrap().keys().collect::<Vec<_>>(), vec!["v"]);
+        let s = p.snapshots.lock().unwrap();
+        assert_eq!(s.mapa.keys().collect::<Vec<_>>(), vec!["novo"]);
+        assert_eq!(s.bytes, 5, "a conta de bytes acompanha a remoção");
+    }
 
     #[test]
     fn pedido_v2_igual_ao_js() {

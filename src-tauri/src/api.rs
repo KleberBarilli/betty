@@ -98,8 +98,13 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
             Err(resposta) => Ok(resposta),
         },
         ("POST", p @ ("/api/history/closed" | "/api/history/closed/delta" | "/api/history/closed/lookup" | "/api/history/closed/metadata"
-            | "/api/history/closed/index" | "/api/history/closed/index/titles" | "/api/history/closed/recover-pnl-dates")) => {
-            let limite = if p == "/api/history/closed/metadata" || p == "/api/history/closed/recover-pnl-dates" { LIMITE_CORPO } else { LIMITE_LEDGER };
+            | "/api/history/closed/index" | "/api/history/closed/index/titles" | "/api/history/closed/index/versions"
+            | "/api/history/closed/recover-pnl-dates")) => {
+            let limite = if matches!(p, "/api/history/closed/metadata" | "/api/history/closed/recover-pnl-dates" | "/api/history/closed/index/versions") {
+                LIMITE_CORPO
+            } else {
+                LIMITE_LEDGER
+            };
             match ler_json(corpo, limite) {
                 Ok(body) => escrita_historico(estado, p, body).await,
                 Err(resposta) => Ok(resposta),
@@ -283,6 +288,17 @@ async fn escrita_historico(estado: &Estado, rota: &str, body: Value) -> Resultad
         "/api/history/closed/metadata" => {
             let r = estado.db.call(move |c| ledger::metadados(c, &user, body.get("keys"))).await.map(|e| ok(json!({ "ok": true, "entries": e })));
             (r, "Não foi possível consultar os metadados.")
+        }
+        "/api/history/closed/index/versions" => {
+            let r = estado
+                .db
+                .call(move |c| {
+                    db::salvar_versoes_indice(c, &user, body.get("versions"))?;
+                    Ok(json!({ "ok": true, "versions": db::versoes_indice(c, &user)? }))
+                })
+                .await
+                .map(ok);
+            (r, "Não foi possível registrar a versão do índice.")
         }
         "/api/history/closed/index" => {
             let r = estado
@@ -752,6 +768,25 @@ mod tests {
                 ms(t_ser)
             );
         }
+    }
+
+    #[test]
+    fn versoes_do_indice_ficam_no_banco() {
+        let (_d, e) = estado();
+        let status = chamar(&e, Method::GET, "/api/history/closed/index/status", Value::Null);
+        assert_eq!(status.body["versions"], json!({}), "banco novo sem versões");
+        let r = chamar(
+            &e,
+            Method::POST,
+            "/api/history/closed/index/versions",
+            json!({ "versions": { "category": "7", "title": " ", "date": 3, "outra": "x" } }),
+        );
+        assert_eq!(r.status, StatusCode::OK);
+        assert_eq!(r.body["versions"], json!({ "category": "7" }), "vazio, número e tipo desconhecido são ignorados");
+        chamar(&e, Method::POST, "/api/history/closed/index/versions", json!({ "versions": { "category": "8", "date": "3" } }));
+        let status = chamar(&e, Method::GET, "/api/history/closed/index/status", Value::Null);
+        assert_eq!(status.body["versions"], json!({ "category": "8", "date": "3" }));
+        assert_eq!(status.body["complete"], json!(true));
     }
 
     #[test]
