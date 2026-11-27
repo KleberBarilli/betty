@@ -110,7 +110,7 @@ Só compacta quando duas condições valem juntas:
 - Apostas do ledger sem `_confirmedClosedTs` também entram no recorte.
 - Os caches `betty_sport_meta_v3` e `betty_gamma_date_meta_v1` saíram do localStorage. Eles nunca chegavam a ser gravados (passavam da cota), então a leitura já voltava sempre vazia.
 
-### 4. Leituras do SQLite em paralelo
+### 4. Leituras do SQLite em paralelo (`90c71ab`)
 
 **Problema:** `db::Db` era uma conexão só, atrás de um `Mutex`. Toda leitura da tela esperava qualquer gravação: ledger, índice, a manutenção da abertura e os caches da Kalshi e da Polymarket. Na primeira abertura depois da atualização, `/api/me` esperou a compactação inteira.
 
