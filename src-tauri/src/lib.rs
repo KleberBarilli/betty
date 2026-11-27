@@ -33,6 +33,7 @@ use anyhow::Context;
 
 #[global_allocator]
 static ALOCADOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+use tauri::webview::NewWindowResponse;
 use tauri::{App, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn run() {
@@ -56,12 +57,19 @@ pub fn run() {
             app.manage(estado);
 
             let url = protocol::app_url("dashboard.html")?;
+            let (app_navegacao, app_janela) = (app.handle().clone(), app.handle().clone());
             WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
                 .title("MyBettys")
                 .inner_size(1440.0, 920.0)
                 .min_inner_size(1080.0, 700.0)
                 .maximized(true)
-                .on_navigation(protocol::navegacao_permitida)
+                // A janela nunca sai do app; links das casas abrem no navegador padrão.
+                .on_navigation(move |url| protocol::tratar_navegacao(&app_navegacao, url))
+                // `target="_blank"` e `window.open` não criam janelas novas no app.
+                .on_new_window(move |url, _| {
+                    protocol::abrir_no_navegador(&app_janela, &url);
+                    NewWindowResponse::Deny
+                })
                 .build()?;
             Ok(())
         })

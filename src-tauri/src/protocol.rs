@@ -32,6 +32,59 @@ pub fn navegacao_permitida(url: &Url) -> bool {
     url.as_str().starts_with(&format!("{ORIGEM}/"))
 }
 
+/// Sites das casas que podem ser abertos no navegador do sistema (o domínio
+/// e os subdomínios). Qualquer outro endereço é ignorado.
+const DOMINIOS_EXTERNOS: [&str; 4] = ["polymarket.com", "kalshi.com", "predict.fun", "sx.bet"];
+
+/// Link externo aceito: só `https`, sem usuário/senha nem porta própria, com
+/// host de nome (não IP) igual a um dos domínios da lista ou subdomínio dele.
+/// O `Url` já chega com o host normalizado (minúsculas e punycode).
+pub fn link_externo_permitido(url: &Url) -> bool {
+    if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() || url.port().is_some() {
+        return false;
+    }
+    let Some(url::Host::Domain(host)) = url.host() else { return false };
+    DOMINIOS_EXTERNOS.iter().any(|d| {
+        host == *d
+            || host
+                .strip_suffix(d)
+                .and_then(|resto| resto.strip_suffix('.'))
+                .is_some_and(|sub| !sub.is_empty() && sub.split('.').all(|rotulo| !rotulo.is_empty()))
+    })
+}
+
+/// Pedido de navegação para fora do app (link comum ou `target="_blank"`).
+/// A janela nunca sai do app: endereços da lista abrem no navegador padrão e
+/// o resto é descartado. Devolve `true` só para navegação interna.
+pub fn tratar_navegacao<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
+    if navegacao_permitida(url) {
+        return true;
+    }
+    abrir_no_navegador(app, url);
+    false
+}
+
+/// Abre um link da lista no navegador padrão do sistema.
+pub fn abrir_no_navegador<R: Runtime>(app: &AppHandle<R>, url: &Url) {
+    if !link_externo_permitido(url) {
+        eprintln!("[links] endereço externo bloqueado: {}", url.scheme());
+        return;
+    }
+    let endereco = url.as_str().to_owned();
+    // Só em desenvolvimento: registra o link sem abrir o navegador.
+    if cfg!(debug_assertions) && std::env::var_os("MYBETTYS_LINKS_SEM_ABRIR").is_some() {
+        eprintln!("[links] abriria no navegador: {endereco}");
+        return;
+    }
+    // Fora do callback do WebView2 e na thread principal (COM já iniciado),
+    // como o ShellExecuteEx espera.
+    let _ = app.run_on_main_thread(move || {
+        if let Err(e) = tauri_plugin_opener::open_url(&endereco, None::<&str>) {
+            eprintln!("[links] não foi possível abrir o navegador: {e}");
+        }
+    });
+}
+
 pub async fn handle<R: Runtime>(app: &AppHandle<R>, request: Request<Vec<u8>>) -> Response<Vec<u8>> {
     let path = request.uri().path().to_owned();
     if path == "/health" || path.starts_with("/api/") {
@@ -107,5 +160,42 @@ mod tests {
         assert!(navegacao_permitida(&app_url("dashboard.html").unwrap()));
         assert!(!navegacao_permitida(&Url::parse("https://polymarket.com/").unwrap()));
         assert!(!navegacao_permitida(&Url::parse("http://betty.localhost.evil.com/").unwrap()));
+    }
+
+    #[test]
+    fn links_externos_so_das_casas() {
+        let aceito = |s: &str| link_externo_permitido(&Url::parse(s).unwrap());
+        for ok in [
+            "https://polymarket.com",
+            "https://polymarket.com/event/abc?x=1#y",
+            "https://kalshi.com/markets/KXNBA/KXNBA-25",
+            "https://predict.fun/market/teste",
+            "https://developers.predict.fun/",
+            "https://sx.bet/",
+            "https://WWW.Kalshi.COM/",
+            "https://polymarket.com:443/",
+        ] {
+            assert!(aceito(ok), "{ok}");
+        }
+        for nao in [
+            "http://polymarket.com/",
+            "https://polymarket.com.evil.com/",
+            "https://evilpolymarket.com/",
+            "https://notsx.bet/",
+            "https://polymarket.com:8443/",
+            "https://user:senha@polymarket.com/",
+            "https://user@kalshi.com/",
+            "https://polymarket.com./",
+            "https://.polymarket.com/",
+            "https://example.com/?u=https://polymarket.com",
+            "javascript:alert(1)",
+            "file:///C:/Windows/System32/calc.exe",
+            "ms-settings:privacy",
+            "https://1.2.3.4/",
+            "http://betty.localhost/dashboard.html",
+            "blob:http://betty.localhost/abc",
+        ] {
+            assert!(!aceito(nao), "{nao}");
+        }
     }
 }
