@@ -162,13 +162,13 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
     resultado.unwrap_or_else(|e| {
         // O detalhe fica só no log; a interface recebe uma mensagem genérica.
         eprintln!("[api] {method} {path}: {e:#}");
-        erro(StatusCode::INTERNAL_SERVER_ERROR, "Erro interno do MyBettys.")
+        erro(StatusCode::INTERNAL_SERVER_ERROR, "Erro interno do Betty.")
     })
 }
 
 type Resultado = anyhow::Result<ApiResponse>;
 
-const ERRO_GENERICO: &str = "Erro interno do MyBettys.";
+const ERRO_GENERICO: &str = "Erro interno do Betty.";
 
 /// Um segmento de rota (`:platform`), sem barra.
 fn segmento<'a>(p: &'a str, prefixo: &str, sufixo: &str) -> Option<&'a str> {

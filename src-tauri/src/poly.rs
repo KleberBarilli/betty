@@ -831,7 +831,7 @@ pub async fn preview(estado: &Estado, corpo: &Value) -> ApiResponse {
             "closedSampleCapped": false,
             "empty": vazia,
             "warning": if vazia {
-                json!("Esta carteira parece vazia: saldo zero e nenhuma posição. Confira se o endereço é o de login da Polymarket — o MyBettys usa a proxy wallet, onde ficam fundos e posições.")
+                json!("Esta carteira parece vazia: saldo zero e nenhuma posição. Confira se o endereço é o de login da Polymarket — o Betty usa a proxy wallet, onde ficam fundos e posições.")
             } else {
                 Value::Null
             }

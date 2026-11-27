@@ -59,23 +59,42 @@ display: flex;
 flex-direction: column;
 padding: 20px 14px;
 }
-.brand {
-display: flex;
-align-items: center;
-gap: 10px;
-padding: 6px 8px 22px;
+/* Logo: símbolo em SVG + "Betty" em texto real (Inter Display ExtraBold, subconjunto
+   B/e/t/y). Como texto a palavra recebe ClearType; como contorno ficava borrada.
+   --h é a altura do símbolo; as medidas vêm de /assets/brand/marca.css. */
+@font-face {
+font-family: "Betty Wordmark";
+src: url("/assets/brand/betty-wordmark.woff2") format("woff2");
+font-weight: 800;
+font-display: block;
+/* Caixa da linha = altura das maiúsculas: o topo do texto é o topo do "B". */
+ascent-override: 72.75390625%;
+descent-override: 0%;
+line-gap-override: 0%;
 }
-.brand .mark {
-width: 34px;
-height: 34px;
-border-radius: 9px;
+.logo {
+--h: 40px;
+display: inline-flex;
+align-items: flex-start;
 flex-shrink: 0;
-object-fit: contain;
 }
-.brand .name {
-font-weight: 750;
-font-size: 1.02rem;
-letter-spacing: -0.01em;
+.logo .marca {
+display: block;
+height: var(--h);
+width: auto;
+}
+.logo .palavra {
+display: block;
+margin-left: calc(var(--h) * var(--palavra-dx-un) / var(--marca-alt-un));
+margin-top: calc(var(--h) * var(--palavra-dy-un) / var(--marca-alt-un));
+color: var(--text);
+font-family: "Betty Wordmark", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+font-weight: 800;
+font-size: calc(var(--h) * var(--palavra-em-un) / var(--marca-alt-un));
+line-height: normal;
+letter-spacing: -0.0107421875em;
+font-kerning: none;
+white-space: nowrap;
 }
 .nav-list {
 list-style: none;
@@ -293,9 +312,6 @@ flex-wrap: wrap;
 .sidebar-sync-card .btn-refresh:active { background:#172232; border-color:#415977; }
 @media(min-width:901px) {
   .sidebar { padding:20px 14px; }
-  .sidebar .brand { padding:2px 6px 16px; margin-bottom:4px; border-bottom:1px solid var(--border); }
-  .sidebar .brand .mark { width:34px; height:34px; border-radius:9px; object-fit:contain; }
-  .sidebar .brand .name { font-size:.92rem; }
   .sidebar .nav-section { display:block; padding:16px 8px 5px; color:var(--muted-2); font-size:.57rem; letter-spacing:.12em; text-transform:uppercase; }
   .sidebar .nav-item { position:relative; padding:8px 10px; font-size:.84rem; border-radius:8px; }
   .sidebar .nav-item.active { box-shadow:none; }
@@ -597,7 +613,7 @@ margin-bottom: 14px;
 .chart-area { position: relative; min-height: 240px; }
 .chart-svg { width: 100%; height: 240px; display: block; overflow: visible; }
 .chart-svg .grid-line { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 3 4; }
-.chart-svg .grid-label { fill: var(--muted-2); font-size: 10.5px; font-weight: 600; }
+.chart-svg .grid-label { fill: var(--muted-2); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart-svg .hit-rect { fill: transparent; cursor: crosshair; }
 .chart-svg .hover-line { stroke: var(--muted-2); stroke-width: 1; stroke-dasharray: 3 3; display: none; }
 .chart-svg .hover-dot { fill: var(--bg); stroke-width: 2; display: none; }
@@ -884,10 +900,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .sync-progress[hidden] { display: none; }
 body.initial-loading { overflow:hidden; }
 body.initial-loading > :not(#syncProgress):not(script) { visibility:hidden; }
-body.initial-loading #syncProgress { visibility:visible; position:fixed; z-index:10000; top:50%; left:50%; transform:translate(-50%,-50%); width:min(420px,calc(100% - 48px)); margin:0; padding:0; border:0; border-radius:0; background:transparent; text-align:center; }
+body.initial-loading #syncProgress { visibility:visible; position:fixed; z-index:10000; inset:0; height:fit-content; width:min(420px,calc(100% - 48px)); margin:auto; padding:0; border:0; border-radius:0; background:transparent; text-align:center; }
 body.initial-loading #syncProgress .sync-progress-brand { display:flex; flex-direction:column; align-items:center; gap:16px; margin-bottom:38px; }
-.sync-progress-brand img { width:88px; height:88px; border-radius:50%; object-fit:cover; box-shadow:0 0 0 1px rgba(255,255,255,.09),0 8px 32px #0005; }
-.sync-progress-brand strong { color:var(--text); font-size:32px; font-weight:650; letter-spacing:-.7px; }
+.sync-progress-brand .logo { --h:108px; }
 body.initial-loading #syncProgress .sync-progress-heading { justify-content:center; font-size:15px; font-weight:500; color:var(--text); margin-bottom:20px; }
 body.initial-loading #syncProgress .sync-progress-dot { display:none; }
 body.initial-loading #syncProgress .sync-progress-detail { display:block; color:var(--muted); font-size:13px; line-height:1.6; margin-top:16px; min-height:42px; }
@@ -945,7 +960,6 @@ footer.page-footer a:hover { text-decoration: underline; }
 @media (max-width: 900px) {
 body { flex-direction: column; }
 .sidebar { position: static; width: 100%; min-height: auto; flex-direction: row; align-items: center; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 10px; gap: 10px; }
-.brand { padding: 0 8px 0 0; }
 .nav-list { flex-direction: row; }
 .sidebar-footer { display: none; }
 .main { padding: 16px 6px 40px; }
@@ -976,9 +990,6 @@ border-right:0; border-bottom:1px solid var(--border);
 background:rgba(11,13,18,.97);
 backdrop-filter:blur(12px);
 }
-.brand { padding:2px 6px 7px; gap:8px; }
-.brand .mark { width:30px; height:30px; font-size:.9rem; border-radius:8px; }
-.brand .name { font-size:.94rem; }
 .nav-list {
 display:flex; flex-direction:row; gap:5px;
 width:100%; overflow-x:auto; overflow-y:hidden;
@@ -1047,7 +1058,6 @@ input, select, button { max-width:100%; }
 table { min-width:660px; }
 }
 @media (max-width: 420px) {
-.brand .name { font-size:.88rem; }
 .nav-item { padding:7px 8px; font-size:.73rem; }
 .nav-item .ic { width:14px; height:14px; }
 .topbar-right { flex-direction:column; }
@@ -1149,9 +1159,6 @@ position: sticky !important; top: 0; z-index: 1000;
 padding: 7px 8px 8px !important;
 border-bottom: 1px solid var(--border);
 }
-.brand { padding: 2px 5px 7px !important; }
-.brand .mark { width: 28px !important; height: 28px !important; }
-.brand .name { font-size: .88rem !important; }
 .nav-list { gap: 4px !important; padding-bottom: 1px !important; }
 .nav-item {
 min-height: 34px; padding: 7px 9px !important;

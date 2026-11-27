@@ -15,19 +15,10 @@ h1, .topbar h1 {
 @media (min-width: 901px) {
   .sidebar {
     width: var(--sidebar-w);
-    padding: 18px 12px 14px;
+    padding: 26px 12px 14px; /* 1º item alinhado ao título da página */
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border-soft);
   }
-  .sidebar .brand {
-    gap: 10px;
-    padding: 0 10px 18px;
-    margin-bottom: 6px;
-    border-bottom: 0;
-  }
-  .sidebar .brand .mark { width: 30px; height: 30px; border-radius: 9px; }
-  .sidebar .brand .name { font-size: 1rem; font-weight: 700; letter-spacing: -0.015em; }
-
   .sidebar .nav-list { gap: 2px; }
   .sidebar .nav-item {
     min-height: 38px;
@@ -341,10 +332,59 @@ body:not([data-secao="visao"]) #visaoGeral { display: none !important; }
 }
 
 /* Indicadores */
-.visao-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
-.visao-kpis .kpi { padding: 16px 18px; }
-.kpi-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.kpi-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+/* Números soltos no fundo da página, agrupados por pergunta (Resultado, Risco).
+   Moldura fica só para o que é objeto: o gráfico e as casas. */
+.visao-grupo { min-width: 0; }
+.visao-grupo:has(> .visao-linhas:empty) { display: none; }
+.visao-grupo-t {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+/* Faixa: os seis números principais numa linha, separados por traço vertical.
+   A margem negativa com overflow escondido corta o traço da primeira célula de
+   cada linha, inclusive quando a faixa quebra em janelas menores. */
+.visao-faixa {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px 0;
+  margin-left: -20px;
+  padding: 4px 0;
+  overflow: hidden;
+}
+.visao-faixa > #stats { display: contents; }
+.visao-faixa .fx { min-width: 0; margin-left: -1px; padding: 2px 20px; border-left: 1px solid var(--border); }
+.visao-faixa .fx .v2 { margin-top: 4px; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 1080px) { .visao-faixa { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .visao-faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Resultado e Risco: duas colunas de linhas (rótulo à esquerda, valor à direita). */
+.visao-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 20px 48px; }
+.visao-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.visao-linha:last-child { border-bottom: 0; }
+.visao-linha > div { min-width: 0; }
+.visao-linha .val { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi-abertas { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+button.visao-linha { cursor: pointer; }
+button.visao-linha:hover .destaque-titulo { color: var(--accent); }
+button.visao-linha:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .kpi-barras { flex: none; width: 150px; height: 44px; }
 .kpi-barras .pos { fill: var(--pos); }
 .kpi-barras .neg { fill: var(--danger); }
@@ -357,25 +397,7 @@ body:not([data-secao="visao"]) #visaoGeral { display: none !important; }
 .kpi-legenda .key { width: 8px; height: 8px; border-radius: 2px; }
 .kpi-legenda img { width: 14px; height: 14px; border-radius: 4px; }
 
-/* Resumo rápido em faixa */
-.visao .minis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--border-soft);
-}
-.visao .minis > div { padding: 13px 16px; background: var(--card); }
-.visao .minis .positive { color: var(--pos); }
-.visao .minis .negative { color: var(--danger); }
-
-/* Destaques */
-.visao-destaques { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
-.visao-destaques .destaque { padding: 16px 18px; }
-.visao-destaques .destaque .k { margin-bottom: 8px; }
-.destaque-titulo { margin-bottom: 4px; }
+.destaque-titulo { transition: color 0.12s; }
 .visao-spark-legenda { margin-top: 2px; color: var(--muted-2); font-size: 0.66rem; }
 
 /* ---------- Tabelas de Posições e Histórico ---------- */

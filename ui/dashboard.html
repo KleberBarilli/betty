@@ -3,20 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Painel de posições e resultados do MyBettys" />
-<link rel="icon" type="image/png" href="/assets/mybettys-logo-128.png" />
+<meta name="description" content="Painel de posições e resultados do Betty" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/favicon-16.png" />
+<link rel="preload" href="/assets/brand/betty-wordmark.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="/assets/brand/marca.css" />
 <link rel="stylesheet" href="/profit-calendar.css" />
-<title>MyBettys</title>
+<title>Betty</title>
 <link rel="stylesheet" href="/dashboard.css">
 <link rel="stylesheet" href="/layout.css">
 
 </head>
 <body class="initial-loading" data-secao="visao">
 <aside class="sidebar" inert>
-<div class="brand">
-<img class="mark" src="/assets/mybettys-logo-128.png" alt="Logo MyBettys">
-<div class="name">MyBettys</div>
-</div>
 <ul class="nav-list" aria-label="Principal">
 <li class="nav-item active" data-secao="visao" role="button" tabindex="0" aria-current="page" data-on-click="irPara('visao')" data-on-keydown="teclaIrPara(event,'visao')">Visão geral</li>
 <li class="nav-item" data-secao="posicoes" role="button" tabindex="0" data-on-click="irPara('posicoes')" data-on-keydown="teclaIrPara(event,'posicoes')">Posições<span class="sidebar-position-count" id="sidebarPositionCount" hidden></span></li>
@@ -79,7 +78,7 @@ Atualizar agora
 <button type="button" data-on-click="atualizarAgora()">Atualizar agora</button>
 </div>
 <section class="sync-progress" id="syncProgress" role="status" aria-live="polite" aria-atomic="true">
-<div class="sync-progress-brand" aria-hidden="true"><img src="/assets/mybettys-logo-128.png" alt=""><strong>MyBettys</strong></div>
+<div class="sync-progress-brand" aria-hidden="true"><span class="logo"><img class="marca" src="/assets/brand/marca.svg" alt=""><span class="palavra" aria-hidden="true">Betty</span></span></div>
 <div class="sync-progress-heading"><span class="sync-progress-dot" aria-hidden="true"></span><span id="syncProgressTitle">Preparando seus dados</span></div>
 <div class="sync-progress-bar" aria-hidden="true"><div class="sync-progress-bar-fill"></div></div>
 <div class="sync-progress-detail" id="syncProgressDetail">Buscando posições nas casas conectadas…</div>
@@ -140,15 +139,25 @@ Atualizar agora
 </section>
 <section class="visao-casas" id="visaoCasas" aria-label="Casas"></section>
 </div>
-<section class="visao-kpis" id="stats" aria-label="Indicadores"></section>
-<section class="minis" aria-label="Resumo rápido">
-<div><div class="k">Lucro realizado</div><div class="v2 resumo-val" id="resumoLucro">—</div></div>
-<div><div class="k">ROI</div><div class="v2 resumo-val" id="resumoRoi">—</div></div>
-<div><div class="k">Taxa de acerto</div><div class="v2 resumo-val" id="resumoTaxa">—</div></div>
-<div><div class="k">Odd média</div><div class="v2 resumo-val" id="resumoOdd">—</div></div>
-<div><div class="k">Stake média</div><div class="v2 resumo-val" id="resumoStakeMedia">—</div></div>
+<section class="visao-faixa" aria-label="Indicadores">
+<div id="stats"></div>
+<div class="fx"><div class="k">Taxa de acerto</div><div class="v2" id="resumoTaxa">—</div></div>
+<div class="fx"><div class="k">Odd média</div><div class="v2" id="resumoOdd">—</div></div>
 </section>
-<section class="visao-destaques" id="dashboardInsights" aria-label="Destaques"></section>
+<div class="visao-cols">
+<section class="visao-grupo" aria-labelledby="visaoResultadoTitulo">
+<h2 class="visao-grupo-t" id="visaoResultadoTitulo">Resultado</h2>
+<div class="visao-linhas">
+<div class="visao-linha"><div><div>Últimos 14 dias</div><div class="sm mu" id="visaoFechadas">—</div></div><svg class="kpi-barras" id="visaoBarras" viewBox="0 0 222 60" aria-hidden="true"></svg></div>
+<div class="visao-linha"><div>Stake média</div><span class="val" id="resumoStakeMedia">—</span></div>
+<div class="visao-linha"><div><div>Posições com cotação</div><div class="sm mu" id="visaoCotacaoNota"></div></div><span class="val" id="visaoCotacao">—</span></div>
+</div>
+</section>
+<section class="visao-grupo" aria-labelledby="visaoRiscoTitulo">
+<h2 class="visao-grupo-t" id="visaoRiscoTitulo">Risco</h2>
+<div class="visao-linhas" id="dashboardInsights"></div>
+</section>
+</div>
 </div>
 <!-- Tabs + Search + filtros (só Posições) -->
 <div class="toolbar" id="toolbarSection" style="display:none;">
@@ -375,7 +384,7 @@ data-on-input="aplicarFiltrosDebounced()"
 </div>
 <div class="aviso-download" id="avisoDownload" role="status" aria-live="polite" hidden></div>
 <footer class="page-footer">
-Dados via <a href="https://polymarket.com" target="_blank" rel="noopener">Polymarket</a> · <a href="https://kalshi.com" target="_blank" rel="noopener">Kalshi</a> · <a href="https://predict.fun/" target="_blank" rel="noopener">Predict.fun</a> · <a href="https://sx.bet/" target="_blank" rel="noopener">SX Bet</a> · MyBettys
+Dados via <a href="https://polymarket.com" target="_blank" rel="noopener">Polymarket</a> · <a href="https://kalshi.com" target="_blank" rel="noopener">Kalshi</a> · <a href="https://predict.fun/" target="_blank" rel="noopener">Predict.fun</a> · <a href="https://sx.bet/" target="_blank" rel="noopener">SX Bet</a> · Betty
 </footer>
 </main>
 <script src="/audit-utils.js"></script>

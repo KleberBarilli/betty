@@ -789,8 +789,6 @@ atualizarSaldosFixos();
 periodoEstatCarregadoPara = null;
 periodoGraficoPadraoPendente = true;
 carregarPeriodoEstatisticas();
-const name = document.querySelector(".sidebar .name");
-if (name) name.textContent = "MyBettys";
 const h1 = document.getElementById("topbarTitle");
 if (h1 && viewAtual === "dashboard") h1.textContent = TITULOS_SECAO.visao[0];
 const sub = document.getElementById("topbarSub");
@@ -1087,7 +1085,7 @@ const nome = CASAS_NOVAS[tipo];
 if (nome) {
 const predict = tipo === "predict";
 document.getElementById("accountModalTitle").textContent = "Conectar " + nome;
-document.getElementById("accountModalSub").textContent = "A chave de API fica criptografada no MyBettys.";
+document.getElementById("accountModalSub").textContent = "A chave de API fica criptografada no Betty.";
 fields.innerHTML = `
 ${predict ? '<label for="novaCasaWallet">Endereço público da conta Predict.fun</label><input id="novaCasaWallet" placeholder="0x..." autocomplete="off" spellcheck="false">' : ''}
 <label for="novaCasaApiKey">Chave de API</label><input id="novaCasaApiKey" type="password" autocomplete="off">
@@ -1103,9 +1101,9 @@ return;
 }
 document.getElementById("accountModalTitle").textContent=tipo==="poly"?"Conectar Polymarket":"Conectar Kalshi";
 document.getElementById("accountModalSub").textContent=tipo==="poly"?"Informe a wallet pública. Validamos a proxy (onde ficam fundos e posições) antes de confirmar.":"As credenciais são enviadas por HTTPS e armazenadas criptografadas no servidor. Nunca ficam no HTML.";
-fields.innerHTML=tipo==="poly"?`<label>Wallet pública</label><input id="modalWallet" placeholder="0x..." autocomplete="off"><div id="polyPreviewBox"></div><div class="connection-note">Cole o endereço de login ou a proxy wallet. O MyBettys resolve a proxy e mostra saldo e posições antes de gravar. Nunca envie seed phrase nem Private Key.</div>`:`<label>API Key ID (Read only)</label><input id="modalKalshiKey" placeholder="Ex.: 123e4567-e89b-12d3-a456-426614174000" autocomplete="off"><label>Private Key PEM</label><textarea id="modalKalshiPrivate" placeholder="-----BEGIN PRIVATE KEY-----
+fields.innerHTML=tipo==="poly"?`<label>Wallet pública</label><input id="modalWallet" placeholder="0x..." autocomplete="off"><div id="polyPreviewBox"></div><div class="connection-note">Cole o endereço de login ou a proxy wallet. O Betty resolve a proxy e mostra saldo e posições antes de gravar. Nunca envie seed phrase nem Private Key.</div>`:`<label>API Key ID (Read only)</label><input id="modalKalshiKey" placeholder="Ex.: 123e4567-e89b-12d3-a456-426614174000" autocomplete="off"><label>Private Key PEM</label><textarea id="modalKalshiPrivate" placeholder="-----BEGIN PRIVATE KEY-----
 ...
------END PRIVATE KEY-----"></textarea><div class="connection-note">Use uma API Key <strong>Read only</strong> da Kalshi. A API Key ID e a Private Key são enviadas somente ao backend e ficam criptografadas. O MyBettys não envia ordens nem precisa de permissão de escrita.</div>`;
+-----END PRIVATE KEY-----"></textarea><div class="connection-note">Use uma API Key <strong>Read only</strong> da Kalshi. A API Key ID e a Private Key são enviadas somente ao backend e ficam criptografadas. O Betty não envia ordens nem precisa de permissão de escrita.</div>`;
 document.getElementById("accountModalError").textContent="";
 const save=document.getElementById("accountModalSave");
 if (save) save.textContent = tipo==="poly" ? "Validar carteira" : "Salvar conexão";
@@ -4211,10 +4209,6 @@ concMercado: concMercado && stakeAbertas > 0 ? concMercado : null
 const oddsValidas = fechadoDb ? [] : fechadosF.map(d => getOddNum(d)).filter(o => o > 0);
 const oddMedia = fechadoDb ? (Number(fechadoDb.oddMedia) || 0) : (oddsValidas.length ? (oddsValidas.reduce((s, o) => s + o, 0) / oddsValidas.length) : 0);
 const stakeMedia = nFechadas > 0 ? (stakeFechadas / nFechadas) : 0;
-const roiEl = document.getElementById("resumoRoi");
-if (pintar && roiEl) { roiEl.textContent = (roiGeral >= 0 ? '+' : '') + roiGeral.toFixed(2) + '%'; roiEl.className = "v2 resumo-val " + (roiGeral >= 0 ? "positive" : "negative"); }
-const lucroEl = document.getElementById("resumoLucro");
-if (pintar && lucroEl) { lucroEl.textContent = fmtSinalDinheiro(pnlRealizado); lucroEl.className = "v2 resumo-val " + (pnlRealizado >= 0 ? "positive" : "negative"); }
 const taxaEl = document.getElementById("resumoTaxa");
 if (pintar && taxaEl) taxaEl.textContent = winRateGeral.toFixed(0) + "%";
 const oddEl = document.getElementById("resumoOdd");
@@ -6782,6 +6776,122 @@ if (somaPorDia[ymd] != null) somaPorDia[ymd] += (d.realizedPnl || 0);
 });
 return dias.map(d => ({ d, v: somaPorDia[d] }));
 }
+// ===== Gráficos de barras (PnL por Dia / por Mês) =====
+// O SVG usa o tamanho que ocupa na tela (viewBox = pixels reais). Com um viewBox fixo
+// e preserveAspectRatio="none", números, linhas e o ponto do hover esticavam junto.
+// Por isso o gráfico é redesenhado quando a área muda de tamanho (observarTamanhoGrafico).
+
+// Escala "redonda" para o eixo Y: passo 1/2/2,5/5 × 10^n, sempre passando pelo zero.
+function escalaEixoPnl(lo, hi) {
+if (lo === hi) { lo -= 1; hi += 1; }
+const bruto = (hi - lo) / 4;
+const mag = 10 ** Math.floor(Math.log10(bruto));
+const passo = [1, 2, 2.5, 5, 10].map(m => m * mag).find(p => p >= bruto * 0.999);
+let min = Math.floor(lo / passo) * passo, max = Math.ceil(hi / passo) * passo;
+// Folga para a barra mais alta não encostar no limite do gráfico.
+if (hi > 0 && max - hi < passo * 0.15) max += passo;
+if (lo < 0 && lo - min < passo * 0.15) min -= passo;
+const marcas = [];
+for (let k = Math.round(min / passo); k <= Math.round(max / passo); k++) marcas.push(k * passo);
+return { min, max, passo, marcas };
+}
+function fmtEixoPnl(v, passo) {
+if (Math.abs(v) < passo / 1000) return "$0";
+const casas = Number.isInteger(passo) ? 0 : 2;
+const abs = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+return (v < 0 ? "-$" : "$") + abs;
+}
+function desenharBarrasPnl(wrap, itens, { rotulo, fracBarra, barraMin }) {
+const tooltip = document.getElementById("chartTooltip");
+wrap.innerHTML = '<svg class="chart-svg" aria-hidden="true"></svg><div class="chart-labels"></div>';
+const svgEl = wrap.querySelector(".chart-svg");
+const caixa = svgEl.getBoundingClientRect();
+const w = Math.max(240, Math.round(caixa.width)), h = Math.max(140, Math.round(caixa.height));
+svgEl.setAttribute("viewBox", `0 0 ${w} ${h}`);
+const valores = itens.map(d => d.v);
+const { min, max, passo, marcas } = escalaEixoPnl(Math.min(0, ...valores), Math.max(0, ...valores));
+// Coluna dos valores do eixo: largura do maior rótulo, medida com a fonte real.
+svgEl.innerHTML = marcas.map(v => `<text class="grid-label">${fmtEixoPnl(v, passo)}</text>`).join("");
+const larguraRotulos = Math.max(...[...svgEl.querySelectorAll(".grid-label")].map(t => t.getComputedTextLength()));
+const padL = Math.ceil(larguraRotulos) + 14, padR = 14, padT = 12, padB = 10;
+const plotW = w - padL - padR, plotH = h - padT - padB, plotBottom = padT + plotH;
+const yDe = v => padT + (1 - (v - min) / (max - min)) * plotH;
+const linha = y => Math.round(y) + 0.5; // linha de 1px nítida
+const zeroY = Math.round(yDe(0));
+const slotW = plotW / itens.length;
+const barW = Math.max(barraMin, Math.round(slotW * fracBarra));
+const centros = itens.map((d, i) => padL + (i + 0.5) * slotW);
+const corDe = v => v > 0 ? "#3ddc84" : v < 0 ? "#ff6369" : "#3a4150";
+const grade = marcas.map(v => {
+const y = yDe(v);
+return (v === 0 ? "" : `<line class="grid-line" x1="${padL}" y1="${linha(y)}" x2="${w - padR}" y2="${linha(y)}"/>`)
++ `<text class="grid-label" x="${padL - 10}" y="${Math.round(y)}" text-anchor="end" dominant-baseline="central">${fmtEixoPnl(v, passo)}</text>`;
+}).join("");
+const barras = itens.map((d, i) => {
+const topo = Math.round(Math.min(yDe(d.v), zeroY)), base = Math.round(Math.max(yDe(d.v), zeroY));
+const alt = Math.max(1, base - topo);
+const x = Math.round(centros[i] - barW / 2);
+return `<rect class="pnl-bar" x="${x}" width="${barW}" y="${zeroY}" height="0" data-y="${topo}" data-h="${alt}" rx="2.5" fill="${corDe(d.v)}"/>`;
+}).join("");
+svgEl.innerHTML = `${grade}${barras}
+<line class="zero-line" x1="${padL}" y1="${zeroY + 0.5}" x2="${w - padR}" y2="${zeroY + 0.5}"/>
+<line class="hover-line" x1="0" y1="${padT}" x2="0" y2="${plotBottom}"/>
+<circle class="hover-dot" r="4.5"/>
+<rect class="hit-rect" x="${padL}" y="0" width="${plotW}" height="${h}"/>`;
+const labelsEl = wrap.querySelector(".chart-labels");
+const labelsIdx = [...new Set([0, Math.floor((itens.length - 1) / 2), itens.length - 1])];
+labelsEl.innerHTML = labelsIdx.map(i => `<span>${rotulo(itens[i].d)}</span>`).join("");
+labelsEl.style.setProperty("padding-left", padL + "px", "important");
+labelsEl.style.setProperty("padding-right", padR + "px", "important");
+requestAnimationFrame(() => {
+svgEl.querySelectorAll(".pnl-bar").forEach(el => {
+el.setAttribute("y", el.dataset.y);
+el.setAttribute("height", el.dataset.h);
+});
+});
+const hitRect = svgEl.querySelector(".hit-rect");
+const hoverLine = svgEl.querySelector(".hover-line");
+const hoverDot = svgEl.querySelector(".hover-dot");
+hitRect.addEventListener("mousemove", (e) => {
+const mx = e.clientX - svgEl.getBoundingClientRect().left;
+const idx = Math.max(0, Math.min(itens.length - 1, Math.floor((mx - padL) / slotW)));
+const cx = Math.round(centros[idx]) + 0.5;
+const v = itens[idx].v;
+hoverLine.setAttribute("x1", cx); hoverLine.setAttribute("x2", cx);
+hoverLine.style.display = "block";
+hoverDot.setAttribute("cx", cx); hoverDot.setAttribute("cy", yDe(v));
+hoverDot.setAttribute("stroke", corDe(v));
+hoverDot.style.display = "block";
+if (tooltip) {
+tooltip.style.display = "block";
+tooltip.style.left = Math.min(94, Math.max(6, (cx / w) * 100)) + "%";
+tooltip.textContent = rotulo(itens[idx].d) + " • " + (v >= 0 ? "+" : "") + fmtDinheiro(v);
+}
+});
+hitRect.addEventListener("mouseleave", () => {
+hoverLine.style.display = "none";
+hoverDot.style.display = "none";
+if (tooltip) tooltip.style.display = "none";
+});
+}
+// Redesenha as barras quando a área do gráfico muda de tamanho (janela, sidebar).
+// A curva do PnL Acumulado não tem texto dentro do SVG e continua esticando sozinha.
+function observarTamanhoGrafico() {
+const area = document.getElementById("chartArea");
+if (!area || typeof ResizeObserver !== "function") return;
+let largura = 0, altura = 0, agendado = false;
+new ResizeObserver(([entrada]) => {
+const { width, height } = entrada.contentRect;
+if (Math.round(width) === largura && Math.round(height) === altura) return;
+const primeira = largura === 0;
+largura = Math.round(width); altura = Math.round(height);
+if (primeira || agendado || (tipoGraficoAtual !== "pnldia" && tipoGraficoAtual !== "pnlmes")) return;
+agendado = true;
+requestAnimationFrame(() => { agendado = false; if (dashboardEstaVisivel()) renderizarGraficoComSerie(); });
+}).observe(area);
+}
+observarTamanhoGrafico();
+// ===== PnL por Dia (barras) =====
 function desenharGraficoPnlDia() {
 const wrap = document.getElementById("chartArea");
 const valorEl = document.getElementById("chartValorAtual");
@@ -6805,88 +6915,8 @@ wrap.innerHTML = '<div class="chart-empty">Sem dados nesse período.</div>';
 if (tooltip) tooltip.style.display = "none";
 return;
 }
-const vals = dias.map(d => d.v);
-let min = Math.min(0, ...vals), max = Math.max(0, ...vals);
-if (min === max) { min -= 1; max += 1; }
-const folga = (max - min) * 0.18 || 1;
-min -= folga; max += folga;
-const range = max - min;
-const w = 700, h = 240;
-const padL = 54, padR = 14, padT = 16, padB = 14;
-const plotW = w - padL - padR;
-const plotH = h - padT - padB;
-const plotBottom = padT + plotH;
-const zeroY = padT + (1 - (0 - min) / range) * plotH;
-const slotW = plotW / dias.length;
-const barW = Math.max(2, slotW * (dias.length > 40 ? 0.7 : 0.55));
-const centros = dias.map((d, i) => padL + (i + 0.5) * slotW);
-let gridHtml = "";
-const nLinhas = 4;
-for (let k = 0; k <= nLinhas; k++) {
-const val = min + (range * k) / nLinhas;
-const y = padT + (1 - k / nLinhas) * plotH;
-gridHtml += `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}"/>`;
-gridHtml += `<text class="grid-label" x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${fmtDinheiro(val)}</text>`;
-}
-const barsHtml = dias.map((d, i) => {
-const valY = padT + (1 - (d.v - min) / range) * plotH;
-const yTop = d.v >= 0 ? valY : zeroY;
-const hgt = Math.max(1, Math.abs(zeroY - valY));
-const cor = d.v > 0 ? "#3ddc84" : d.v < 0 ? "#ff6369" : "#3a4150";
-return `<rect class="pnl-bar" data-i="${i}" x="${(centros[i] - barW / 2).toFixed(2)}" width="${barW.toFixed(2)}" y="${zeroY.toFixed(2)}" height="0" data-y="${yTop.toFixed(2)}" data-h="${hgt.toFixed(2)}" rx="2.5" fill="${cor}"/>`;
-}).join("");
-const fmtLabel = (ymd) => { const [yy, mm, dd] = ymd.split("-"); return `${dd}/${mm}`; };
-const labelsIdx = [...new Set([0, Math.floor((dias.length - 1) / 2), dias.length - 1])];
-const labels = labelsIdx.map(i => `<span>${fmtLabel(dias[i].d)}</span>`).join("");
-wrap.innerHTML = `
-<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chart-svg">
-${gridHtml}
-${barsHtml}
-<line class="zero-line" x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}"/>
-<line class="hover-line" x1="0" y1="${padT}" x2="0" y2="${plotBottom}"/>
-<circle class="hover-dot" r="4.5" stroke="#3ddc84"/>
-<rect class="hit-rect" x="${padL}" y="0" width="${plotW}" height="${h}"/>
-</svg>
-<div class="chart-labels">${labels}</div>
-`;
-requestAnimationFrame(() => {
-wrap.querySelectorAll(".pnl-bar").forEach(el => {
-el.setAttribute("y", el.dataset.y);
-el.setAttribute("height", el.dataset.h);
-});
-});
-const svgEl = wrap.querySelector(".chart-svg");
-const hitRect = wrap.querySelector(".hit-rect");
-const hoverLine = wrap.querySelector(".hover-line");
-const hoverDot = wrap.querySelector(".hover-dot");
-if (hitRect && hoverLine && hoverDot && svgEl) {
-hitRect.addEventListener("mousemove", (e) => {
-const rect = svgEl.getBoundingClientRect();
-const mx = ((e.clientX - rect.left) / rect.width) * w;
-let idx = Math.floor((mx - padL) / slotW);
-idx = Math.max(0, Math.min(dias.length - 1, idx));
-const cx = centros[idx];
-const cor = dias[idx].v > 0 ? "#3ddc84" : dias[idx].v < 0 ? "#ff6369" : "#3a4150";
-hoverLine.setAttribute("x1", cx); hoverLine.setAttribute("x2", cx);
-hoverLine.style.display = "block";
-const valY = padT + (1 - (dias[idx].v - min) / range) * plotH;
-hoverDot.setAttribute("cx", cx); hoverDot.setAttribute("cy", valY);
-hoverDot.setAttribute("stroke", cor);
-hoverDot.style.display = "block";
-if (tooltip) {
-const dt = fmtLabel(dias[idx].d);
-const pct = Math.min(94, Math.max(6, (cx / w) * 100));
-tooltip.style.display = "block";
-tooltip.style.left = pct + "%";
-tooltip.textContent = dt + " • " + (dias[idx].v >= 0 ? "+" : "") + fmtDinheiro(dias[idx].v);
-}
-});
-hitRect.addEventListener("mouseleave", () => {
-hoverLine.style.display = "none";
-hoverDot.style.display = "none";
-if (tooltip) tooltip.style.display = "none";
-});
-}
+const fmtLabel = (ymd) => { const [, mm, dd] = ymd.split("-"); return `${dd}/${mm}`; };
+desenharBarrasPnl(wrap, dias, { rotulo: fmtLabel, fracBarra: dias.length > 40 ? 0.7 : 0.55, barraMin: 2 });
 }
 // ===== PnL por Mês (barras) =====
 function ymBrasil(dt) {
@@ -6950,88 +6980,8 @@ wrap.innerHTML = '<div class="chart-empty">Sem dados mensais.</div>';
 if (tooltip) tooltip.style.display = "none";
 return;
 }
-const vals = meses.map(d => d.v);
-let min = Math.min(0, ...vals), max = Math.max(0, ...vals);
-if (min === max) { min -= 1; max += 1; }
-const folga = (max - min) * 0.18 || 1;
-min -= folga; max += folga;
-const range = max - min;
-const w = 700, h = 240;
-const padL = 54, padR = 14, padT = 16, padB = 14;
-const plotW = w - padL - padR;
-const plotH = h - padT - padB;
-const zeroY = padT + (1 - (0 - min) / range) * plotH;
-const slotW = plotW / meses.length;
-const barW = Math.max(6, slotW * 0.55);
-const centros = meses.map((d, i) => padL + (i + 0.5) * slotW);
-let gridHtml = "";
-for (let k = 0; k <= 4; k++) {
-const val = min + (range * k) / 4;
-const y = padT + (1 - k / 4) * plotH;
-gridHtml += `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}"/>`;
-gridHtml += `<text class="grid-label" x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${fmtDinheiro(val)}</text>`;
-}
-const barsHtml = meses.map((d, i) => {
-const valY = padT + (1 - (d.v - min) / range) * plotH;
-const yTop = d.v >= 0 ? valY : zeroY;
-const hgt = Math.max(1, Math.abs(zeroY - valY));
-const cor = d.v > 0 ? "#3ddc84" : d.v < 0 ? "#ff6369" : "#3a4150";
-return `<rect class="pnl-bar" data-i="${i}" x="${(centros[i] - barW / 2).toFixed(2)}" width="${barW.toFixed(2)}" y="${zeroY.toFixed(2)}" height="0" data-y="${yTop.toFixed(2)}" data-h="${hgt.toFixed(2)}" rx="2.5" fill="${cor}"/>`;
-}).join("");
-const fmtMes = (ym) => {
-const [yy, mm] = ym.split("-");
-return mm + "/" + yy.slice(2);
-};
-const labelsIdx = [...new Set([0, Math.floor((meses.length - 1) / 2), meses.length - 1])];
-const labels = labelsIdx.map(i => `<span>${fmtMes(meses[i].d)}</span>`).join("");
-wrap.innerHTML = `
-<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="chart-svg">
-${gridHtml}
-${barsHtml}
-<line class="zero-line" x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}"/>
-<line class="hover-line" x1="0" y1="${padT}" x2="0" y2="${(padT + plotH).toFixed(1)}"/>
-<circle class="hover-dot" r="4.5" stroke="#3ddc84"/>
-<rect class="hit-rect" x="${padL}" y="0" width="${plotW}" height="${h}"/>
-</svg>
-<div class="chart-labels">${labels}</div>
-`;
-requestAnimationFrame(() => {
-wrap.querySelectorAll(".pnl-bar").forEach(el => {
-el.setAttribute("y", el.dataset.y);
-el.setAttribute("height", el.dataset.h);
-});
-});
-const svgEl = wrap.querySelector(".chart-svg");
-const hitRect = wrap.querySelector(".hit-rect");
-const hoverLine = wrap.querySelector(".hover-line");
-const hoverDot = wrap.querySelector(".hover-dot");
-if (hitRect && hoverLine && hoverDot && svgEl) {
-hitRect.addEventListener("mousemove", (e) => {
-const rect = svgEl.getBoundingClientRect();
-const mx = ((e.clientX - rect.left) / rect.width) * w;
-let idx = Math.floor((mx - padL) / slotW);
-idx = Math.max(0, Math.min(meses.length - 1, idx));
-const cx = centros[idx];
-const cor = meses[idx].v > 0 ? "#3ddc84" : meses[idx].v < 0 ? "#ff6369" : "#3a4150";
-hoverLine.setAttribute("x1", cx); hoverLine.setAttribute("x2", cx);
-hoverLine.style.display = "block";
-const valY = padT + (1 - (meses[idx].v - min) / range) * plotH;
-hoverDot.setAttribute("cx", cx); hoverDot.setAttribute("cy", valY);
-hoverDot.setAttribute("stroke", cor);
-hoverDot.style.display = "block";
-if (tooltip) {
-const pct = Math.min(94, Math.max(6, (cx / w) * 100));
-tooltip.style.display = "block";
-tooltip.style.left = pct + "%";
-tooltip.textContent = fmtMes(meses[idx].d) + " • " + (meses[idx].v >= 0 ? "+" : "") + fmtDinheiro(meses[idx].v);
-}
-});
-hitRect.addEventListener("mouseleave", () => {
-hoverLine.style.display = "none";
-hoverDot.style.display = "none";
-if (tooltip) tooltip.style.display = "none";
-});
-}
+const fmtMes = (ym) => { const [yy, mm] = ym.split("-"); return mm + "/" + yy.slice(2); };
+desenharBarrasPnl(wrap, meses, { rotulo: fmtMes, fracBarra: 0.55, barraMin: 6 });
 }
 // ===== Status "Online" + "Atualizado há Xs" =====
 // Enquanto true, o texto abaixo de "Online" mostra "Atualizando..." e o
@@ -7372,8 +7322,8 @@ function fmtDolarSinal(v) {
 }
 function classeSinal(v) { return (Number(v) || 0) >= 0 ? "pos" : "neg"; }
 function kpisVazios(texto) {
-  return ["PnL realizado", "PnL não realizado", "Exposição"].map(k =>
-    `<div class="card kpi kpi-vazio"><div class="kpi-topo"><span class="k">${k}</span></div><div class="v">—</div><div class="sm mu">${escapeHtml(texto)}</div></div>`).join("");
+  return ["PnL realizado", "PnL não realizado", "Exposição", "ROI"].map((k, i) =>
+    `<div class="fx kpi-vazio"><div class="k">${k}</div><div class="v2">—</div>${i ? "" : `<div class="sm mu">${escapeHtml(texto)}</div>`}</div>`).join("");
 }
 function saldoPorCasa() {
   return { polymarket: POLY_API_BALANCE, kalshi: KALSHI_API_BALANCE, predict: PREDICT_API_BALANCE, sxbet: SXBET_API_BALANCE };
@@ -7387,7 +7337,7 @@ function pintarVisaoGeral(d) {
   if (chips) {
     const partes = [
       `<span class="chip ${classeSinal(d.pnlHoje)}">${d.pnlHoje >= 0 ? "▲" : "▼"} ${fmtDolarSinal(d.pnlHoje)} hoje</span>`,
-      `<span class="chip ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)} em 7 dias</span>`,
+      `<span class="chip ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)} em 7 dias${d.pnlAnterior == null ? "" : ` · antes ${fmtDolarSinal(d.pnlAnterior)}`}</span>`,
       d.patrimonioParcial
         ? `<span class="sm mu">Inclui ${escapeHtml(d.casasPatrimonio.map(c => NOMES_CASAS[c]).join(", ") || "nenhuma casa")}</span>`
         : `<span class="sm mu">Saldo <b>${fmtDolar(d.saldoPatrimonio)}</b> · em aberto <b>${fmtDolar(d.valorAberto)}</b></span>`,
@@ -7435,39 +7385,38 @@ function pintarKpisVisao(d) {
   if (!el) return;
   const soSxBet = d.abertosF.length && !d.abertosF.some(a => a._platform !== "sxbet");
   const comCotacao = d.abertosF.filter(a => a._platform !== "sxbet").length;
-  const casas = Object.entries(d.casasAbertas).filter(([, g]) => g.stake > 0).sort((a, b) => b[1].stake - a[1].stake);
-  const barra = casas.map(([, g], i) => `<i class="o${Math.min(i, 3)}" style="width:${(g.stake / d.stakeAbertas * 100).toFixed(2)}%"></i>`).join("");
-  const legenda = casas.map(([casa, g], i) => `<span class="leg"><span class="key o${Math.min(i, 3)}"></span><img src="/assets/platforms/${casa}.png" alt="${escapeHtml(NOMES_CASAS[casa] || casa)}">${Math.round(g.stake / d.stakeAbertas * 100)}%</span>`).join("");
+  // Faixa: os quatro números calculados aqui; taxa de acerto e odd média
+  // são células fixas do HTML, preenchidas por renderizarStats.
   el.innerHTML = `
-<div class="card kpi">
-<div class="kpi-topo"><span class="k">PnL realizado</span><span class="chip ${classeSinal(d.roiGeral)}">ROI ${(d.roiGeral >= 0 ? "+" : "") + d.roiGeral.toFixed(2)}%</span></div>
-<div class="kpi-linha"><div><div class="v ${classeSinal(d.pnlRealizado)}">${fmtDolarSinal(d.pnlRealizado)}</div><div class="sm mu">${d.nFechadas.toLocaleString("en-US")} apostas fechadas · últimos 14 dias ao lado</div></div>
-<svg class="kpi-barras" id="visaoBarras" viewBox="0 0 222 60" aria-hidden="true"></svg></div>
-</div>
-<div class="card kpi">
-<div class="kpi-topo"><span class="k">PnL não realizado</span>${d.abertosF.length ? `<span class="chip">${comCotacao} de ${d.abertosF.length} com cotação</span>` : ""}</div>
-<div class="v ${soSxBet ? "" : classeSinal(d.pnlNaoRealizado)}">${soSxBet ? "—" : fmtDolarSinal(d.pnlNaoRealizado)}</div>
-<div class="sm mu">${MYBETTYS_CONNECTIONS?.sxbet ? "A SX Bet informa só a exposição, sem valor a mercado" : "Valor a mercado das posições abertas"}</div>
-</div>
-<div class="card kpi">
-<div class="kpi-topo"><span class="k">Exposição · ${d.abertosF.length} ${d.abertosF.length === 1 ? "aberta" : "abertas"}</span><button type="button" class="link" data-on-click="irPara('posicoes')">Ver posições</button></div>
-<div class="v">${fmtDolar(d.stakeAbertas)}</div>
-${casas.length ? `<div class="pbar">${barra}</div><div class="kpi-legenda">${legenda}</div>` : `<div class="sm mu">Nenhuma posição aberta</div>`}
-</div>`;
+<div class="fx"><div class="k">PnL realizado</div><div class="v2 ${classeSinal(d.pnlRealizado)}">${fmtDolarSinal(d.pnlRealizado)}</div></div>
+<div class="fx"><div class="k">PnL não realizado</div><div class="v2 ${soSxBet ? "" : classeSinal(d.pnlNaoRealizado)}">${soSxBet ? "—" : fmtDolarSinal(d.pnlNaoRealizado)}</div></div>
+<div class="fx"><div class="k">Exposição</div><div class="v2">${fmtDolar(d.stakeAbertas)}</div></div>
+<div class="fx"><div class="k">ROI</div><div class="v2 ${classeSinal(d.roiGeral)}">${(d.roiGeral >= 0 ? "+" : "") + d.roiGeral.toFixed(2)}%</div></div>`;
+  const texto = (id, valor) => { const alvo = document.getElementById(id); if (alvo) alvo.textContent = valor; };
+  texto("visaoFechadas", `${d.nFechadas.toLocaleString("en-US")} apostas fechadas no total`);
+  texto("visaoCotacao", d.abertosF.length ? `${comCotacao} de ${d.abertosF.length}` : "—");
+  texto("visaoCotacaoNota", MYBETTYS_CONNECTIONS?.sxbet ? "A SX Bet informa só a exposição, sem valor a mercado" : "Valor a mercado das posições abertas");
 }
+// Coluna "Risco": exposição por casa, maior posição e drawdown, uma linha cada.
 function pintarDestaquesVisao(d) {
   const el = document.getElementById("dashboardInsights");
   if (!el) return;
-  const cards = [];
+  const casas = Object.entries(d.casasAbertas).filter(([, g]) => g.stake > 0).sort((a, b) => b[1].stake - a[1].stake);
+  const barra = casas.map(([, g], i) => `<i class="o${Math.min(i, 3)}" style="width:${(g.stake / d.stakeAbertas * 100).toFixed(2)}%"></i>`).join("");
+  const legenda = casas.map(([casa, g], i) => `<span class="leg"><span class="key o${Math.min(i, 3)}"></span><img src="/assets/platforms/${casa}.png" alt="${escapeHtml(NOMES_CASAS[casa] || casa)}">${Math.round(g.stake / d.stakeAbertas * 100)}%</span>`).join("");
+  const n = d.abertosF.length;
+  const itens = [`<div class="visao-linha"><div class="grow">
+<div class="kpi-abertas">${n ? `${n} ${n === 1 ? "posição aberta" : "posições abertas"}` : "Nenhuma posição aberta"}<button type="button" class="link" data-on-click="irPara('posicoes')">Ver posições</button></div>
+${casas.length ? `<div class="pbar">${barra}</div><div class="kpi-legenda">${legenda}</div>` : ""}
+</div></div>`];
   if (d.concMercado) {
     const pct = d.stakeAbertas > 0 ? d.concMercado.stake / d.stakeAbertas * 100 : 0;
-    cards.push(`<button type="button" class="card destaque" data-on-click="irPara('posicoes')"><div class="k">Maior exposição atual</div><div class="b el destaque-titulo">${escapeHtml(d.concMercado.titulo)}</div><div class="sm mu">${fmtDolar(d.concMercado.stake)} · ${pct.toFixed(1)}% da exposição</div></button>`);
+    itens.push(`<button type="button" class="visao-linha" data-on-click="irPara('posicoes')"><div><div class="el destaque-titulo">${escapeHtml(d.concMercado.titulo)}</div><div class="sm mu">Maior exposição atual · ${pct.toFixed(1)}% do total</div></div><span class="val">${fmtDolar(d.concMercado.stake)}</span></button>`);
   }
   if (Number.isFinite(d.drawdownAtual)) {
-    cards.push(`<div class="card destaque"><div class="k">Drawdown diário</div><div class="v2 ${d.drawdownAtual < 0 ? "neg" : ""}">${fmtDolar(d.drawdownAtual)} <span class="sm mu">agora</span></div>${Number.isFinite(d.maxDrawdown) ? `<div class="sm mu">Máximo no histórico <b class="neg">${fmtDolar(d.maxDrawdown)}</b></div>` : ""}</div>`);
+    itens.push(`<div class="visao-linha"><div><div>Drawdown diário</div>${Number.isFinite(d.maxDrawdown) ? `<div class="sm mu">Máximo no histórico <b class="neg">${fmtDolar(d.maxDrawdown)}</b></div>` : ""}</div><span class="val ${d.drawdownAtual < 0 ? "neg" : ""}">${fmtDolar(d.drawdownAtual)}</span></div>`);
   }
-  cards.push(`<div class="card destaque"><div class="k">Variação · 7 dias</div><div class="v2 ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)}</div><div class="sm mu">7 dias anteriores <b>${d.pnlAnterior == null ? "—" : fmtDolarSinal(d.pnlAnterior)}</b></div></div>`);
-  el.innerHTML = cards.join("");
+  el.innerHTML = itens.join("");
 }
 // Séries diárias dos últimos 30 dias (todas as casas e cada casa) para os mini gráficos.
 let seriesVisao = { chave: "", dados: new Map(), pendente: null };

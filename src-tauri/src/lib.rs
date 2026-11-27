@@ -60,10 +60,19 @@ pub fn run() {
             let url = protocol::app_url("dashboard.html")?;
             let (app_navegacao, app_janela) = (app.handle().clone(), app.handle().clone());
             WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
-                .title("MyBettys")
+                .title("Betty")
                 .inner_size(1440.0, 920.0)
                 .min_inner_size(1080.0, 700.0)
                 .maximized(true)
+                // Rasterização na CPU: na GPU (D3D11) o WebView2 suaviza SVG com MSAA e as
+                // curvas/diagonais do logo e dos gráficos saem serrilhadas (3 níveis de
+                // cobertura contra 44 na CPU). A composição continua na GPU. Os três
+                // primeiros `--disable-features` são os padrões do wry, que este método
+                // substitui (menu "mini", PDF e SmartScreen).
+                .additional_browser_args(
+                    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection \
+                     --disable-gpu-rasterization",
+                )
                 // A janela nunca sai do app; links das casas abrem no navegador padrão.
                 .on_navigation(move |url| protocol::tratar_navegacao(&app_navegacao, url))
                 // `target="_blank"` e `window.open` não criam janelas novas no app.
