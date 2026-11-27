@@ -522,7 +522,7 @@ pub async fn ler_tudo(estado: &Estado, user: &str, wallet: &str, endpoint: &str,
     if !atual() {
         bail!("Polymarket v2: consulta obsoleta");
     }
-    let tamanho = js::para_vec(&linhas).len();
+    let tamanho = js::tamanho_json(&linhas);
     let linhas = Arc::new(linhas);
     if let Ok(mut s) = poly.snapshots.lock() {
         s.remover(&chave);

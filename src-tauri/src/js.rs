@@ -128,6 +128,26 @@ pub fn para_vec<T: serde::Serialize + ?Sized>(v: &T) -> Vec<u8> {
     buf
 }
 
+/// `para_vec(v).len()` sem guardar o texto: conta os bytes que o mesmo
+/// serializador escreveria. Serve para medir listas grandes sem alocar uma
+/// cópia inteira delas.
+pub fn tamanho_json<T: serde::Serialize + ?Sized>(v: &T) -> usize {
+    struct Contador(usize);
+    impl std::io::Write for Contador {
+        fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+            self.0 += b.len();
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut contador = Contador(0);
+    let mut ser = serde_json::Serializer::with_formatter(&mut contador, FormatoJs);
+    v.serialize(&mut ser).expect("serialização JSON");
+    contador.0
+}
+
 /// `JSON.stringify(v)`.
 pub fn para_texto<T: serde::Serialize + ?Sized>(v: &T) -> String {
     String::from_utf8(para_vec(v)).expect("JSON é UTF-8")
@@ -243,6 +263,19 @@ pub fn truthy(valor: Option<&Value>) -> bool {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn tamanho_igual_ao_do_texto() {
+        let valores = [
+            json!(null),
+            json!([]),
+            json!({ "a": 1.5, "b": "ação \"x\" \n", "c": [1, 2, { "d": null }], "e": numero_json(1e21), "f": numero_json(0.000001) }),
+            json!((0..500).map(|i| json!({ "i": i, "t": format!("texto {i}"), "x": numero_json(f64::from(i) / 7.0) })).collect::<Vec<_>>()),
+        ];
+        for v in &valores {
+            assert_eq!(tamanho_json(v), para_vec(v).len(), "{v}");
+        }
+    }
 
     #[test]
     fn number_segue_o_javascript() {

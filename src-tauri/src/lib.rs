@@ -62,7 +62,7 @@ pub fn run() {
 
             let url = protocol::app_url("dashboard.html")?;
             let (app_navegacao, app_janela) = (app.handle().clone(), app.handle().clone());
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
+            let janela = WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url))
                 .title("Betty")
                 .inner_size(1440.0, 920.0)
                 .min_inner_size(1080.0, 700.0)
@@ -86,10 +86,47 @@ pub fn run() {
                 // Exportação em CSV: salva na pasta Downloads com o nome sugerido.
                 .on_download(download::tratar)
                 .build()?;
+            #[cfg(windows)]
+            memoria_ao_minimizar(&janela);
+            #[cfg(not(windows))]
+            let _ = janela;
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o Betty");
+}
+
+/// Com a janela minimizada, o WebView2 é avisado de que pode liberar memória
+/// (`MemoryUsageTargetLevel` baixo: ele descarta caches e roda a coleta de
+/// lixo); ao voltar, nível normal. A página não é suspensa nem recarregada:
+/// os timers e a sincronização seguem como antes.
+#[cfg(windows)]
+fn memoria_ao_minimizar(janela: &tauri::WebviewWindow) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL, ICoreWebView2_19,
+    };
+    use windows_core::Interface;
+
+    let minimizada = Arc::new(AtomicBool::new(false));
+    let alvo = janela.clone();
+    janela.on_window_event(move |evento| {
+        if !matches!(evento, tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Focused(_)) {
+            return;
+        }
+        let agora = alvo.is_minimized().unwrap_or(false);
+        if minimizada.swap(agora, Ordering::Relaxed) == agora {
+            return;
+        }
+        let nivel = if agora { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW } else { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL };
+        let _ = alvo.with_webview(move |w| {
+            // SAFETY: chamadas COM no WebView2 da própria janela, na thread da interface.
+            let r = unsafe { w.controller().CoreWebView2().and_then(|c| c.cast::<ICoreWebView2_19>()).and_then(|c| c.SetMemoryUsageTargetLevel(nivel)) };
+            if let Err(e) = r {
+                eprintln!("[janela] nível de memória do WebView2: {e}");
+            }
+        });
+    });
 }
 
 /// Nomes de quando o app se chamava MyBettys. Só existem para trazer os dados de

@@ -36,25 +36,25 @@ Medidos em 2026-11-27 numa conta real: 4.232 apostas, sendo 2.281 da Polymarket,
 | Rotas normais do histórico (query, stats, pnl, calendário) | 3–18 ms | igual |
 | `/api/me` durante a manutenção da abertura (compactação + `VACUUM`, 4,4 s) | 4,4–5,1 s, esperando a manutenção inteira | mediana 0,2 ms, máximo 1,1 ms |
 
-Processo do app instalado (build antigo), parado depois de abrir:
+### No app instalado
 
-| Processo | Memória privada |
-|---|---|
-| `betty.exe` (Rust) | 211 MB, com pico de 1,1 GB na abertura |
-| WebView2: página | 178 MB |
-| WebView2: GPU | 124 MB |
-| WebView2: browser, rede, storage, crashpad | 34 + 11 + 11 + 3 MB |
+Medido em 2026-11-27 com `medir_memoria.ps1` e `medir_app.mjs`. O build novo tem tudo até a seção 6 de [O que já foi feito](#o-que-já-foi-feito). A memória foi lida 1 minuto depois de abrir, com o app parado.
 
-Abertura medida num build de teste com cópia do banco:
-- **0 a 3,9 s:** tela de carregamento. Desses, 3,7 s são da compactação única do banco, que só acontece uma vez.
-- **3,9 s:** os dados salvos aparecem.
-- **11,5 s:** a sincronização confirma os números.
+| Processo (memória privada) | Build antigo | Build novo |
+|---|---|---|
+| `betty.exe` (Rust) | 212–215 MB, com pico de 1.174 MB | 233–278 MB logo depois de abrir, pico de 404–559 MB (ver item 2 de [O que falta](#o-que-falta)) |
+| WebView2: página | 193–225 MB | 77–88 MB |
+| WebView2: GPU | 83–131 MB | 100–103 MB |
+| WebView2: browser, rede, storage | 37 + 11 + 11 MB | 36 + 12 + 8 MB |
+| Banco (`betty.db`) | 284 MB | 134 MB |
+
+| Abertura (desde a navegação da página) | Build antigo | Build novo |
+|---|---|---|
+| Dados salvos na tela | só depois da sincronização inteira; 3,9 s num build de teste | 0,39–0,45 s |
+| Números confirmados | 11,5 s num build de teste | 4,8–5,4 s |
+| Primeira abertura depois de atualizar | — | confirmação em 21,5 s: compactação única, índice, `VACUUM` e o reenvio único das apostas da Polymarket ao ledger |
 
 A sincronização é dominada pela rede: activity da Polymarket 4,5 s, fechadas da Polymarket 3,4 s, liquidações da Kalshi 2,3 s, sync da Predict 1,4 s.
-
-> O `betty.exe` instalado ainda é o build antigo. Os números "depois" vieram de
-> cópias do banco e de um build de teste. Medir no app instalado é o item 1 de
-> [O que falta](#o-que-falta).
 
 ## O que já foi feito
 
@@ -169,6 +169,15 @@ Só compacta quando duas condições valem juntas:
 | 60 eventos, 30 com recorte | 102 ms | 18 ms |
 | 400 eventos, recorte das apostas | 153 ms | 136 ms |
 
+### 6. Entregue no app instalado, e a memória do WebView2
+
+- **Instalação:** `cargo tauri build` em `src-tauri` e o instalador com `/S /UPDATE` (o modo de atualização não cria atalhos novos). Antes, uma cópia do banco com `copiar_banco.py`. Os números estão em [No app instalado](#no-app-instalado).
+- **Janela minimizada:** `lib.rs::memoria_ao_minimizar` pede ao WebView2 o nível de memória baixo (`ICoreWebView2_19::SetMemoryUsageTargetLevel`, pelo `with_webview` do Tauri e o crate `webview2-com`) quando a janela minimiza, e o normal quando volta. A página não é suspensa: timers e sincronização seguem.
+  - Medido: 1 minuto minimizado, o WebView2 caiu 18 MB (GPU 103 → 87 MB, página 88 → 86 MB).
+  - Ao restaurar, a página era a mesma (`medir_app.mjs conferir`).
+  - Não houve controle no mesmo build sem o recurso, então parte da queda pode ser do próprio Windows.
+- **`--disable-gpu-rasterization`:** sem diferença na memória da GPU (ver [O que não vale a pena mexer](#o-que-não-vale-a-pena-mexer)).
+
 ## Como validar
 
 ### Método
@@ -215,6 +224,10 @@ Só compacta quando duas condições valem juntas:
 | `oraculo_compactacao.mjs` | Modelo de oráculo: compara o que a interface deriva de dois bancos. |
 | `oraculo_recorte.mjs` + `preparar_meta.py` | Modelo de oráculo para respostas de rota (evento inteiro x recortado). |
 | `rotas_leitura.py` + `comparar_rotas.py` | Lista de 64 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
+| `medir_app.mjs` | Pelo CDP, sem capturas: linha do tempo da abertura (tela, dados salvos, confirmação), compilação e execução de cada script numa recarga, e um marcador para saber se a página recarregou. |
+| `medir_memoria.ps1` | Memória privada do `betty.exe` (e o pico) e de cada processo do WebView2 dele, por papel (página, GPU, rede...). |
+
+Para medir o app instalado pelo CDP, abra-o com `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` com os mesmos flags de `lib.rs` mais `--remote-debugging-port=<porta>`, só no processo que abre o app. A sessão de 2026-11-27 seguiu esta ordem: medir o build antigo aberto, copiar o banco, fechar (`CloseMainWindow`), instalar, abrir duas vezes medindo, `scripts`, minimizar 1 minuto, abrir sem o flag da GPU e, no fim, abrir normalmente. São várias aberturas seguidas: combine antes com quem usa a máquina.
 Rode `teste_abertura.mjs` e `teste_versoes.mjs` a cada mudança no `dashboard.js`:
 
 ```powershell
@@ -228,39 +241,17 @@ E o Rust: `cargo test --lib` e `cargo clippy --all-targets` (hoje só há 3 avis
 
 Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os cuidados, como validar e quando está pronto.
 
-### 1. Entregar e medir no app instalado (fazer primeiro)
-
-- **Problema:** nada do que já foi feito chegou ao app que o usuário usa.
-- **Proposta:**
-  1. Gerar o instalador (`cargo tauri build` em `src-tauri`) e instalar.
-  2. A primeira abertura roda a compactação única, cerca de 4 s com a tela de carregamento. A partir da segunda, os dados salvos aparecem logo.
-  3. Medir:
-     - memória privada do `betty.exe` e de cada processo do WebView2, parado depois de abrir;
-     - pico do `betty.exe` (`PeakPagedMemorySize64`);
-     - tempo até os dados salvos e até a confirmação, em mais de uma abertura.
-- **Pronto quando:** os números estiverem nesta página, ao lado dos de partida.
-
-### 2. Memória do WebView2
-
-- **Problema:** página com 178 MB e GPU com 124 MB, mesmo minimizado.
-- **Proposta:**
-  - Quando a janela for minimizada ou escondida, chamar `ICoreWebView2_19::put_MemoryUsageTargetLevel(COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW)` e voltar ao normal ao restaurar. O acesso é por `webview.with_webview(...)` no Tauri, com o crate `webview2-com`.
-  - Medir também o efeito de `--disable-gpu-rasterization` (em `lib.rs`) na memória do processo de GPU. Ele existe por qualidade do SVG (serrilhado na GPU); não tirar sem comparar o visual.
-- **Validar:** memória privada antes e depois, minimizado por 1 minuto; o app volta sem recarregar a página.
-- **Pronto quando:** a queda estiver medida e anotada aqui.
-
-### 3. Menos `serde_json::Value` nos caminhos das casas
+### 1. Menos `serde_json::Value` nos caminhos das casas
 
 - **Problema:**
   - O `serde_json` está com `arbitrary_precision` e `preserve_order` no app inteiro. É necessário para o ledger sair byte a byte igual, mas faz cada número virar texto alocado e cada objeto um `IndexMap`.
   - As respostas da Polymarket (`poly::buscar_linhas`, `normalizar`) e da Kalshi são lidas inteiras como `Value`.
-  - `poly::ler_tudo` serializa a lista inteira só para medir o tamanho (`js::para_vec(&linhas).len()`).
-- **Proposta:**
-  - Structs com `#[derive(Deserialize)]` nos campos usados, ou `RawValue` onde o JSON é repassado sem mudança.
-  - Estimar o tamanho sem serializar.
+- **Já feito:** `poly::ler_tudo` media o tamanho da lista serializando-a inteira; agora `js::tamanho_json` conta os mesmos bytes sem guardar o texto.
+- **Proposta:** structs com `#[derive(Deserialize)]` nos campos usados, ou `RawValue` (`json_bruto`) onde o JSON é repassado sem mudança.
+- **Antes de fazer:** falta um gravador de respostas das casas. As linhas são normalizadas, filtradas, juntadas com o cache de activity no SQLite e paginadas para a interface, então mudar a leitura exige comparar byte a byte com respostas reais gravadas. Hoje não há como reproduzir uma sessão sem rede.
 - **Validar:** respostas das rotas das casas idênticas (`despejar_rotas_para_comparacao` contra respostas gravadas de uma sessão real) e oráculos existentes (`tracked::tests::oraculo_predict`, `kalshi_dados::tests::oraculo_titulos`, `ledger::tests::oraculo_ledger`).
 
-### 4. Memória do processo Rust parado
+### 2. Memória do processo Rust parado
 
 - **Problema:** 211 MB privados parado no build antigo. Ainda não foi medido depois das mudanças.
 - **Proposta:** medir primeiro (item 1). Se continuar alto, os suspeitos são:
@@ -270,15 +261,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   - as liquidações da Kalshi guardadas em memória (`EstadoKalshi::liquidacoes`, cerca de 1.944 linhas).
 - **Cuidado:** `EstadoKalshi::liquidacoes` e `revisados`, e as agendas de `EstadoTracked`, mudam comportamento (cache da sessão, agenda vencida usada como reserva). Não basta expirar por tempo.
 
-### 5. Dividir o `dashboard.js` por tela (medir antes)
-
-- **Problema possível:** são 7.700 linhas e 380 KB lidas e compiladas de uma vez na abertura.
-- **Proposta:**
-  1. Medir antes, pelo CDP (`Performance` ou `Profiler`), quanto tempo vai em compilar e avaliar o script.
-  2. Se for relevante, separar por tela (estatísticas, calendário, configurações) com `import()` dinâmico. O CSP já permite scripts da própria origem.
-- **Cuidado:** o arquivo usa muito estado global e funções chamadas por nome (`data-on-click`, em `acoes.js`).
-
-### 6. Sincronização inteira no Rust (o item grande)
+### 3. Sincronização inteira no Rust (o item grande)
 
 - **Problema:**
   - Toda a sincronização está no `dashboard.js` (`carregarAba`). A interface baixa as listas das casas pelo backend, enriquece, concilia, compara com o ledger, envia o delta e reindexa, com centenas de idas e voltas pelo `betty://` e o histórico inteiro no heap do JS.
@@ -308,7 +291,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   4. Manter o pipeline do JS atrás de uma chave até o Rust dar o mesmo índice, o mesmo ledger e os mesmos números em várias sincronizações reais. Depois, apagar.
 - **Validar:** ledger e índice byte a byte iguais entre o pipeline do JS e o do Rust na mesma cópia de banco e com as mesmas respostas das casas. Gravar as respostas de uma sessão real e reproduzir.
 
-### 7. Sincronização incremental (depois do item 6)
+### 4. Sincronização incremental (depois do item 3)
 
 - **Problema:** cada sincronização baixa o histórico inteiro de fechadas da Polymarket (3 páginas de 1.000 no v2) e conferem tudo de novo. A activity da Polymarket (`poly::atividade_incremental`) e as liquidações da Kalshi (`kalshi::liquidacoes_incrementais`) já são incrementais.
 - **Proposta:** as fechadas vêm em ordem de `TIMESTAMP DESC`. Parar quando aparecerem K linhas seguidas que já estão no ledger com a mesma assinatura. Fazer a varredura completa em segundo plano de tempos em tempos (por exemplo 1 vez por dia ou na abertura).
@@ -320,6 +303,8 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Tamanho do binário:** cerca de 11 MB.
 - **Consultas comuns ao SQLite:** já são de 3 a 18 ms.
 - **Timer de 1 s da barra lateral (`tickAtualizado`):** só troca o DOM quando o texto muda.
+- **Dividir o `dashboard.js` por tela:** medido no app instalado (`medir_app.mjs scripts`, uma recarga com rastreamento): o `dashboard.js` leva 0,1 ms para compilar e 1,4 ms para executar, e os outros seis scripts somam menos de 1 ms. A página fica pronta em 0,16–0,45 s desde a navegação. Separar por tela não teria o que ganhar.
+- **Tirar o `--disable-gpu-rasterization`:** o processo de GPU ficou com 100–103 MB com o flag e 101 MB sem ele. Não há memória a ganhar, e o flag existe pela qualidade do SVG.
 
 ## Armadilhas conhecidas
 
