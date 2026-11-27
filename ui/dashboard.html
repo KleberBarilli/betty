@@ -44,21 +44,6 @@ Atualizar agora
 </section>
 </div>
 </aside>
-<div id="configLockOverlay" class="config-lock-overlay" aria-hidden="true">
-<div class="config-lock-modal" role="dialog" aria-modal="true" aria-labelledby="configLockTitle">
-<div id="configLockTitle" class="config-lock-title">🔒 Configurações protegidas</div>
-<div class="config-lock-sub">Digite a senha para acessar esta aba.</div>
-<input id="configLockInput" class="config-lock-input"
-type="password" autocomplete="current-password"
-placeholder="Senha"
-data-on-keydown="teclaConfirmarSenhaConfig(event)">
-<div id="configLockError" class="config-lock-error"></div>
-<div class="config-lock-actions">
-<button type="button" class="config-lock-btn" data-on-click="fecharSenhaConfig()">Cancelar</button>
-<button type="button" class="config-lock-btn primary" data-on-click="confirmarSenhaConfig()">Entrar</button>
-</div>
-</div>
-</div>
 <div class="account-modal" id="connectionTestModal" role="dialog" aria-modal="true" aria-labelledby="connectionTestTitle" aria-hidden="true">
 <div class="account-box"><button type="button" class="account-close" aria-label="Fechar teste" data-on-click="fecharTesteConexao()">×</button>
 <h3 id="connectionTestTitle">Teste de conexão</h3>

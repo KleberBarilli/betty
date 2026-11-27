@@ -1395,40 +1395,7 @@ try { polyClosedSnapshotCache={at:0,data:[]}; } catch (_) {}
 try { kalshiClosedSnapshotCache={at:0,data:[]}; } catch (_) {}
 try { polyClosedEnrichmentCache=null; } catch (_) {}
 }
-// Proteção da aba Configurações.
-// Esta proteção é de interface no HTML; não substitui autenticação de servidor.
-let configDesbloqueada = true;
-function abrirConfiguracoesProtegidas() {
-if (configDesbloqueada) {
-trocarView("config");
-return;
-}
-const overlay = document.getElementById("configLockOverlay");
-const input = document.getElementById("configLockInput");
-const error = document.getElementById("configLockError");
-if (!overlay) return;
-overlay.classList.add("show");
-overlay.setAttribute("aria-hidden", "false");
-if (error) error.textContent = "";
-if (input) {
-input.value = "";
-setTimeout(() => input.focus(), 30);
-}
-}
-function fecharSenhaConfig() {
-const overlay = document.getElementById("configLockOverlay");
-if (overlay) {
-overlay.classList.remove("show");
-overlay.setAttribute("aria-hidden", "true");
-}
-}
-function confirmarSenhaConfig() {
-configDesbloqueada = true;
-fecharSenhaConfig();
-trocarView("config");
-}
 function trocarView(view) {      if (document.body.classList.contains('initial-loading')) return;
-if (view === "config" && !configDesbloqueada) { abrirConfiguracoesProtegidas(); return; }
 fecharExportPopup();
 const viewAnterior = viewAtual;
 if (viewAtual === 'estatisticas' && view !== 'estatisticas') {
@@ -7260,7 +7227,6 @@ function teclaTrocarView(event, view) {
 function teclaToggleSyncPanel(event) {
   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSyncPanel(event); }
 }
-function teclaConfirmarSenhaConfig(event) { if (event.key === 'Enter') confirmarSenhaConfig(); }
 
 // ===== Navegação por seção (layout v2) =====
 // As seções do menu se apoiam nas views existentes: Histórico usa a tabela de
