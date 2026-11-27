@@ -101,7 +101,7 @@ async fn meta_varios(db: &Db, tipo: &'static str, chaves: Vec<String>, com_ttl: 
     if chaves.is_empty() {
         return Ok(HashMap::new());
     }
-    db.call(move |c| {
+    db.ler(move |c| {
         let mut achados = HashMap::new();
         let agora = agora_ms();
         for lote in chaves.chunks(400) {
@@ -367,7 +367,7 @@ async fn metadados_para(db: &Db, tickers: &[String]) -> (HashMap<String, Value>,
 /// evento não pôde ser lido ficam para a próxima leitura do histórico.
 pub async fn atualizar_modalidades_no_ledger(estado: &Estado) -> Result<()> {
     let user = estado.usuario.id.clone();
-    let pendentes = estado.db.call(move |c| history::pendentes_modalidade_kalshi(c, &user, 12)).await?;
+    let pendentes = estado.db.ler(move |c| history::pendentes_modalidade_kalshi(c, &user, 12)).await?;
     if pendentes.is_empty() {
         return Ok(());
     }
@@ -480,7 +480,7 @@ async fn enriquecer_posicoes(c: &Estado, linhas: Vec<Value>) -> Result<Vec<Value
     if !pendentes.is_empty() {
         let linhas_raw: Vec<history::Linha> =
             pendentes.iter().map(|&i| serde_json::from_str(&js::para_texto(&saida[i]))).collect::<Result<_, _>>()?;
-        let recuperadas = c.db.call(move |conn| history::anexar_metadados_kalshi(conn, linhas_raw)).await?;
+        let recuperadas = c.db.ler(move |conn| history::anexar_metadados_kalshi(conn, linhas_raw)).await?;
         let por_slug: HashMap<String, Value> = recuperadas
             .iter()
             .filter_map(|l| serde_json::from_str::<Value>(&js::para_texto(l)).ok())
@@ -573,7 +573,7 @@ async fn carregar_liquidacoes(c: &Estado) -> Result<HashMap<String, Liquidacao>>
     let u = user.clone();
     let mapa = c
         .db
-        .call(move |conn| {
+        .ler(move |conn| {
             let mut s = conn.prepare("SELECT settlement_key,source_signature,data_json,updated_at FROM kalshi_settlement_cache WHERE user_id=?")?;
             let mut mapa = HashMap::new();
             for r in s.query_map([&u], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)))? {
@@ -728,7 +728,7 @@ async fn credenciais(c: &Estado) -> Result<(zeroize::Zeroizing<String>, zeroize:
     let user = c.usuario.id.clone();
     let linha: Option<(Option<String>, Option<String>)> = c
         .db
-        .call(move |conn| {
+        .ler(move |conn| {
             Ok(conn
                 .query_row("SELECT kalshi_api_key_enc,kalshi_private_key_enc FROM connections WHERE user_id=?", [&user], |r| {
                     Ok((r.get(0)?, r.get(1)?))

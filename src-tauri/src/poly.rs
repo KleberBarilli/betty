@@ -313,7 +313,7 @@ fn sha256_hex(s: &str) -> String {
 
 async fn atividade_carregar(db: &Db, user: &str, chave: &str) -> Option<Value> {
     let (u, k) = (user.to_string(), sha256_hex(chave));
-    db.call(move |c| {
+    db.ler(move |c| {
         Ok(c.query_row("SELECT data_json FROM polymarket_activity_cache WHERE user_id=? AND cache_key=?", [&u, &k], |r| r.get::<_, String>(0))
             .optional()?)
     })
@@ -550,7 +550,7 @@ async fn carteira(estado: &Estado) -> Result<Option<String>> {
     let u = estado.usuario.id.clone();
     let enc: Option<String> = estado
         .db
-        .call(move |c| {
+        .ler(move |c| {
             Ok(c.query_row("SELECT polymarket_wallet_enc FROM connections WHERE user_id=?", [&u], |r| r.get::<_, Option<String>>(0))
                 .optional()?
                 .flatten())
@@ -1063,63 +1063,63 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
     }
     let u = estado.usuario.id.clone();
     let corpo = corpo.clone();
-    let r = estado
-        .db
-        .call(move |c| {
-            let agora = agora_ms();
-            if let Some(entradas) = corpo.get("entries").and_then(Value::as_array) {
-                let validas: Vec<&Value> = entradas.iter().filter(|e| metadado_valido(e)).collect();
-                let tx = c.transaction()?;
-                {
-                    let mut s = tx.prepare(
-                        "INSERT INTO polymarket_metadata_cache(user_id,slug,version,data_json,updated_at) VALUES(?,?,?,?,?)
+    // Só `entries` grava; a leitura (a maior parte, na abertura) não espera gravações.
+    let grava = corpo.get("entries").is_some_and(Value::is_array);
+    let tarefa = move |c: &mut rusqlite::Connection| {
+        let agora = agora_ms();
+        if let Some(entradas) = corpo.get("entries").and_then(Value::as_array) {
+            let validas: Vec<&Value> = entradas.iter().filter(|e| metadado_valido(e)).collect();
+            let tx = c.transaction()?;
+            {
+                let mut s = tx.prepare(
+                    "INSERT INTO polymarket_metadata_cache(user_id,slug,version,data_json,updated_at) VALUES(?,?,?,?,?)
     ON CONFLICT(user_id,slug) DO UPDATE SET version=excluded.version,data_json=excluded.data_json,updated_at=excluded.updated_at",
-                    )?;
-                    for e in &validas {
-                        s.execute(rusqlite::params![u, e["slug"].as_str(), META_VERSAO, js::para_texto(&e["data"]), agora])?;
-                    }
-                }
-                tx.commit()?;
-                return Ok(json!({ "ok": true, "saved": validas.len() }));
-            }
-            let mut chaves: Vec<String> = Vec::new();
-            for s in corpo.get("slugs").and_then(Value::as_array).map_or(&[][..], |a| a.as_slice()) {
-                if let Some(s) = s.as_str().filter(|s| s.encode_utf16().count() <= 500) {
-                    if !chaves.iter().any(|c| c == s) {
-                        chaves.push(s.to_string());
-                    }
+                )?;
+                for e in &validas {
+                    s.execute(rusqlite::params![u, e["slug"].as_str(), META_VERSAO, js::para_texto(&e["data"]), agora])?;
                 }
             }
-            let precisa = necessidades(c, &u, corpo.get("need"), &chaves)?;
-            let mut entradas = Vec::new();
-            for lote in chaves.chunks(400) {
-                let marcas = vec!["?"; lote.len()].join(",");
-                let sql = format!(
-                    "SELECT slug,data_json,updated_at FROM polymarket_metadata_cache
+            tx.commit()?;
+            return Ok(json!({ "ok": true, "saved": validas.len() }));
+        }
+        let mut chaves: Vec<String> = Vec::new();
+        for s in corpo.get("slugs").and_then(Value::as_array).map_or(&[][..], |a| a.as_slice()) {
+            if let Some(s) = s.as_str().filter(|s| s.encode_utf16().count() <= 500) {
+                if !chaves.iter().any(|c| c == s) {
+                    chaves.push(s.to_string());
+                }
+            }
+        }
+        let precisa = necessidades(c, &u, corpo.get("need"), &chaves)?;
+        let mut entradas = Vec::new();
+        for lote in chaves.chunks(400) {
+            let marcas = vec!["?"; lote.len()].join(",");
+            let sql = format!(
+                "SELECT slug,data_json,updated_at FROM polymarket_metadata_cache
       WHERE user_id=? AND version=? AND updated_at>? AND updated_at<=? AND slug IN ({marcas})"
-                );
-                let mut s = c.prepare(&sql)?;
-                let mut p: Vec<&dyn rusqlite::types::ToSql> = vec![&u, &META_VERSAO];
-                let (de, ate) = (agora - META_TTL_MS, agora);
-                p.push(&de);
-                p.push(&ate);
-                p.extend(lote.iter().map(|k| k as &dyn rusqlite::types::ToSql));
-                for row in s.query_map(p.as_slice(), |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
-                    let (slug, d) = row?;
-                    if let Ok(dado) = serde_json::from_str::<Value>(&d) {
-                        let mut e = json!({ "slug": slug, "data": dado });
-                        if metadado_valido(&e) {
-                            if let Some(n) = precisa.get(&slug) {
-                                recortar_evento(&mut e["data"], n);
-                            }
-                            entradas.push(e);
+            );
+            let mut s = c.prepare(&sql)?;
+            let mut p: Vec<&dyn rusqlite::types::ToSql> = vec![&u, &META_VERSAO];
+            let (de, ate) = (agora - META_TTL_MS, agora);
+            p.push(&de);
+            p.push(&ate);
+            p.extend(lote.iter().map(|k| k as &dyn rusqlite::types::ToSql));
+            for row in s.query_map(p.as_slice(), |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
+                let (slug, d) = row?;
+                if let Ok(dado) = serde_json::from_str::<Value>(&d) {
+                    let mut e = json!({ "slug": slug, "data": dado });
+                    if metadado_valido(&e) {
+                        if let Some(n) = precisa.get(&slug) {
+                            recortar_evento(&mut e["data"], n);
                         }
+                        entradas.push(e);
                     }
                 }
             }
-            Ok(json!({ "ok": true, "entries": entradas }))
-        })
-        .await;
+        }
+        Ok(json!({ "ok": true, "entries": entradas }))
+    };
+    let r = if grava { estado.db.call(tarefa).await } else { estado.db.ler(tarefa).await };
     r.map_or_else(
         |e| {
             eprintln!("[polymarket] cache de metadados: {e:#}");

@@ -3,6 +3,7 @@
 //! nunca apagam dados.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -163,17 +164,30 @@ pub fn agora() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
-/// Conexão só de leitura com uma transação aberta. Em WAL ela enxerga o banco
-/// como estava ao abrir, mesmo com a sincronização gravando pela conexão
-/// principal: é o estado salvo que a interface mostra enquanto atualiza.
-pub fn abrir_instantaneo(caminho: &Path) -> Result<Connection> {
+/// Leitura mapeada do arquivo do banco, até 256 MB.
+const MMAP: i64 = 268_435_456;
+
+/// Conexão só de leitura, com as funções SQL registradas. Em WAL ela lê sem
+/// esperar a conexão de escrita e vê tudo o que já foi confirmado.
+///
+/// Abre sem `mmap_size` (ver `Db::mapear_leitura`).
+pub fn abrir_leitura(caminho: &Path) -> Result<Connection> {
     use rusqlite::OpenFlags;
     let conn = Connection::open_with_flags(caminho, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
         .with_context(|| format!("não foi possível abrir {} para leitura", caminho.display()))?;
     conn.busy_timeout(Duration::from_secs(5))?;
+    // Cada conexão tem o próprio cache de páginas: 8 MB, contra 32 MB na de escrita.
     conn.pragma_update(None, "cache_size", -8_000)?;
     conn.pragma_update(None, "temp_store", "MEMORY")?;
     registrar_funcoes(&conn)?;
+    Ok(conn)
+}
+
+/// Conexão só de leitura com uma transação aberta. Em WAL ela enxerga o banco
+/// como estava ao abrir, mesmo com a sincronização gravando pela conexão
+/// principal: é o estado salvo que a interface mostra enquanto atualiza.
+pub fn abrir_instantaneo(caminho: &Path) -> Result<Connection> {
+    let conn = abrir_leitura(caminho)?;
     conn.execute_batch("BEGIN")?;
     // O instantâneo só fica fixo na primeira leitura da transação.
     conn.query_row("SELECT COUNT(*) FROM closed_bets_index", [], |_| Ok(()))?;
@@ -191,7 +205,7 @@ pub fn abrir(caminho: &Path) -> Result<Connection> {
     // memória e leitura mapeada (até 256 MB) evitam isso.
     conn.pragma_update(None, "cache_size", -32_000)?;
     conn.pragma_update(None, "temp_store", "MEMORY")?;
-    conn.pragma_update(None, "mmap_size", 268_435_456i64)?;
+    conn.pragma_update(None, "mmap_size", MMAP)?;
     registrar_funcoes(&conn)?;
     migrar(&conn)?;
     Ok(conn)
@@ -412,12 +426,12 @@ pub fn usuario_local(conn: &mut Connection) -> Result<UsuarioLocal> {
     Ok(usuario)
 }
 
-/// Conexão única protegida por mutex; as consultas rodam fora das threads
+/// Uma conexão protegida por mutex; as consultas rodam fora das threads
 /// assíncronas para não travar a interface.
 #[derive(Clone)]
-pub struct Db(Arc<Mutex<Connection>>);
+pub struct Conexao(Arc<Mutex<Connection>>);
 
-impl Db {
+impl Conexao {
     pub fn new(conn: Connection) -> Self {
         Self(Arc::new(Mutex::new(conn)))
     }
@@ -437,8 +451,81 @@ impl Db {
     }
 }
 
+/// Conexões de leitura abertas ao lado da de escrita.
+pub const CONEXOES_DE_LEITURA: usize = 2;
+
+/// O banco do app: uma conexão de escrita e algumas só de leitura.
+///
+/// Em WAL as leituras não esperam as gravações: `ler` vê tudo o que já foi
+/// confirmado, mesmo durante a manutenção da abertura ou um lote longo do
+/// ledger. Toda gravação passa por `call`, uma por vez.
+#[derive(Clone)]
+pub struct Db {
+    escrita: Conexao,
+    leitura: Arc<[Conexao]>,
+    vez: Arc<AtomicUsize>,
+}
+
+impl Db {
+    /// Abre `n` conexões de leitura do mesmo arquivo da conexão de escrita.
+    /// Com `n = 0`, `ler` usa a de escrita.
+    pub fn com_leitura(conn: Connection, n: usize) -> Result<Self> {
+        let caminho = conn.path().filter(|p| !p.is_empty()).map(std::path::PathBuf::from).ok_or_else(|| anyhow!("banco sem arquivo"))?;
+        let leitura = (0..n).map(|_| abrir_leitura(&caminho).map(Conexao::new)).collect::<Result<Vec<_>>>()?;
+        Ok(Self { escrita: Conexao::new(conn), leitura: leitura.into(), vez: Default::default() })
+    }
+
+    /// Liga a leitura mapeada (`mmap_size`) nas conexões de leitura, que deixa
+    /// as varreduras grandes do ledger 1,3 a 1,6 vez mais rápidas.
+    ///
+    /// Só depois da manutenção da abertura: no Windows um arquivo mapeado por
+    /// outra conexão não pode ser truncado, e o `VACUUM` de `recuperar_espaco`
+    /// deixaria de devolver o espaço ao disco sem avisar.
+    pub async fn mapear_leitura(&self) -> Result<()> {
+        for conexao in self.leitura.iter() {
+            conexao.call(|c| Ok(c.pragma_update(None, "mmap_size", MMAP)?)).await?;
+        }
+        Ok(())
+    }
+
+    /// A conexão de escrita.
+    pub async fn call<R, F>(&self, f: F) -> Result<R>
+    where
+        R: Send + 'static,
+        F: FnOnce(&mut Connection) -> Result<R> + Send + 'static,
+    {
+        self.escrita.call(f).await
+    }
+
+    /// Uma conexão só de leitura: a primeira livre, a partir de um rodízio;
+    /// com todas ocupadas, espera a da vez. Qualquer gravação dentro de `f`
+    /// falha (`SQLITE_READONLY`).
+    pub async fn ler<R, F>(&self, f: F) -> Result<R>
+    where
+        R: Send + 'static,
+        F: FnOnce(&mut Connection) -> Result<R> + Send + 'static,
+    {
+        if self.leitura.is_empty() {
+            return self.escrita.call(f).await;
+        }
+        let leitura = self.leitura.clone();
+        let vez = self.vez.fetch_add(1, Ordering::Relaxed);
+        tauri::async_runtime::spawn_blocking(move || {
+            let n = leitura.len();
+            let livre = (0..n).find_map(|i| leitura[(vez + i) % n].0.try_lock().ok());
+            let mut guard = match livre {
+                Some(g) => g,
+                None => leitura[vez % n].0.lock().map_err(|_| anyhow!("banco indisponível"))?,
+            };
+            f(&mut guard)
+        })
+        .await
+        .map_err(|e| anyhow!("tarefa do banco falhou: {e}"))?
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn chave() -> MasterKey {
@@ -494,6 +581,116 @@ mod tests {
 
         let u = usuario_local(&mut conn).unwrap();
         assert_eq!(u.id, "u1", "reaproveita o usuário existente");
+    }
+
+    /// Segura a conexão de escrita no meio de uma transação até `soltar`.
+    pub(crate) fn segurar_escrita(db: &Db) -> (std::sync::mpsc::Sender<()>, std::thread::JoinHandle<Result<()>>) {
+        use std::sync::mpsc;
+        let (entrou, dentro) = mpsc::channel();
+        let (soltar, solto) = mpsc::channel::<()>();
+        let db = db.clone();
+        let escrita = std::thread::spawn(move || {
+            tauri::async_runtime::block_on(db.call(move |c| {
+                let tx = c.transaction()?;
+                tx.execute("INSERT INTO database_maintenance(maintenance_key,completed_at) VALUES('teste-escrita','agora')", [])?;
+                entrou.send(()).unwrap();
+                solto.recv().unwrap();
+                tx.commit()?;
+                Ok(())
+            }))
+        });
+        dentro.recv().unwrap();
+        (soltar, escrita)
+    }
+
+    /// Roda `f` numa thread e falha se ela não terminar em 5 s.
+    pub(crate) fn sem_esperar<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(f());
+        });
+        rx.recv_timeout(Duration::from_secs(5)).expect("a leitura ficou esperando a gravação")
+    }
+
+    #[test]
+    fn leitura_nao_espera_a_gravacao() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut conn = abrir(&dir.path().join("t.db")).unwrap();
+        usuario_local(&mut conn).unwrap();
+        let db = Db::com_leitura(conn, 2).unwrap();
+        let contar = |db: &Db| {
+            let db = db.clone();
+            sem_esperar(move || {
+                tauri::async_runtime::block_on(db.ler(|c| Ok(c.query_row("SELECT COUNT(*) FROM database_maintenance", [], |r| r.get::<_, i64>(0))?)))
+                    .unwrap()
+            })
+        };
+        let (soltar, escrita) = segurar_escrita(&db);
+        let antes = contar(&db);
+        // As duas conexões de leitura atendem ao mesmo tempo.
+        let (a, b) = (db.clone(), db.clone());
+        let juntas = sem_esperar(move || {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let (tx2, rx2) = std::sync::mpsc::channel();
+            let um = std::thread::spawn(move || {
+                tauri::async_runtime::block_on(a.ler(move |_| {
+                    tx.send(()).unwrap();
+                    rx2.recv().unwrap();
+                    Ok(())
+                }))
+            });
+            rx.recv().unwrap();
+            let outro = tauri::async_runtime::block_on(b.ler(|c| Ok(c.query_row("SELECT 1", [], |r| r.get::<_, i64>(0))?)));
+            tx2.send(()).unwrap();
+            um.join().unwrap().unwrap();
+            outro.unwrap()
+        });
+        assert_eq!(juntas, 1);
+        soltar.send(()).unwrap();
+        escrita.join().unwrap().unwrap();
+        assert_eq!(contar(&db), antes + 1, "a leitura vê o que já foi confirmado");
+
+        let erro = tauri::async_runtime::block_on(db.ler(|c| Ok(c.execute("DELETE FROM database_maintenance", [])?))).unwrap_err();
+        assert!(format!("{erro:#}").contains("readonly"), "{erro:#}");
+    }
+
+    #[test]
+    fn vacuum_encolhe_o_arquivo_com_as_leituras_abertas() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.db");
+        let conn = abrir(&p).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE lixo(x BLOB);
+             WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<400) INSERT INTO lixo SELECT randomblob(100000) FROM n;
+             DELETE FROM lixo;",
+        )
+        .unwrap();
+        conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(())).unwrap();
+        // Com `mapear_leitura` aqui o arquivo continua com 40 MB, sem erro.
+        let db = Db::com_leitura(conn, 2).unwrap();
+        // As duas conexões de leitura já leram o arquivo.
+        let (a, b) = (db.clone(), db.clone());
+        sem_esperar(move || {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let um = std::thread::spawn(move || {
+                tauri::async_runtime::block_on(a.ler(move |c| {
+                    c.query_row("SELECT COUNT(*) FROM lixo", [], |_| Ok(()))?;
+                    rx.recv().unwrap();
+                    Ok(())
+                }))
+            });
+            tauri::async_runtime::block_on(b.ler(|c| Ok(c.query_row("SELECT COUNT(*) FROM lixo", [], |_| Ok(()))?))).unwrap();
+            tx.send(()).unwrap();
+            um.join().unwrap().unwrap();
+        });
+        let antes = std::fs::metadata(&p).unwrap().len();
+        let livre = tauri::async_runtime::block_on(db.call(|c| recuperar_espaco(c))).unwrap();
+        assert!(livre.is_some_and(|b| b > LIVRE_PARA_VACUUM), "{livre:?}");
+        let depois = std::fs::metadata(&p).unwrap().len();
+        assert!(depois < antes / 10, "o arquivo não encolheu: {antes} -> {depois}");
+        tauri::async_runtime::block_on(db.mapear_leitura()).unwrap();
+        let n = tauri::async_runtime::block_on(db.ler(|c| Ok(c.query_row("SELECT COUNT(*) FROM lixo", [], |r| r.get::<_, i64>(0))?))).unwrap();
+        assert_eq!(n, 0, "lê normalmente depois de mapear");
     }
 
     #[test]

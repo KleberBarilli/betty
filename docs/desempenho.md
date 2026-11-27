@@ -34,6 +34,7 @@ Medidos em 2026-11-27 numa conta real: 4.232 apostas, sendo 2.281 da Polymarket,
 | `/api/polymarket-metadata/cache` (lote grande da abertura) | 32,8 MB | 3,7 MB |
 | Interface visível ao abrir | só depois da sincronização inteira | dados salvos logo; confirmados no fim |
 | Rotas normais do histórico (query, stats, pnl, calendário) | 3–18 ms | igual |
+| `/api/me` durante a manutenção da abertura (compactação + `VACUUM`, 4,4 s) | 4,4–5,1 s, esperando a manutenção inteira | mediana 0,2 ms, máximo 1,1 ms |
 
 Processo do app instalado (build antigo), parado depois de abrir:
 
@@ -109,6 +110,33 @@ Só compacta quando duas condições valem juntas:
 - Apostas do ledger sem `_confirmedClosedTs` também entram no recorte.
 - Os caches `betty_sport_meta_v3` e `betty_gamma_date_meta_v1` saíram do localStorage. Eles nunca chegavam a ser gravados (passavam da cota), então a leitura já voltava sempre vazia.
 
+### 4. Leituras do SQLite em paralelo
+
+**Problema:** `db::Db` era uma conexão só, atrás de um `Mutex`. Toda leitura da tela esperava qualquer gravação: ledger, índice, a manutenção da abertura e os caches da Kalshi e da Polymarket. Na primeira abertura depois da atualização, `/api/me` esperou a compactação inteira.
+
+**Solução:**
+- `db::Db` tem uma conexão de escrita (`call`) e duas só de leitura (`ler`, `db::CONEXOES_DE_LEITURA`), abertas por `db::abrir_leitura` (`SQLITE_OPEN_READ_ONLY`, 8 MB de cache cada, contra 32 MB na de escrita). Em WAL elas não esperam a de escrita e veem tudo o que já foi confirmado.
+- `ler` pega a primeira conexão livre, num rodízio. Com as duas ocupadas, espera a da vez. Uma gravação dentro de `ler` falha com `SQLITE_READONLY`.
+- **Vão para `ler`:**
+  - `/api/me`, `GET /api/settings` e as conexões devolvidas depois de conectar uma casa;
+  - todas as rotas `GET` do histórico, `lookup`, `metadata` e a leitura do `/api/polymarket-metadata/cache` (a gravação, com `entries`, continua em `call`);
+  - as leituras de cache e de credenciais em `kalshi.rs`, `poly.rs`, `poly_datas.rs` e `tracked.rs`.
+- **Tudo o que grava continua em `call`**, uma gravação por vez, como antes.
+- **Métricas pendentes:** `history::garantir_metricas` não grava numa conexão de leitura. As rotas que a chamavam (query, stats, calendar, pnl) passam antes por `api::completar_metricas`: ela confere numa conexão de leitura (`history::metricas_pendentes`) e, só se faltar alguma, completa na de escrita. Só bancos de versões antigas têm métricas pendentes, porque `ledger::salvar_indice` sempre grava com elas. O `index/status` continua sem completar, como antes.
+- **`mmap`:** as conexões de leitura abrem sem `mmap_size` e só o ligam no fim de `lib.rs::manutencao_do_banco` (`Db::mapear_leitura`). No Windows, um arquivo mapeado por outra conexão não pode ser truncado, e o `VACUUM` deixaria de devolver o espaço sem dar erro (ver [Armadilhas conhecidas](#armadilhas-conhecidas)). Com `mmap`, as varreduras grandes (ledger inteiro, exportação, metadados) ficam 1,3 a 1,6 vez mais rápidas do que sem.
+- O estado salvo (`api::Instantaneo`) guarda uma `db::Conexao`, a mesma conexão com mutex que a de escrita usa.
+
+**Validação:**
+- 63 rotas de leitura numa cópia do banco real, antes e depois (`rotas_leitura.py` e `comparar_rotas.py`): 62 idênticas byte a byte. A outra é um controle de propósito: o PnL sem `now` fixo, que só difere no instante do último ponto da série.
+- Tempos dessas rotas iguais aos de antes, dentro do ruído (ledger inteiro 789 → 612 ms, exportação 434 → 479 ms, metadados 222 → 195 ms).
+- Testes:
+  - `db::tests::leitura_nao_espera_a_gravacao`: lê com a escrita presa no meio de uma transação, as duas conexões de leitura ao mesmo tempo, e confere que a gravação aparece depois do commit;
+  - `api::tests::rotas_de_leitura_nao_esperam_a_gravacao`: 8 rotas respondem com a escrita presa;
+  - `api::tests::metricas_pendentes_sao_completadas_antes_da_leitura`;
+  - `db::tests::vacuum_encolhe_o_arquivo_com_as_leituras_abertas`.
+- Controle negativo: com `ler` mandado para a conexão de escrita, os dois testes de espera falham.
+- Manutenção real (`api::tests::medir_leitura_durante_a_manutencao`, numa cópia sem compactar): o banco foi de 284 MB para 151 MB com as conexões de leitura abertas, e `/api/me` respondeu 44 vezes durante os 4,4 s, com mediana de 0,2 ms. Com `BETTY_CONEXOES_DE_LEITURA=0` (uma conexão só, como antes), o único pedido esperou 4,4 s.
+
 ## Como validar
 
 ### Método
@@ -120,6 +148,7 @@ Só compacta quando duas condições valem juntas:
    - O teste ignorado `api::tests::despejar_rotas_para_comparacao` roda uma lista de rotas sobre um banco e grava as respostas em JSONL.
    - Variáveis: `BETTY_COMPARAR_DB`, `BETTY_COMPARAR_URLS` (uma linha por rota: `/rota?x`, ou `POST /rota arquivo.json`), `BETTY_COMPARAR_SAIDA`, e opcionalmente `BETTY_COMPARAR_CONFIG`.
    - Rode antes e depois da mudança (ou nos dois bancos) e compare os corpos.
+   - Para as rotas de leitura, `rotas_leitura.py` monta a lista e os corpos dos POST a partir da cópia, e `comparar_rotas.py` compara os dois JSONL. Use uma cópia nova do banco em cada lado: algumas rotas gravam (estado salvo, métricas pendentes). Para ter o código antigo sem outra pasta (o Kaspersky só libera `src-tauri\target`), `git stash push -- src`, rode, e `git stash pop`.
 3. **Compare o que a interface deriva dos dados, com o JS real.**
    - Os oráculos carregam `ui/*.js` num `node:vm`, com DOM falso (Proxy) e `localStorage` em memória, e chamam as funções reais: `indiceHistoricoFechado`, `tituloExibicao`, `classificarAposta`, `resolverDataInicio`, `getTsResultadoPnL`...
    - Troque valores entre o vm e o Node como texto JSON (`deepStrictEqual` falha entre realms).
@@ -152,6 +181,7 @@ Só compacta quando duas condições valem juntas:
 | `observar_abertura.mjs` | Linha do tempo da abertura e capturas pelo CDP (porta da depuração remota). |
 | `oraculo_compactacao.mjs` | Modelo de oráculo: compara o que a interface deriva de dois bancos. |
 | `oraculo_recorte.mjs` + `preparar_meta.py` | Modelo de oráculo para respostas de rota (evento inteiro x recortado). |
+| `rotas_leitura.py` + `comparar_rotas.py` | Lista de 63 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
 
 Rode `teste_abertura.mjs` e `teste_versoes.mjs` a cada mudança no `dashboard.js`:
 
@@ -178,19 +208,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
      - tempo até os dados salvos e até a confirmação, em mais de uma abertura.
 - **Pronto quando:** os números estiverem nesta página, ao lado dos de partida.
 
-### 2. Leituras do SQLite em paralelo
-
-- **Problema:** `db::Db` é uma conexão só, atrás de um `Mutex`. Toda leitura da tela espera qualquer gravação: ledger, índice, a manutenção da abertura e os caches da Kalshi e da Polymarket. Na primeira abertura depois da atualização, `/api/me` esperou 2,2 s pela compactação.
-- **Proposta:** uma conexão de escrita e duas ou três de leitura (`SQLITE_OPEN_READ_ONLY`, WAL). As rotas que só leem usam as de leitura. `api::Instantaneo` e `db::abrir_instantaneo` já mostram como abrir uma conexão de leitura com as funções SQL registradas.
-- **Cuidados:**
-  - `history::garantir_metricas` grava dentro de rotas de leitura (stats, pnl e query a chamam). Numa conexão só de leitura ela já é pulada (`is_readonly`). Então as métricas pendentes precisam ser completadas na conexão de escrita, como `abrir_instantaneo` faz, ou ao gravar o índice.
-  - Cada conexão tem o próprio cache de páginas: use `cache_size` menor nas de leitura.
-- **Validar:**
-  - rotas de leitura idênticas pelo `despejar_rotas_para_comparacao`;
-  - um teste que grava pela conexão de escrita enquanto lê pela de leitura, como `api::tests::estado_salvo_nao_ve_a_sincronizacao_gravando`.
-- **Pronto quando:** uma leitura não espera uma gravação longa, ou seja, o tempo de `/api/me` durante a manutenção fica perto do normal.
-
-### 3. Memória do WebView2
+### 2. Memória do WebView2
 
 - **Problema:** página com 178 MB e GPU com 124 MB, mesmo minimizado.
 - **Proposta:**
@@ -199,16 +217,16 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Validar:** memória privada antes e depois, minimizado por 1 minuto; o app volta sem recarregar a página.
 - **Pronto quando:** a queda estiver medida e anotada aqui.
 
-### 4. Cache por evento sem ler o evento inteiro
+### 3. Cache por evento sem ler o evento inteiro
 
-- **Problema:** `poly::cache_metadados` ainda transforma o evento inteiro em `serde_json::Value` antes de recortar, 300 a 400 ms para cerca de 225 eventos, segurando o `Mutex` do banco. A tabela `polymarket_metadata_cache` tem 65 MB.
+- **Problema:** `poly::cache_metadados` ainda transforma o evento inteiro em `serde_json::Value` antes de recortar, 300 a 400 ms para cerca de 225 eventos. Desde as leituras em paralelo ela não segura mais a conexão de escrita, mas ocupa uma das duas de leitura. A tabela `polymarket_metadata_cache` tem 65 MB.
 - **Proposta (uma das duas):**
   - (a) Ler só o primeiro nível com `RawValue` e decodificar só `dates.markets[slug]` e os mercados de `sport.markets` que casam.
   - (b) Guardar o cache por mercado (uma tabela `slug` + `market_slug`) e consultar só as linhas necessárias.
 - **Na mesma linha:** `kalshi_metadata_cache` tem 40 MB, e boa parte é duplicada dentro de cada linha (`_markets` = `markets` e `_milestones` = `_milestone`, cerca de 17 MB). Antes de tirar a duplicata, confirmar em `kalshi.rs` e `kalshi_dados.rs` quem lê cada chave.
 - **Validar:** respostas da rota idênticas às de hoje (com e sem `need`), com o `oraculo_recorte.mjs`.
 
-### 5. Menos `serde_json::Value` nos caminhos das casas
+### 4. Menos `serde_json::Value` nos caminhos das casas
 
 - **Problema:**
   - O `serde_json` está com `arbitrary_precision` e `preserve_order` no app inteiro. É necessário para o ledger sair byte a byte igual, mas faz cada número virar texto alocado e cada objeto um `IndexMap`.
@@ -219,16 +237,17 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   - Estimar o tamanho sem serializar.
 - **Validar:** respostas das rotas das casas idênticas (`despejar_rotas_para_comparacao` contra respostas gravadas de uma sessão real) e oráculos existentes (`tracked::tests::oraculo_predict`, `kalshi_dados::tests::oraculo_titulos`, `ledger::tests::oraculo_ledger`).
 
-### 6. Memória do processo Rust parado
+### 5. Memória do processo Rust parado
 
 - **Problema:** 211 MB privados parado no build antigo. Ainda não foi medido depois das mudanças.
 - **Proposta:** medir primeiro (item 1). Se continuar alto, os suspeitos são:
   - o `mimalloc` segurando memória depois de picos (testar `mi_option_purge_decommits` ou `mi_collect`, ou comparar com o alocador do sistema);
+  - o cache de páginas das conexões de leitura (até 8 MB cada, em `db::abrir_leitura`). As páginas lidas por `mmap` não entram nele nem na memória privada;
   - os snapshots da Polymarket (até 64 MB serializados, mais em `Value`);
   - as liquidações da Kalshi guardadas em memória (`EstadoKalshi::liquidacoes`, cerca de 1.944 linhas).
 - **Cuidado:** `EstadoKalshi::liquidacoes` e `revisados`, e as agendas de `EstadoTracked`, mudam comportamento (cache da sessão, agenda vencida usada como reserva). Não basta expirar por tempo.
 
-### 7. Dividir o `dashboard.js` por tela (medir antes)
+### 6. Dividir o `dashboard.js` por tela (medir antes)
 
 - **Problema possível:** são 7.700 linhas e 380 KB lidas e compiladas de uma vez na abertura.
 - **Proposta:**
@@ -236,7 +255,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   2. Se for relevante, separar por tela (estatísticas, calendário, configurações) com `import()` dinâmico. O CSP já permite scripts da própria origem.
 - **Cuidado:** o arquivo usa muito estado global e funções chamadas por nome (`data-on-click`, em `acoes.js`).
 
-### 8. Sincronização inteira no Rust (o item grande)
+### 7. Sincronização inteira no Rust (o item grande)
 
 - **Problema:**
   - Toda a sincronização está no `dashboard.js` (`carregarAba`). A interface baixa as listas das casas pelo backend, enriquece, concilia, compara com o ledger, envia o delta e reindexa, com centenas de idas e voltas pelo `betty://` e o histórico inteiro no heap do JS.
@@ -266,7 +285,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   4. Manter o pipeline do JS atrás de uma chave até o Rust dar o mesmo índice, o mesmo ledger e os mesmos números em várias sincronizações reais. Depois, apagar.
 - **Validar:** ledger e índice byte a byte iguais entre o pipeline do JS e o do Rust na mesma cópia de banco e com as mesmas respostas das casas. Gravar as respostas de uma sessão real e reproduzir.
 
-### 9. Sincronização incremental (depois do item 8)
+### 8. Sincronização incremental (depois do item 7)
 
 - **Problema:** cada sincronização baixa o histórico inteiro de fechadas da Polymarket (3 páginas de 1.000 no v2) e conferem tudo de novo. A activity da Polymarket (`poly::atividade_incremental`) e as liquidações da Kalshi (`kalshi::liquidacoes_incrementais`) já são incrementais.
 - **Proposta:** as fechadas vêm em ordem de `TIMESTAMP DESC`. Parar quando aparecerem K linhas seguidas que já estão no ledger com a mesma assinatura. Fazer a varredura completa em segundo plano de tempos em tempos (por exemplo 1 vez por dia ou na abertura).
@@ -286,4 +305,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Cota do localStorage:** fica em torno de 5 a 10 MB. Qualquer cache grande no navegador falha calado. Prefira o SQLite.
 - **`dadosFinanceirosConfirmados()`:** a regra de só mostrar números confirmados só cede nos dados salvos da abertura. Não use cache do navegador como fonte de números financeiros.
 - **429 da Kalshi:** os endpoints públicos da Kalshi respondem 429 em rajadas. `net::get_json` já tenta de novo em 429/503. Ao comparar duas execuções, dê um intervalo entre elas.
+- **`mmap` e `VACUUM` no Windows:** com outra conexão do processo mapeando o arquivo, o truncamento depois do `VACUUM` não acontece e não dá erro: o arquivo fica do mesmo tamanho (medido: 40 MB antes e depois, contra menos de 4 MB sem o `mmap`). Por isso as conexões de leitura só ligam o `mmap` depois da manutenção (`Db::mapear_leitura`). Qualquer `VACUUM` novo fora dela precisa desligar o `mmap` delas antes (`PRAGMA mmap_size=0` em cada uma). O teste `db::tests::vacuum_encolhe_o_arquivo_com_as_leituras_abertas` falha se elas estiverem mapeadas.
+- **`ler` só lê:** uma gravação dentro de `Db::ler` falha com `SQLITE_READONLY`. Uma rota de leitura que passe a gravar (como `garantir_metricas`) precisa da etapa na conexão de escrita antes, como `api::completar_metricas`.
+- **PnL e o relógio:** a série do `/pnl` termina no instante do pedido. Para comparar duas execuções, passe `now=` fixo.
 - **Finais de linha:** o repositório usa `core.autocrlf=true`. Scripts que regravam arquivos podem trocar LF por CRLF na cópia de trabalho; confira antes do commit.

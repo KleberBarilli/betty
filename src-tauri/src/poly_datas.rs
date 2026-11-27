@@ -87,7 +87,7 @@ pub async fn recuperar(db: &Db, user_id: &str, entradas: Option<Vec<(String, Val
         Some(e) => e,
         None => {
             let u = user_id.to_string();
-            db.call(move |c| {
+            db.ler(move |c| {
                 let mut s = c.prepare(
                     "SELECT bet_key,data_json FROM closed_bets_ledger WHERE user_id=? AND platform='polymarket'
     AND json_extract(data_json,'$.redeemable')=1 AND json_extract(data_json,'$.curPrice')=0

@@ -324,20 +324,21 @@ pub(crate) fn odd_historica(aposta: &Value) -> f64 {
     if preco.is_finite() && preco > 0.0 { 1.0 / preco } else { 0.0 }
 }
 
+/// Há linhas do índice sem métricas? Só bancos vindos de versões antigas têm:
+/// toda gravação do índice já sai com elas.
+pub fn metricas_pendentes(c: &Connection, user_id: &str) -> Result<bool> {
+    let pendentes: i64 =
+        c.query_row("SELECT COUNT(*) FROM closed_bets_index WHERE user_id=? AND metrics_ready=0", [user_id], |r| r.get(0))?;
+    Ok(pendentes > 0)
+}
+
 /// `garantirMetricasIndiceHistorico()`: completa métricas de linhas do índice
 /// que ainda não as têm. Normalmente não há nada a fazer.
 pub fn garantir_metricas(c: &mut Connection, user_id: &str) -> Result<()> {
-    // A conexão do estado salvo só lê: as métricas foram completadas na
-    // conexão principal antes de ela abrir.
-    if c.is_readonly(rusqlite::MAIN_DB)? {
-        return Ok(());
-    }
-    let pendentes: i64 = c.query_row(
-        "SELECT COUNT(*) FROM closed_bets_index WHERE user_id=? AND metrics_ready=0",
-        [user_id],
-        |r| r.get(0),
-    )?;
-    if pendentes == 0 {
+    // As conexões de leitura e a do estado salvo não gravam: as métricas são
+    // completadas antes, na conexão de escrita (`api::completar_metricas` e
+    // `api::abrir_instantaneo`).
+    if c.is_readonly(rusqlite::MAIN_DB)? || !metricas_pendentes(c, user_id)? {
         return Ok(());
     }
     let linhas: Vec<(String, String, String, f64)> = {

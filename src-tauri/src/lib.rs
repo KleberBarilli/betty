@@ -196,11 +196,13 @@ fn inicializar(pastas: &Pastas) -> anyhow::Result<api::Estado> {
     let usuario = db::usuario_local(&mut conn)?;
     eprintln!("[início] pronto em {} ms", inicio.elapsed().as_millis());
 
-    Ok(api::Estado { db: db::Db::new(conn), chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
+    let db = db::Db::com_leitura(conn, db::CONEXOES_DE_LEITURA)?;
+    Ok(api::Estado { db, chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
 }
 
 /// Manutenção que pode levar alguns segundos, fora do caminho de abertura: a
-/// janela já aparece e as consultas ao banco esperam a vez. Hoje é a
+/// janela já aparece, as leituras seguem pelas conexões de leitura e as
+/// gravações esperam a vez. Hoje é a
 /// compactação única dos metadados do ledger, seguida do `VACUUM` que devolve
 /// o espaço liberado ao disco.
 fn manutencao_do_banco(db: db::Db) {
@@ -230,6 +232,10 @@ fn manutencao_do_banco(db: db::Db) {
                 eprintln!("[manutenção] concluída em {} ms", inicio.elapsed().as_millis());
             }
             Err(e) => eprintln!("[manutenção] falhou (o app segue normalmente): {e:#}"),
+        }
+        // Só agora: com o arquivo mapeado, o VACUUM acima não o encolheria.
+        if let Err(e) = db.mapear_leitura().await {
+            eprintln!("[manutenção] leitura mapeada: {e:#}");
         }
     });
 }

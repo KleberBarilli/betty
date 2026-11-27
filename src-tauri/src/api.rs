@@ -10,7 +10,7 @@ use serde_json::{Map, Value, json};
 use tauri::http::{Method, StatusCode};
 
 use crate::crypto::MasterKey;
-use crate::db::{self, Db, UsuarioLocal};
+use crate::db::{self, Conexao, Db, UsuarioLocal};
 use crate::kalshi::{self, EstadoKalshi};
 use crate::poly::{self, EstadoPoly};
 use crate::{history, js, ledger, poly_datas, tracked};
@@ -38,14 +38,14 @@ pub struct Estado {
 /// dele e não veem as gravações pela metade. Expira sozinho depois de 15
 /// minutos, para o WAL não crescer se a sincronização nunca terminar.
 #[derive(Default, Clone)]
-pub struct Instantaneo(Arc<Mutex<Option<(Instant, Db)>>>);
+pub struct Instantaneo(Arc<Mutex<Option<(Instant, Conexao)>>>);
 
 const VALIDADE_INSTANTANEO: Duration = Duration::from_secs(15 * 60);
 
 impl Instantaneo {
-    fn guardar(&self, db: Db) {
+    fn guardar(&self, conexao: Conexao) {
         if let Ok(mut g) = self.0.lock() {
-            *g = Some((Instant::now(), db));
+            *g = Some((Instant::now(), conexao));
         }
     }
 
@@ -55,7 +55,7 @@ impl Instantaneo {
         }
     }
 
-    fn atual(&self) -> Option<Db> {
+    fn atual(&self) -> Option<Conexao> {
         let g = self.0.lock().ok()?;
         g.as_ref().filter(|(em, _)| em.elapsed() < VALIDADE_INSTANTANEO).map(|(_, db)| db.clone())
     }
@@ -70,11 +70,35 @@ impl Instantaneo {
     }
 }
 
-/// Conexão das leituras do histórico: o estado salvo quando a interface pede
-/// (`snapshot=1`) e ele ainda existe; senão a principal.
-fn base_de_leitura(estado: &Estado, query: Option<&str>) -> Db {
+/// De onde sai uma leitura do histórico.
+#[derive(Clone, Copy)]
+struct Leitura {
+    /// Aceita `snapshot=1`: lê do estado salvo enquanto ele existir.
+    salvo: bool,
+    /// A consulta completa as métricas pendentes do índice, o que só a conexão
+    /// de escrita grava.
+    metricas: bool,
+}
+
+const LEDGER: Leitura = Leitura { salvo: false, metricas: false };
+const PAGINA: Leitura = Leitura { salvo: true, metricas: true };
+const LAYOUT: Leitura = Leitura { salvo: true, metricas: false };
+
+/// O estado salvo, quando a interface pede (`snapshot=1`) e ele ainda existe.
+fn estado_salvo(estado: &Estado, query: Option<&str>) -> Option<Conexao> {
     let pede = query.is_some_and(|q| q.split('&').any(|p| p == "snapshot=1"));
-    pede.then(|| estado.instantaneo.atual()).flatten().unwrap_or_else(|| estado.db.clone())
+    pede.then(|| estado.instantaneo.atual()).flatten()
+}
+
+/// Completa, na conexão de escrita, as métricas que faltam no índice. Quase
+/// sempre só confere (numa conexão de leitura) e não espera nenhuma gravação.
+async fn completar_metricas(estado: &Estado) -> anyhow::Result<()> {
+    let user = estado.usuario.id.clone();
+    let u = user.clone();
+    if estado.db.ler(move |c| history::metricas_pendentes(c, &u)).await? {
+        estado.db.call(move |c| history::garantir_metricas(c, &user)).await?;
+    }
+    Ok(())
 }
 
 /// Abre o estado salvo. As métricas pendentes são completadas antes, na
@@ -91,7 +115,7 @@ async fn abrir_instantaneo(estado: &Estado) -> Resultado {
     let conn = tauri::async_runtime::spawn_blocking(move || db::abrir_instantaneo(&caminho))
         .await
         .map_err(|e| anyhow::anyhow!("estado salvo: {e}"))??;
-    estado.instantaneo.guardar(Db::new(conn));
+    estado.instantaneo.guardar(Conexao::new(conn));
     Ok(ok(json!({ "ok": true })))
 }
 
@@ -184,52 +208,42 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
             if let Err(e) = kalshi::atualizar_modalidades_no_ledger(estado).await {
                 eprintln!("[api] metadados Kalshi do ledger: {e:#}");
             }
-            historico(estado, estado.db.clone(), query, ERRO_GENERICO, "", |c, u, _| h::ledger(c, u).map(|b| Some(b.into()))).await
+            historico(estado, LEDGER, query, ERRO_GENERICO, "", |c, u, _| h::ledger(c, u).map(|b| Some(b.into()))).await
         }
         ("GET", "/api/history/closed/export") => {
-            historico(estado, estado.db.clone(), query, "Não foi possível preparar a exportação.", "", |c, u, _| {
-                h::exportar(c, u).map(|b| Some(b.into()))
-            })
-            .await
+            historico(estado, LEDGER, query, "Não foi possível preparar a exportação.", "", |c, u, _| h::exportar(c, u).map(|b| Some(b.into())))
+                .await
         }
         ("GET", "/api/history/closed/index/status") => {
-            historico(estado, estado.db.clone(), query, ERRO_GENERICO, "", |c, u, _| h::status_indice(c, u).map(|v| Some(v.into()))).await
+            historico(estado, LEDGER, query, ERRO_GENERICO, "", |c, u, _| h::status_indice(c, u).map(|v| Some(v.into()))).await
         }
         ("GET", "/api/history/closed/index/pending") => {
-            historico(estado, estado.db.clone(), query, "Não foi possível consultar as pendências do histórico.", "Cursor inválido.", |c, u, q| {
+            historico(estado, LEDGER, query, "Não foi possível consultar as pendências do histórico.", "Cursor inválido.", |c, u, q| {
                 h::pendentes_indice(c, u, q).map(|b| b.map(Corpo::from))
             })
             .await
         }
         ("GET", "/api/history/closed/query") => {
-            historico(estado, base_de_leitura(estado, query), query, "Não foi possível consultar o histórico fechado.", "", |c, u, q| {
+            historico(estado, PAGINA, query, "Não foi possível consultar o histórico fechado.", "", |c, u, q| {
                 h::consultar(c, u, q).map(|b| Some(b.into()))
             })
             .await
         }
         ("GET", "/api/history/closed/layout") => {
-            historico(estado, base_de_leitura(estado, query), query, "Não foi possível medir o histórico.", "", |c, u, q| h::layout(c, u, q).map(|v| Some(v.into())))
-                .await
+            historico(estado, LAYOUT, query, "Não foi possível medir o histórico.", "", |c, u, q| h::layout(c, u, q).map(|v| Some(v.into()))).await
         }
         ("GET", "/api/history/closed/stats") => {
-            historico(estado, base_de_leitura(estado, query), query, "Não foi possível calcular as estatísticas.", "", |c, u, q| {
-                h::stats(c, u, q).map(|v| Some(v.into()))
+            historico(estado, PAGINA, query, "Não foi possível calcular as estatísticas.", "", |c, u, q| h::stats(c, u, q).map(|v| Some(v.into())))
+                .await
+        }
+        ("GET", "/api/history/closed/calendar") => {
+            historico(estado, PAGINA, query, "Não foi possível carregar o calendário.", "Selecione um mês válido (AAAA-MM).", |c, u, q| {
+                h::calendario(c, u, q).map(|v| v.map(Corpo::from))
             })
             .await
         }
-        ("GET", "/api/history/closed/calendar") => {
-            historico(
-                estado,
-                base_de_leitura(estado, query),
-                query,
-                "Não foi possível carregar o calendário.",
-                "Selecione um mês válido (AAAA-MM).",
-                |c, u, q| h::calendario(c, u, q).map(|v| v.map(Corpo::from)),
-            )
-            .await
-        }
         ("GET", "/api/history/closed/pnl") => {
-            historico(estado, base_de_leitura(estado, query), query, "Não foi possível consultar o PnL.", "", |c, u, q| h::pnl(c, u, q).map(|v| Some(v.into()))).await
+            historico(estado, PAGINA, query, "Não foi possível consultar o PnL.", "", |c, u, q| h::pnl(c, u, q).map(|v| Some(v.into()))).await
         }
         (m, p) if p.starts_with("/api/connections/") || p.starts_with("/api/tracked/") => rastreadas(estado, m, p, corpo).await,
         _ => Ok(nao_migrada(method, path)),
@@ -287,15 +301,25 @@ async fn rastreadas(estado: &Estado, metodo: &str, p: &str, corpo: &[u8]) -> Res
     Ok(nao_migrada(&m, p))
 }
 
-/// Executa uma consulta de histórico no banco. `Ok(None)` vira 400 com
-/// `msg_invalida`; um erro vira 500 com `msg_erro`, como no `server.js`.
-async fn historico<F>(estado: &Estado, db: Db, query: Option<&str>, msg_erro: &'static str, msg_invalida: &'static str, f: F) -> Resultado
+/// Executa uma consulta de histórico numa conexão de leitura (ou no estado
+/// salvo). `Ok(None)` vira 400 com `msg_invalida`; um erro vira 500 com
+/// `msg_erro`, como no `server.js`.
+async fn historico<F>(estado: &Estado, leitura: Leitura, query: Option<&str>, msg_erro: &'static str, msg_invalida: &'static str, f: F) -> Resultado
 where
     F: FnOnce(&mut Connection, &str, &history::Consulta) -> anyhow::Result<Option<Corpo>> + Send + 'static,
 {
     let consulta = history::ler_consulta(query);
     let user_id = estado.usuario.id.clone();
-    match db.call(move |c| f(c, &user_id, &consulta)).await {
+    let consultar = move |c: &mut Connection| f(c, &user_id, &consulta);
+    let resultado = match leitura.salvo.then(|| estado_salvo(estado, query)).flatten() {
+        Some(salvo) => salvo.call(consultar).await,
+        None if leitura.metricas => match completar_metricas(estado).await {
+            Ok(()) => estado.db.ler(consultar).await,
+            Err(e) => Err(e),
+        },
+        None => estado.db.ler(consultar).await,
+    };
+    match resultado {
         Ok(Some(Corpo::Json(corpo))) => Ok(ok(corpo)),
         Ok(Some(Corpo::Bytes(b))) => Ok(ApiResponse { status: StatusCode::OK, body: Value::Null, bruto: Some(b) }),
         Ok(None) => Ok(erro(StatusCode::BAD_REQUEST, msg_invalida)),
@@ -318,7 +342,7 @@ async fn com_conexoes(estado: &Estado, r: anyhow::Result<ApiResponse>, msg_erro:
     if r.status == StatusCode::OK {
         let chave = estado.chave.clone();
         let user_id = estado.usuario.id.clone();
-        r.body["connections"] = estado.db.call(move |c| conexoes_seguras(c, &chave, &user_id)).await?;
+        r.body["connections"] = estado.db.ler(move |c| conexoes_seguras(c, &chave, &user_id)).await?;
     }
     Ok(r)
 }
@@ -350,13 +374,13 @@ async fn escrita_historico(estado: &Estado, rota: &str, body: Value) -> Resultad
         "/api/history/closed/lookup" => {
             let r = estado
                 .db
-                .call(move |c| ledger::assinaturas(c, &user, body.get("entries")))
+                .ler(move |c| ledger::assinaturas(c, &user, body.get("entries")))
                 .await
                 .map(|e| ok(json!({ "ok": true, "count": e.len(), "entries": e })));
             (r, "Não foi possível consultar o histórico persistente.")
         }
         "/api/history/closed/metadata" => {
-            let r = estado.db.call(move |c| ledger::metadados(c, &user, body.get("keys"))).await.map(|e| ok(json!({ "ok": true, "entries": e })));
+            let r = estado.db.ler(move |c| ledger::metadados(c, &user, body.get("keys"))).await.map(|e| ok(json!({ "ok": true, "entries": e })));
             (r, "Não foi possível consultar os metadados.")
         }
         "/api/history/closed/index/versions" => {
@@ -444,7 +468,7 @@ async fn me(estado: &Estado) -> Resultado {
     let usuario = estado.usuario.clone();
     let chave = estado.chave.clone();
     let user_id = usuario.id.clone();
-    let conexoes = estado.db.call(move |c| conexoes_seguras(c, &chave, &user_id)).await?;
+    let conexoes = estado.db.ler(move |c| conexoes_seguras(c, &chave, &user_id)).await?;
     Ok(ok(json!({ "ok": true, "user": usuario, "connections": conexoes })))
 }
 
@@ -505,7 +529,7 @@ async fn ler_settings(estado: &Estado) -> Resultado {
     let user_id = estado.usuario.id.clone();
     let config = estado
         .db
-        .call(move |c| {
+        .ler(move |c| {
             let linha = c
                 .query_row(
                     "SELECT stake_unidade, stake_regras, stake_por_casa, closed_range_start, closed_range_end, closed_range_by_platform \
@@ -666,7 +690,8 @@ mod tests {
         let mut conn = db::abrir(&dir.path().join("t.db")).unwrap();
         let usuario = db::usuario_local(&mut conn).unwrap();
         let chave = Arc::new(MasterKey::from_hex(&"11".repeat(32)).unwrap());
-        (dir, Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
+        let db = Db::com_leitura(conn, db::CONEXOES_DE_LEITURA).unwrap();
+        (dir, Estado { db, chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
     }
 
     fn chamar(e: &Estado, method: Method, path: &str, corpo: Value) -> ApiResponse {
@@ -767,7 +792,10 @@ mod tests {
             })
             .unwrap_or_else(|| "00".repeat(32));
         let chave = Arc::new(MasterKey::from_hex(&hex).unwrap());
-        let e = Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() };
+        let db = Db::com_leitura(conn, db::CONEXOES_DE_LEITURA).unwrap();
+        // Como no app depois da manutenção da abertura.
+        tauri::async_runtime::block_on(db.mapear_leitura()).unwrap();
+        let e = Estado { db, chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() };
         let arquivo_urls = var("BETTY_COMPARAR_URLS");
         let pasta = std::path::Path::new(&arquivo_urls).parent().unwrap().to_path_buf();
         let urls = std::fs::read_to_string(&arquivo_urls).unwrap();
@@ -790,6 +818,55 @@ mod tests {
             let linha = json!({ "url": url, "status": r.status.as_u16(), "ms": ms, "body": body });
             writeln!(saida, "{linha}").unwrap();
         }
+    }
+
+    /// Tempo de `/api/me` enquanto a manutenção da abertura (compactação e
+    /// VACUUM) roda na conexão de escrita, num banco real ainda sem compactar
+    /// (cópia em `BETTY_COMPARAR_DB`). `BETTY_CONEXOES_DE_LEITURA=0` repete o
+    /// comportamento antigo, com uma conexão só.
+    #[test]
+    #[ignore]
+    fn medir_leitura_durante_a_manutencao() {
+        use std::time::Instant;
+        let caminho = std::env::var("BETTY_COMPARAR_DB").expect("defina BETTY_COMPARAR_DB");
+        let mut conn = db::abrir(std::path::Path::new(&caminho)).unwrap();
+        let usuario = db::usuario_local(&mut conn).unwrap();
+        let n = std::env::var("BETTY_CONEXOES_DE_LEITURA").ok().and_then(|v| v.parse().ok()).unwrap_or(db::CONEXOES_DE_LEITURA);
+        let chave = Arc::new(MasterKey::from_hex(&"00".repeat(32)).unwrap());
+        let db = Db::com_leitura(conn, n).unwrap();
+        let e = Estado { db, chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() };
+        let me = |e: &Estado| {
+            let i = Instant::now();
+            let r = tauri::async_runtime::block_on(handle(e, &Method::GET, "/api/me", None, b""));
+            assert_eq!(r.status, StatusCode::OK);
+            i.elapsed().as_secs_f64() * 1000.0
+        };
+        let mut normal: Vec<f64> = (0..20).map(|_| me(&e)).collect();
+        normal.sort_by(f64::total_cmp);
+        let escrita = e.db.clone();
+        let manutencao = std::thread::spawn(move || {
+            let i = Instant::now();
+            let r = tauri::async_runtime::block_on(escrita.call(|c| Ok((ledger::compactar_ledger_uma_vez(c)?, db::recuperar_espaco(c)?))));
+            (i.elapsed().as_secs_f64() * 1000.0, r.unwrap())
+        });
+        std::thread::sleep(Duration::from_millis(50));
+        let mut durante = Vec::new();
+        while !manutencao.is_finished() {
+            durante.push(me(&e));
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let (ms, (compactacao, livre)) = manutencao.join().unwrap();
+        durante.sort_by(f64::total_cmp);
+        let mediana = |v: &[f64]| v.get(v.len() / 2).copied().unwrap_or(f64::NAN);
+        eprintln!(
+            "conexões de leitura: {n} | manutenção {ms:.0} ms (compactadas: {:?}, VACUUM: {:?} MB)\n/api/me normal: mediana {:.1} ms | durante: {} pedidos, mediana {:.1} ms, máximo {:.1} ms",
+            compactacao.map(|c| c.compactadas),
+            livre.map(|b| b / 1_048_576),
+            mediana(&normal),
+            durante.len(),
+            mediana(&durante),
+            durante.last().copied().unwrap_or(f64::NAN)
+        );
     }
 
     /// Perfil do `delta` por fase, com os lotes de `BETTY_COMPARAR_URLS`
@@ -871,6 +948,68 @@ mod tests {
         assert_eq!(total(&e, None), 2.0, "a leitura normal já vê");
         chamar(&e, Method::DELETE, "/api/history/snapshot", Value::Null);
         assert_eq!(total(&e, Some("snapshot=1")), 2.0, "sem estado salvo, cai na conexão principal");
+    }
+
+    /// Grava uma aposta da Kalshi no ledger e no índice.
+    fn indexar(e: &Estado, id: &str, pnl: f64) {
+        let user = e.usuario.id.clone();
+        let linha = json!({ "_platform": "kalshi", "slug": id, "ticker": id, "title": "A vs B", "realizedPnl": pnl, "initialValue": 10,
+                            "avgPrice": 0.5, "timestamp": 1_790_000_000, "_resolvedTime": "2026-09-20T12:00:00Z" });
+        let id = id.to_string();
+        tauri::async_runtime::block_on(e.db.call(move |c| {
+            ledger::gravar(c, &user, vec![linha], true)?;
+            ledger::salvar_indice(c, &user, Some(&json!([{ "platform": "kalshi", "betKey": id, "category": "Futebol",
+                "tableYmd": "2026-09-20", "pnlValue": pnl, "stakeValue": 10, "oddValue": 2 }])))?;
+            Ok(())
+        }))
+        .unwrap();
+    }
+
+    #[test]
+    fn rotas_de_leitura_nao_esperam_a_gravacao() {
+        let (_d, e) = estado();
+        indexar(&e, "a1", 5.0);
+        let e = Arc::new(e);
+        let (soltar, escrita) = db::tests::segurar_escrita(&e.db);
+        for rota in [
+            "/api/me",
+            "/api/settings",
+            "/api/history/closed/stats",
+            "/api/history/closed/query",
+            "/api/history/closed/pnl",
+            "/api/history/closed/layout",
+            "/api/history/closed/index/status",
+            "/api/history/closed",
+        ] {
+            let e = e.clone();
+            let r = db::tests::sem_esperar(move || tauri::async_runtime::block_on(handle(&e, &Method::GET, rota, None, b"")));
+            assert_eq!(r.status, StatusCode::OK, "{rota}");
+        }
+        soltar.send(()).unwrap();
+        escrita.join().unwrap().unwrap();
+    }
+
+    #[test]
+    fn metricas_pendentes_sao_completadas_antes_da_leitura() {
+        let (_d, e) = estado();
+        indexar(&e, "a1", 5.0);
+        indexar(&e, "a2", -3.0);
+        let user = e.usuario.id.clone();
+        // Linhas do índice sem métricas, como as de um banco de versão antiga.
+        tauri::async_runtime::block_on(e.db.call(move |c| {
+            c.execute("UPDATE closed_bets_index SET metrics_ready=0,pnl_value=0,stake_value=0,won=0 WHERE user_id=?", [&user])?;
+            Ok(())
+        }))
+        .unwrap();
+        let status = chamar(&e, Method::GET, "/api/history/closed/index/status", Value::Null);
+        assert_eq!(status.body["pending"], json!(2), "o status não completa as métricas");
+        let r = tauri::async_runtime::block_on(handle(&e, &Method::GET, "/api/history/closed/stats", None, b""));
+        assert_eq!(r.status, StatusCode::OK);
+        assert_eq!(r.body["total"]["lucroD"], json!(2), "{}", r.body["total"]);
+        assert_eq!(r.body["total"]["wins"], json!(1));
+        assert_eq!(r.body["total"]["volumeD"], json!(20));
+        let status = chamar(&e, Method::GET, "/api/history/closed/index/status", Value::Null);
+        assert_eq!(status.body["pending"], json!(0));
     }
 
     #[test]

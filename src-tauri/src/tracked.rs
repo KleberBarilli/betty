@@ -1666,7 +1666,7 @@ async fn ler_conexao(estado: &Estado, casa: &str) -> Result<Option<(String, Opti
     let (u, p) = (estado.usuario.id.clone(), casa.to_string());
     estado
         .db
-        .call(move |c| {
+        .ler(move |c| {
             Ok(c.query_row(
                 "SELECT account_scope, credentials_enc FROM tracked_connections WHERE user_id=? AND platform=?",
                 params![u, p],
