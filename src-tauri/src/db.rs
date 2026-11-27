@@ -163,6 +163,23 @@ pub fn agora() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
+/// Conexão só de leitura com uma transação aberta. Em WAL ela enxerga o banco
+/// como estava ao abrir, mesmo com a sincronização gravando pela conexão
+/// principal: é o estado salvo que a interface mostra enquanto atualiza.
+pub fn abrir_instantaneo(caminho: &Path) -> Result<Connection> {
+    use rusqlite::OpenFlags;
+    let conn = Connection::open_with_flags(caminho, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
+        .with_context(|| format!("não foi possível abrir {} para leitura", caminho.display()))?;
+    conn.busy_timeout(Duration::from_secs(5))?;
+    conn.pragma_update(None, "cache_size", -8_000)?;
+    conn.pragma_update(None, "temp_store", "MEMORY")?;
+    registrar_funcoes(&conn)?;
+    conn.execute_batch("BEGIN")?;
+    // O instantâneo só fica fixo na primeira leitura da transação.
+    conn.query_row("SELECT COUNT(*) FROM closed_bets_index", [], |_| Ok(()))?;
+    Ok(conn)
+}
+
 pub fn abrir(caminho: &Path) -> Result<Connection> {
     let conn = Connection::open(caminho).with_context(|| format!("não foi possível abrir {}", caminho.display()))?;
     conn.busy_timeout(Duration::from_secs(5))?;

@@ -641,3 +641,29 @@ button.visao-linha:focus-visible { outline: 2px solid var(--accent); outline-off
 }
 .aviso-download.erro { border-left-color: var(--danger); }
 .aviso-download[hidden] { display: none; }
+
+/* ---------- Selo da abertura com dados salvos ---------- */
+.selo-dados-salvos {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+}
+.selo-dados-salvos[hidden] { display: none; }
+.selo-dados-salvos .selo-ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: sync-breathe 1.6s ease-in-out infinite;
+}
+.selo-dados-salvos.aviso { background: var(--warn-soft); color: var(--warn); }
+.selo-dados-salvos.aviso .selo-ponto { animation: none; }
+@media (prefers-reduced-motion: reduce) { .selo-dados-salvos .selo-ponto { animation: none; } }

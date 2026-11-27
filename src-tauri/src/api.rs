@@ -2,7 +2,8 @@
 //!
 //! Rotas que não existem no app desktop respondem 501.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Map, Value, json};
@@ -29,6 +30,69 @@ pub struct Estado {
     pub kalshi: Arc<EstadoKalshi>,
     pub poly: Arc<EstadoPoly>,
     pub tracked: Arc<tracked::EstadoTracked>,
+    pub instantaneo: Instantaneo,
+}
+
+/// Estado salvo do histórico, congelado enquanto a interface sincroniza com
+/// as casas (`POST /api/history/snapshot`): as leituras com `snapshot=1` saem
+/// dele e não veem as gravações pela metade. Expira sozinho depois de 15
+/// minutos, para o WAL não crescer se a sincronização nunca terminar.
+#[derive(Default, Clone)]
+pub struct Instantaneo(Arc<Mutex<Option<(Instant, Db)>>>);
+
+const VALIDADE_INSTANTANEO: Duration = Duration::from_secs(15 * 60);
+
+impl Instantaneo {
+    fn guardar(&self, db: Db) {
+        if let Ok(mut g) = self.0.lock() {
+            *g = Some((Instant::now(), db));
+        }
+    }
+
+    fn soltar(&self) {
+        if let Ok(mut g) = self.0.lock() {
+            *g = None;
+        }
+    }
+
+    fn atual(&self) -> Option<Db> {
+        let g = self.0.lock().ok()?;
+        g.as_ref().filter(|(em, _)| em.elapsed() < VALIDADE_INSTANTANEO).map(|(_, db)| db.clone())
+    }
+
+    /// Solta o estado salvo vencido (chamado a cada minuto).
+    pub fn limpar_vencido(&self) {
+        if let Ok(mut g) = self.0.lock()
+            && g.as_ref().is_some_and(|(em, _)| em.elapsed() >= VALIDADE_INSTANTANEO)
+        {
+            *g = None;
+        }
+    }
+}
+
+/// Conexão das leituras do histórico: o estado salvo quando a interface pede
+/// (`snapshot=1`) e ele ainda existe; senão a principal.
+fn base_de_leitura(estado: &Estado, query: Option<&str>) -> Db {
+    let pede = query.is_some_and(|q| q.split('&').any(|p| p == "snapshot=1"));
+    pede.then(|| estado.instantaneo.atual()).flatten().unwrap_or_else(|| estado.db.clone())
+}
+
+/// Abre o estado salvo. As métricas pendentes são completadas antes, na
+/// conexão principal, porque a do estado salvo só lê.
+async fn abrir_instantaneo(estado: &Estado) -> Resultado {
+    let user = estado.usuario.id.clone();
+    let caminho = estado
+        .db
+        .call(move |c| {
+            history::garantir_metricas(c, &user)?;
+            c.path().filter(|p| !p.is_empty()).map(std::path::PathBuf::from).ok_or_else(|| anyhow::anyhow!("banco sem arquivo"))
+        })
+        .await?;
+    let conn = tauri::async_runtime::spawn_blocking(move || db::abrir_instantaneo(&caminho))
+        .await
+        .map_err(|e| anyhow::anyhow!("estado salvo: {e}"))??;
+    estado.instantaneo.guardar(Db::new(conn));
+    Ok(ok(json!({ "ok": true })))
 }
 
 pub struct ApiResponse {
@@ -63,6 +127,11 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
     let resultado = match (method.as_str(), path) {
         ("GET", "/health") => Ok(ok(json!({ "ok": true, "service": "betty", "engine": "rust" }))),
         ("GET", "/api/me") => me(estado).await,
+        ("POST", "/api/history/snapshot") => abrir_instantaneo(estado).await,
+        ("DELETE", "/api/history/snapshot") => {
+            estado.instantaneo.soltar();
+            Ok(ok(json!({ "ok": true })))
+        }
         // No app desktop não há sessão: sair só volta para a tela inicial.
         ("POST", "/api/auth/logout") => Ok(ok(json!({ "ok": true }))),
         ("GET", "/api/settings") => ler_settings(estado).await,
@@ -115,35 +184,35 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
             if let Err(e) = kalshi::atualizar_modalidades_no_ledger(estado).await {
                 eprintln!("[api] metadados Kalshi do ledger: {e:#}");
             }
-            historico(estado, query, ERRO_GENERICO, "", |c, u, _| h::ledger(c, u).map(|b| Some(b.into()))).await
+            historico(estado, estado.db.clone(), query, ERRO_GENERICO, "", |c, u, _| h::ledger(c, u).map(|b| Some(b.into()))).await
         }
         ("GET", "/api/history/closed/export") => {
-            historico(estado, query, "Não foi possível preparar a exportação.", "", |c, u, _| {
+            historico(estado, estado.db.clone(), query, "Não foi possível preparar a exportação.", "", |c, u, _| {
                 h::exportar(c, u).map(|b| Some(b.into()))
             })
             .await
         }
         ("GET", "/api/history/closed/index/status") => {
-            historico(estado, query, ERRO_GENERICO, "", |c, u, _| h::status_indice(c, u).map(|v| Some(v.into()))).await
+            historico(estado, estado.db.clone(), query, ERRO_GENERICO, "", |c, u, _| h::status_indice(c, u).map(|v| Some(v.into()))).await
         }
         ("GET", "/api/history/closed/index/pending") => {
-            historico(estado, query, "Não foi possível consultar as pendências do histórico.", "Cursor inválido.", |c, u, q| {
+            historico(estado, estado.db.clone(), query, "Não foi possível consultar as pendências do histórico.", "Cursor inválido.", |c, u, q| {
                 h::pendentes_indice(c, u, q).map(|b| b.map(Corpo::from))
             })
             .await
         }
         ("GET", "/api/history/closed/query") => {
-            historico(estado, query, "Não foi possível consultar o histórico fechado.", "", |c, u, q| {
+            historico(estado, base_de_leitura(estado, query), query, "Não foi possível consultar o histórico fechado.", "", |c, u, q| {
                 h::consultar(c, u, q).map(|b| Some(b.into()))
             })
             .await
         }
         ("GET", "/api/history/closed/layout") => {
-            historico(estado, query, "Não foi possível medir o histórico.", "", |c, u, q| h::layout(c, u, q).map(|v| Some(v.into())))
+            historico(estado, base_de_leitura(estado, query), query, "Não foi possível medir o histórico.", "", |c, u, q| h::layout(c, u, q).map(|v| Some(v.into())))
                 .await
         }
         ("GET", "/api/history/closed/stats") => {
-            historico(estado, query, "Não foi possível calcular as estatísticas.", "", |c, u, q| {
+            historico(estado, base_de_leitura(estado, query), query, "Não foi possível calcular as estatísticas.", "", |c, u, q| {
                 h::stats(c, u, q).map(|v| Some(v.into()))
             })
             .await
@@ -151,6 +220,7 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
         ("GET", "/api/history/closed/calendar") => {
             historico(
                 estado,
+                base_de_leitura(estado, query),
                 query,
                 "Não foi possível carregar o calendário.",
                 "Selecione um mês válido (AAAA-MM).",
@@ -159,7 +229,7 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
             .await
         }
         ("GET", "/api/history/closed/pnl") => {
-            historico(estado, query, "Não foi possível consultar o PnL.", "", |c, u, q| h::pnl(c, u, q).map(|v| Some(v.into()))).await
+            historico(estado, base_de_leitura(estado, query), query, "Não foi possível consultar o PnL.", "", |c, u, q| h::pnl(c, u, q).map(|v| Some(v.into()))).await
         }
         (m, p) if p.starts_with("/api/connections/") || p.starts_with("/api/tracked/") => rastreadas(estado, m, p, corpo).await,
         _ => Ok(nao_migrada(method, path)),
@@ -219,13 +289,13 @@ async fn rastreadas(estado: &Estado, metodo: &str, p: &str, corpo: &[u8]) -> Res
 
 /// Executa uma consulta de histórico no banco. `Ok(None)` vira 400 com
 /// `msg_invalida`; um erro vira 500 com `msg_erro`, como no `server.js`.
-async fn historico<F>(estado: &Estado, query: Option<&str>, msg_erro: &'static str, msg_invalida: &'static str, f: F) -> Resultado
+async fn historico<F>(estado: &Estado, db: Db, query: Option<&str>, msg_erro: &'static str, msg_invalida: &'static str, f: F) -> Resultado
 where
     F: FnOnce(&mut Connection, &str, &history::Consulta) -> anyhow::Result<Option<Corpo>> + Send + 'static,
 {
     let consulta = history::ler_consulta(query);
     let user_id = estado.usuario.id.clone();
-    match estado.db.call(move |c| f(c, &user_id, &consulta)).await {
+    match db.call(move |c| f(c, &user_id, &consulta)).await {
         Ok(Some(Corpo::Json(corpo))) => Ok(ok(corpo)),
         Ok(Some(Corpo::Bytes(b))) => Ok(ApiResponse { status: StatusCode::OK, body: Value::Null, bruto: Some(b) }),
         Ok(None) => Ok(erro(StatusCode::BAD_REQUEST, msg_invalida)),
@@ -596,7 +666,7 @@ mod tests {
         let mut conn = db::abrir(&dir.path().join("t.db")).unwrap();
         let usuario = db::usuario_local(&mut conn).unwrap();
         let chave = Arc::new(MasterKey::from_hex(&"11".repeat(32)).unwrap());
-        (dir, Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() })
+        (dir, Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
     }
 
     fn chamar(e: &Estado, method: Method, path: &str, corpo: Value) -> ApiResponse {
@@ -697,7 +767,7 @@ mod tests {
             })
             .unwrap_or_else(|| "00".repeat(32));
         let chave = Arc::new(MasterKey::from_hex(&hex).unwrap());
-        let e = Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() };
+        let e = Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() };
         let arquivo_urls = var("BETTY_COMPARAR_URLS");
         let pasta = std::path::Path::new(&arquivo_urls).parent().unwrap().to_path_buf();
         let urls = std::fs::read_to_string(&arquivo_urls).unwrap();
@@ -768,6 +838,39 @@ mod tests {
                 ms(t_ser)
             );
         }
+    }
+
+    #[test]
+    fn estado_salvo_nao_ve_a_sincronizacao_gravando() {
+        let (_d, e) = estado();
+        let user = e.usuario.id.clone();
+        let aposta = |id: &str, pnl: f64| {
+            json!({ "_platform": "kalshi", "slug": id, "ticker": id, "title": "A vs B", "realizedPnl": pnl, "initialValue": 10,
+                    "timestamp": 1_790_000_000, "_resolvedTime": "2026-09-20T12:00:00Z" })
+        };
+        let indexar = |e: &Estado, id: &str, pnl: f64| {
+            let (user, linha) = (user.clone(), aposta(id, pnl));
+            let id = id.to_string();
+            tauri::async_runtime::block_on(e.db.call(move |c| {
+                ledger::gravar(c, &user, vec![linha], true)?;
+                ledger::salvar_indice(c, &user, Some(&json!([{ "platform": "kalshi", "betKey": id, "category": "Futebol",
+                    "tableYmd": "2026-09-20", "pnlValue": pnl, "stakeValue": 10, "oddValue": 2 }])))?;
+                Ok(())
+            }))
+            .unwrap();
+        };
+        let total = |e: &Estado, q: Option<&str>| {
+            let r = tauri::async_runtime::block_on(handle(e, &Method::GET, "/api/history/closed/stats", q, b""));
+            assert_eq!(r.status, StatusCode::OK);
+            r.body["total"]["total"].as_f64().unwrap()
+        };
+        indexar(&e, "a1", 5.0);
+        assert_eq!(chamar(&e, Method::POST, "/api/history/snapshot", Value::Null).status, StatusCode::OK);
+        indexar(&e, "a2", -3.0);
+        assert_eq!(total(&e, Some("snapshot=1")), 1.0, "o estado salvo não vê a aposta nova");
+        assert_eq!(total(&e, None), 2.0, "a leitura normal já vê");
+        chamar(&e, Method::DELETE, "/api/history/snapshot", Value::Null);
+        assert_eq!(total(&e, Some("snapshot=1")), 2.0, "sem estado salvo, cai na conexão principal");
     }
 
     #[test]

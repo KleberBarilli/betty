@@ -327,6 +327,11 @@ pub(crate) fn odd_historica(aposta: &Value) -> f64 {
 /// `garantirMetricasIndiceHistorico()`: completa métricas de linhas do índice
 /// que ainda não as têm. Normalmente não há nada a fazer.
 pub fn garantir_metricas(c: &mut Connection, user_id: &str) -> Result<()> {
+    // A conexão do estado salvo só lê: as métricas foram completadas na
+    // conexão principal antes de ela abrir.
+    if c.is_readonly(rusqlite::MAIN_DB)? {
+        return Ok(());
+    }
     let pendentes: i64 = c.query_row(
         "SELECT COUNT(*) FROM closed_bets_index WHERE user_id=? AND metrics_ready=0",
         [user_id],

@@ -196,7 +196,7 @@ fn inicializar(pastas: &Pastas) -> anyhow::Result<api::Estado> {
     let usuario = db::usuario_local(&mut conn)?;
     eprintln!("[início] pronto em {} ms", inicio.elapsed().as_millis());
 
-    Ok(api::Estado { db: db::Db::new(conn), chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() })
+    Ok(api::Estado { db: db::Db::new(conn), chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
 }
 
 /// Manutenção que pode levar alguns segundos, fora do caminho de abertura: a
@@ -237,12 +237,13 @@ fn manutencao_do_banco(db: db::Db) {
 /// Os caches em memória só servem dentro do prazo de cada um, mas os vencidos
 /// ficavam guardados até chegar uma consulta igual. A cada minuto eles saem.
 fn limpar_caches_periodicamente(estado: &api::Estado) {
-    let (kalshi, poly) = (estado.kalshi.clone(), estado.poly.clone());
+    let (kalshi, poly, instantaneo) = (estado.kalshi.clone(), estado.poly.clone(), estado.instantaneo.clone());
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             kalshi.limpar_vencidos();
             poly.limpar_vencidos();
+            instantaneo.limpar_vencido();
         }
     });
 }

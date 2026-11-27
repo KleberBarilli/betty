@@ -39,7 +39,7 @@ const profitCalendarState = {
   house: 'todas', unit: 'usd', selected: null, data: null, key: '', version: -1, request: 0, detailRequest: 0, detailCollapsed: true
 };
 function profitCalendarKey() {
-  return JSON.stringify([profitCalendarState.month,profitCalendarState.house,BETTY_USER?.id||'local',versaoIndiceHistorico,chavePeriodoFechadasConfigurado()]);
+  return JSON.stringify([profitCalendarState.month,profitCalendarState.house,BETTY_USER?.id||'local',versaoLeituraHistorico(),chavePeriodoFechadasConfigurado()]);
 }
 let profitCalendarPickerYear;
 function fecharSeletorMesProfit(focus = false) {
@@ -152,13 +152,13 @@ function profitCalendarStatus(message, retry = false) {
 }
 async function prepararProfitCalendar() {
   if(!dadosFinanceirosConfirmados())return null;
-  const state=profitCalendarState,key=profitCalendarKey(),version=versaoIndiceHistorico,scope=escopoConsultaPosicoes();
+  const state=profitCalendarState,key=profitCalendarKey(),version=versaoLeituraHistorico(),scope=escopoConsultaPosicoes();
   if(state.data && state.key===key && state.version===version)return state.data;
   if(state.prepared?.key===key && state.prepared.scope===scope)return state.prepared.data;
   let pending=state.pending;
   if(!pending || pending.key!==key || pending.version!==version){
     const params=new URLSearchParams({month:state.month,platform:state.house});
-    const promise=fetch('/api/history/closed/calendar?'+params,{cache:'no-store'}).then(async response=>{
+    const promise=fetch(urlLeituraHistorico('/api/history/closed/calendar?'+params),{cache:'no-store'}).then(async response=>{
       if(!response.ok)throw new Error('Calendar HTTP '+response.status);
       const data=await response.json();if(!data?.ok || !Array.isArray(data.days))throw new Error('Invalid calendar');return data;
     });
@@ -181,7 +181,7 @@ async function renderProfitCalendar(opcoes = {}) {
     profitCalendarStatus(historicoIndiceEmSincronizacao ? 'Histórico em atualização. Aguarde a sincronização.' : 'Aguardando a confirmação do histórico. Use Atualizar agora para sincronizar.');
     return;
   }
-  const version = versaoIndiceHistorico;
+  const version = versaoLeituraHistorico();
   if (!opcoes.forcar && state.data && state.key === key && state.version === version) {
     profitCalendarConfirmedStatus();
     renderProfitCalendarDetail();
@@ -197,7 +197,7 @@ async function renderProfitCalendar(opcoes = {}) {
     pending = state.pending;
     if (!pending || pending.key !== key || pending.version !== version) {
       const promise = (async()=>{
-        const response = await fetch('/api/history/closed/calendar?' + params, { cache: 'no-store' });
+        const response = await fetch(urlLeituraHistorico('/api/history/closed/calendar?' + params), { cache: 'no-store' });
         if (!response.ok) throw new Error('Calendar HTTP ' + response.status);
         const data = await response.json();
         if (!data?.ok || !Array.isArray(data.days)) throw new Error('Invalid calendar');
@@ -284,9 +284,9 @@ async function renderProfitCalendarDetail(page = 1) {
   el.querySelector('details').ontoggle = event => { state.detailCollapsed = !event.currentTarget.open; };
   const rowsEl = document.getElementById('profitCalendarDayRows');
   if (!row?.total) { rowsEl.innerHTML = '<p class="calendar-detail-empty">Nenhuma aposta fechada neste dia.</p>'; return; }
-  if (!dadosFinanceirosConfirmados() || state.version !== versaoIndiceHistorico) { rowsEl.textContent = 'Aguarde a confirmação do histórico para consultar as apostas.'; return; }
+  if (!dadosFinanceirosConfirmados() || state.version !== versaoLeituraHistorico()) { rowsEl.textContent = 'Aguarde a confirmação do histórico para consultar as apostas.'; return; }
   rowsEl.textContent = 'Carregando apostas…';
-  const version = versaoIndiceHistorico;
+  const version = versaoLeituraHistorico();
   try {
     const params = new URLSearchParams({ day, platform: state.house, page: String(page), pageSize: '10' });
     const data = await consultarPaginaFechadas(params);

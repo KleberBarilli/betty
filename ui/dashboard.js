@@ -507,6 +507,33 @@ return { t: Number(o.t) || 0, abertos: o.abertos, fechados: [] };
 return null;
 }
 }
+// Último saldo confirmado de cada casa, para a abertura com dados salvos.
+// Fica numa chave própria: uma conta sem posições abertas também tem saldo.
+const SALDOS_SALVOS_KEY = "betty:saldosSalvos:v1";
+const VARIAVEIS_SALDO = {
+polymarket: [() => POLY_API_BALANCE, v => { POLY_API_BALANCE = v; }],
+kalshi: [() => KALSHI_API_BALANCE, v => { KALSHI_API_BALANCE = v; }],
+predict: [() => PREDICT_API_BALANCE, v => { PREDICT_API_BALANCE = v; }],
+sxbet: [() => SXBET_API_BALANCE, v => { SXBET_API_BALANCE = v; }]
+};
+function lerSaldosSalvos() {
+try {
+const o = JSON.parse(localStorage.getItem(SALDOS_SALVOS_KEY) || "null");
+return o && typeof o === "object" ? o : {};
+} catch (_) { return {}; }
+}
+function salvarSaldosLocais() {
+const anteriores = lerSaldosSalvos(), saldos = {};
+for (const [casa, [ler]] of Object.entries(VARIAVEIS_SALDO)) {
+if (!BETTY_CONNECTIONS?.[casa]) continue;
+const valor = ler();
+// Um saldo que ainda é o salvo (a consulta desta vez falhou) mantém a data dele.
+if (saldosDosDadosSalvos.has(casa)) { if (anteriores[casa]) saldos[casa] = anteriores[casa]; }
+else if (Number.isFinite(valor)) saldos[casa] = { v: valor, t: Date.now() };
+}
+try { localStorage.setItem(SALDOS_SALVOS_KEY, JSON.stringify(saldos)); } catch (_) {}
+}
+let saldosSalvosDaAbertura = {};
 function lerCacheDatas() {
 try {
 const raw = localStorage.getItem(DATE_CACHE_KEY);
@@ -716,10 +743,35 @@ if (versao !== versaoIndiceHistorico) return false;
 historicoIndiceEmSincronizacao = false;
 return true;
 }
+// Abertura com dados salvos: as telas mostram logo o último estado gravado (o
+// índice no SQLite e as posições e saldos do cache local), com o selo
+// "Atualizando" no topo, até a sincronização com as casas confirmar tudo.
+// Nesse período as leituras do histórico saem de um estado salvo congelado no
+// backend (`/api/history/snapshot`, `snapshot=1`): mesmo com a sincronização
+// gravando o índice em lotes, nenhuma tela vê uma leitura pela metade.
+let exibindoDadosSalvos = false;
+let indiceSalvoDisponivel = false;
+let dadosSalvosEm = 0;
+const saldosDosDadosSalvos = new Set();
+const VERSAO_DADOS_SALVOS = -1;
+function versaoLeituraHistorico() {
+return exibindoDadosSalvos ? VERSAO_DADOS_SALVOS : versaoIndiceHistorico;
+}
+function indiceDisponivel() {
+return exibindoDadosSalvos ? indiceSalvoDisponivel : historicoFechadoIndexado;
+}
+function indiceHistoricoLegivel() {
+return exibindoDadosSalvos ? indiceSalvoDisponivel : historicoFechadoIndexado && !historicoIndiceEmSincronizacao;
+}
+function urlLeituraHistorico(url) {
+return exibindoDadosSalvos ? url + (url.includes("?") ? "&" : "?") + "snapshot=1" : url;
+}
 function leituraHistoricoAindaAtual(versao) {
+if (versao === VERSAO_DADOS_SALVOS) return exibindoDadosSalvos;
 return !historicoIndiceEmSincronizacao && versao === versaoIndiceHistorico;
 }
 function resumoHistoricoPodeSerPublicado(versao) {
+if (versao === VERSAO_DADOS_SALVOS) return exibindoDadosSalvos && indiceSalvoDisponivel;
 return historicoFechadoIndexado && leituraHistoricoAindaAtual(versao);
 }
 // O cache do navegador existe apenas para a tabela abrir rápido. Ele pode ser
@@ -727,6 +779,7 @@ return historicoFechadoIndexado && leituraHistoricoAindaAtual(versao);
 // e gráficos só podem ser calculados depois que o snapshot vivo e o índice
 // SQLite representarem a mesma versão confirmada do histórico.
 function dadosFinanceirosConfirmados() {
+if (exibindoDadosSalvos) return true;
 return snapshotAoVivoConfirmado && resumoHistoricoPodeSerPublicado(versaoIndiceHistorico);
 }
 let consultaHistoricoFechadoGeracao = 0;
@@ -821,6 +874,7 @@ atualizarFiltroEsportePosicoes();
 // Primeiro usamos o snapshot normal. Se ele estiver vazio (por exemplo,
 // porque uma resposta temporária da API foi gravada antes de um reload),
 // recuperamos o último snapshot não vazio conhecido.
+saldosSalvosDaAbertura = lerSaldosSalvos();
 const cacheNormal = lerCacheLocal(true);
 const cache = (cacheNormal && ((cacheNormal.abertos || []).length || (cacheNormal.fechados || []).length))
 ? cacheNormal
@@ -841,7 +895,10 @@ fechados = [];
 }
 snapshotAoVivoConfirmado = false;
 // Sem casas conectadas, a conta começa vazia e não consulta nenhuma API.
-if (casasConectadas().length || BETTY_CONNECTIONS?.trackedHistory) carregarAba("aberto", { forcar: true });
+if (casasConectadas().length || BETTY_CONNECTIONS?.trackedHistory) {
+await abrirComDadosSalvos();
+carregarAba("aberto", { forcar: true });
+}
 else {
 liberarNavegacaoInicial();
 document.getElementById('syncProgress').hidden = true;
@@ -1377,6 +1434,9 @@ posAtualizarDados();
 }
 }
 function limparCachesBetty(){
+// Conta ou conexão mudou: o estado salvo deixa de representar o que está conectado.
+encerrarDadosSalvos();
+try { localStorage.removeItem(SALDOS_SALVOS_KEY); } catch (_) {}
 paginasHistoricoPosicoes.clear();
 escopoPaginasHistoricoPosicoes = '';
 try{
@@ -2135,6 +2195,12 @@ const box = document.getElementById('syncProgress');
 if (!box) return;
 clearTimeout(syncProgressHideTimer);
 if (syncProgressInitialGeneration === null) syncProgressInitialGeneration = generation;
+// Com dados salvos na tela, o selo do topo faz o papel da barra.
+if (exibindoDadosSalvos) {
+box.hidden = true;
+atualizarSeloDadosSalvos(detalhe, resultado);
+return;
+}
 // A barra pertence somente à primeira carga desta abertura, inclusive se ela falhar.
 if (generation !== syncProgressInitialGeneration) {
 box.hidden = true;
@@ -2164,6 +2230,78 @@ box.hidden = true;
 if (resultado) syncProgressHideTimer = setTimeout(() => {
 if (syncProgressGeneration === generation && generation === refreshGeneration) box.hidden = true;
 }, resultado === 'ok' ? 1500 : 5000);
+}
+// Abre direto com o último estado gravado, quando existe: o índice do histórico
+// e as posições e saldos do cache local. O estado salvo do histórico é
+// congelado no backend ANTES de a sincronização começar a gravar.
+async function abrirComDadosSalvos() {
+let status = null;
+try {
+const res = await fetch('/api/history/closed/index/status', { cache: 'no-store' });
+status = res.ok ? await res.json() : null;
+} catch (_) {}
+const temHistorico = Number(status?.indexed) > 0;
+if (!temHistorico && !abertos.length) return false;
+try {
+const res = await fetch('/api/history/snapshot', { method: 'POST', cache: 'no-store' });
+if (!res.ok) return false;
+} catch (_) { return false; }
+exibindoDadosSalvos = true;
+indiceSalvoDisponivel = temHistorico;
+for (const [casa, [ler, gravar]] of Object.entries(VARIAVEIS_SALDO)) {
+const salvo = saldosSalvosDaAbertura[casa];
+if (!BETTY_CONNECTIONS?.[casa] || ler() != null || !Number.isFinite(Number(salvo?.v))) continue;
+gravar(Number(salvo.v));
+saldosDosDadosSalvos.add(casa);
+}
+dadosSalvosEm = Math.max(Number(ultimoFetchTs) || 0, ...Object.values(saldosSalvosDaAbertura).map(s => Number(s?.t) || 0));
+atualizarSeloDadosSalvos('');
+document.getElementById('syncProgress').hidden = true;
+liberarNavegacaoInicial();
+atualizarSaldosFixos();
+posAtualizarDados();
+return true;
+}
+// Volta às leituras normais: a sincronização confirmou os dados (ou a conta
+// mudou). Saldos que não foram reconfirmados voltam a ficar sem valor.
+function encerrarDadosSalvos() {
+if (!exibindoDadosSalvos) return;
+exibindoDadosSalvos = false;
+indiceSalvoDisponivel = false;
+for (const casa of saldosDosDadosSalvos) VARIAVEIS_SALDO[casa]?.[1](null);
+saldosDosDadosSalvos.clear();
+// As leituras feitas no estado salvo não servem para o estado confirmado.
+resumoDashboardDb = null; resumoDashboardDbChave = "";
+resumoPeriodoDash = null;
+resumoEstatDb = null; resumoEstatDbChave = "";
+pnlHistoricoDb = null;
+paginasHistoricoPosicoes.clear();
+const selo = document.getElementById('seloDadosSalvos');
+if (selo) selo.hidden = true;
+fetch('/api/history/snapshot', { method: 'DELETE', cache: 'no-store' }).catch(() => {});
+atualizarSaldosFixos();
+}
+function horaDadosSalvos() {
+if (!dadosSalvosEm) return '';
+const quando = new Date(dadosSalvosEm);
+const hora = quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+if (ymdBrasil(quando) === ymdBrasil(new Date())) return hora;
+return quando.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ', ' + hora;
+}
+function atualizarSeloDadosSalvos(detalhe, resultado = '') {
+const selo = document.getElementById('seloDadosSalvos');
+if (!selo) return;
+if (resultado === 'ok') { selo.hidden = true; return; }
+const hora = horaDadosSalvos();
+const falhou = resultado === 'warning';
+selo.hidden = false;
+selo.classList.toggle('aviso', falhou);
+document.getElementById('seloDadosSalvosTexto').textContent = falhou
+? (hora ? `Dados salvos de ${hora} · não foi possível atualizar` : 'Dados salvos · não foi possível atualizar')
+: (hora ? `Atualizando · dados de ${hora}` : 'Atualizando · dados salvos');
+selo.title = falhou
+? 'Os números são os últimos salvos. Use Atualizar agora para tentar de novo.'
+: (detalhe || 'Os números são os últimos salvos e serão trocados pelos confirmados ao fim da atualização.');
 }
 async function carregarAba(aba, opcoes = {}) {
 if (carregandoAba && !opcoes.forcar) return;
@@ -2268,6 +2406,7 @@ if (generation !== refreshGeneration) return;
 // Não substituímos um valor confirmado por cálculo baseado no histórico.
 if (polyBalanceResult.ok && Number.isFinite(polyBalanceResult.value)) {
 POLY_API_BALANCE = polyBalanceResult.value;
+saldosDosDadosSalvos.delete("polymarket");
 } else if (!BETTY_CONNECTIONS?.polymarket) {
 POLY_API_BALANCE = null;
 }
@@ -2275,13 +2414,15 @@ POLY_API_BALANCE = null;
 // Se a chamada falhar, preservamos o último valor confirmado.
 if (kalshiBalanceResult.ok && Number.isFinite(kalshiBalanceResult.value)) {
 KALSHI_API_BALANCE = kalshiBalanceResult.value;
+saldosDosDadosSalvos.delete("kalshi");
 } else if (!BETTY_CONNECTIONS?.kalshi) {
 KALSHI_API_BALANCE = null;
 }
-if (predictBalanceResult.ok) PREDICT_API_BALANCE = predictBalanceResult.value;
+if (predictBalanceResult.ok) { PREDICT_API_BALANCE = predictBalanceResult.value; saldosDosDadosSalvos.delete("predict"); }
 saldoPredictFalhou = !predictBalanceResult.ok;
-if (sxBetBalance !== null || !BETTY_CONNECTIONS?.sxbet) SXBET_API_BALANCE = sxBetBalance;
+if (sxBetBalance !== null || !BETTY_CONNECTIONS?.sxbet) { SXBET_API_BALANCE = sxBetBalance; saldosDosDadosSalvos.delete("sxbet"); }
 atualizarSaldosFixos();
+salvarSaldosLocais();
 if (generation !== refreshGeneration) return;
 const polyOpen = polyOpenResult.ok ? polyOpenResult.value : prev.polyOpen;
 const kalshiOpen = kalshiOpenResult.ok ? kalshiOpenResult.value : prev.kalshiOpen;
@@ -2431,6 +2572,10 @@ carregado.aberto = polyOpenResult.ok || kalshiOpenResult.ok || recebeuNovaCasa |
 carregado.fechado = polyClosedResult.ok || kalshiClosedResult.ok || recebeuNovaCasa || carregado.fechado;
 salvarCacheLocal();
 atualizarProgressoSync(generation, 3, 'Atualizando as telas com os dados recebidos…');
+// As telas só saem dos dados salvos quando o snapshot vivo e o índice foram
+// confirmados e a Polymarket e a Kalshi responderam. Se uma delas falhou, o
+// selo avisa e os saldos salvos continuam na tela até a próxima atualização.
+if (exibindoDadosSalvos && snapshotAoVivoConfirmado && historicoFechadoIndexado && polyOk && kalshiOk) encerrarDadosSalvos();
 posAtualizarDados();
 atualizarStatusOnline(polyOk && kalshiOk && novasCasasOk);
 const syncCompleta = polyOk && kalshiOk && historicoFechadoIndexado && novasCasasOk;
@@ -2447,7 +2592,7 @@ atualizarStatusOnline(false);
 // Mesmo sem um snapshot fechado em memória, o histórico já indexado continua
 // disponível no SQLite. Uma falha externa não pode substituir essa tabela por
 // uma tela de erro nem apagar o que o usuário acabou de consultar.
-if (historicoFechadoIndexado || abertos.length || fechados.length) {
+if (exibindoDadosSalvos || historicoFechadoIndexado || abertos.length || fechados.length) {
 posAtualizarDados();
 } else {
 const stale = lerCacheLocal(true);
@@ -3087,7 +3232,9 @@ if (!BETTY_CONNECTIONS?.polymarket) return [];
 // A API permite até 100.000 de offset. Pagina até o fim para não perder histórico antigo.
 let todas = [];
 let offset = 0;
-const limit = 50;
+// O backend já lê o histórico inteiro da Polymarket e só fatia a lista em
+// memória (aceita até 1.000 por página): 500 evita dezenas de idas e voltas.
+const limit = 500;
 while (true) {
 const url = new URL(POLY_API + "/closed-positions", window.location.origin);
 url.searchParams.set("limit", limit);
@@ -4114,12 +4261,12 @@ const dt = new Date(Date.UTC(y, m - 1, dd + Number(daysFromToday || 0)));
 return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 async function carregarResumoDashboardDb() {
-if (!historicoFechadoIndexado || historicoIndiceEmSincronizacao) return null;
+if (!indiceHistoricoLegivel()) return null;
 const chave = chavePeriodoFechadasConfigurado();
 if (resumoDashboardDb && resumoDashboardDbChave === chave) return resumoDashboardDb;
-const versao = versaoIndiceHistorico;
+const versao = versaoLeituraHistorico();
 if (resumoDashboardDbEmAndamento?.chave === chave && resumoDashboardDbEmAndamento.versao === versao) return resumoDashboardDbEmAndamento.promise;
-const promise = fetch('/api/history/closed/stats', { cache: 'no-store' })
+const promise = fetch(urlLeituraHistorico('/api/history/closed/stats'), { cache: 'no-store' })
 .then(r => { if (!r.ok) throw new Error('resumo HTTP ' + r.status); return r.json(); })
 .then(data => {
 if (!data?.ok) throw new Error('resumo inválido');
@@ -4137,14 +4284,14 @@ resumoDashboardDbEmAndamento = { chave, versao, promise };
 return promise;
 }
 async function carregarResumoPeriodoDash() {
-if (!historicoFechadoIndexado || historicoIndiceEmSincronizacao) return null;
+if (!indiceHistoricoLegivel()) return null;
 const start = ymdOffset(-6), end = ymdBrasil(new Date());
 const chave = [start, end, chavePeriodoFechadasConfigurado()].join("|");
 if (resumoPeriodoDash?.chave === chave) return resumoPeriodoDash.data;
-const versao = versaoIndiceHistorico;
+const versao = versaoLeituraHistorico();
 if (resumoPeriodoDashEmAndamento?.chave === chave && resumoPeriodoDashEmAndamento.versao === versao) return resumoPeriodoDashEmAndamento.promise;
 const params = new URLSearchParams({ start, end, includePrevious: "1" });
-const promise = fetch('/api/history/closed/stats?' + params.toString(), { cache: 'no-store' })
+const promise = fetch(urlLeituraHistorico('/api/history/closed/stats?' + params.toString()), { cache: 'no-store' })
 .then(r => { if (!r.ok) throw new Error('período HTTP ' + r.status); return r.json(); })
 .then(data => {
 if (!data?.ok) throw new Error('período inválido');
@@ -4179,7 +4326,7 @@ if (!dadosFinanceirosConfirmados()) {
 if (pintar) renderizarDashboardSincronizandoHistorico();
 return;
 }
-const versaoHistorico = versaoIndiceHistorico;
+const versaoHistorico = versaoLeituraHistorico();
 if (pintar) atualizarSaldosFixos();
 const abertosF = filtrarExcluidos(Array.isArray(abertos) ? abertos : []);
 const [resumoDb, periodoDb] = await Promise.all([carregarResumoDashboardDb(), carregarResumoPeriodoDash()]);
@@ -4421,7 +4568,7 @@ const paginasHistoricoPosicoes = new Map();
 let escopoPaginasHistoricoPosicoes = '';
 let preparoPaginaFechadasTimer = null;
 function escopoConsultaPosicoes() {
-return JSON.stringify([BETTY_USER?.id || 'local',refreshGeneration,versaoIndiceHistorico,chavePeriodoFechadasConfigurado()]);
+return JSON.stringify([BETTY_USER?.id || 'local',exibindoDadosSalvos ? 'salvos' : refreshGeneration,versaoLeituraHistorico(),chavePeriodoFechadasConfigurado()]);
 }
 function agendarPreparoNavegacao() {
 const previous=agendarPreparoNavegacao.handle;
@@ -4465,7 +4612,7 @@ return existente.promise;
 }
 const entrada = {bytes:0};
 entrada.promise = (async()=>{
-const res = await fetch('/api/history/closed/query?' + params.toString(), { cache: 'no-store' });
+const res = await fetch(urlLeituraHistorico('/api/history/closed/query?' + params.toString()), { cache: 'no-store' });
 if (!res.ok) throw new Error('histórico HTTP ' + res.status);
 const data = await res.json();
 if (!data?.ok || !Array.isArray(data.fechados)) throw new Error('histórico inválido');
@@ -4517,9 +4664,9 @@ consultarPaginaFechadas(vizinha).catch(()=>{});
 },80);
 }
 async function aplicarFiltrosHistoricoFechadoDb(opcoes = {}) {
-if (historicoIndiceEmSincronizacao) return;
+if (historicoIndiceEmSincronizacao && !exibindoDadosSalvos) return;
 const geracao = ++consultaHistoricoFechadoGeracao;
-const versao = versaoIndiceHistorico;
+const versao = versaoLeituraHistorico();
 const escopo = escopoConsultaPosicoes();
 try {
 const data = await consultarPaginaFechadas(parametrosConsultaFechadas());
@@ -4538,6 +4685,8 @@ if (geracao !== consultaHistoricoFechadoGeracao || abaAtual !== "fechado" || esc
 // Enquanto o índice é criado ou se a consulta local falhar, preservamos o
 // comportamento anterior e nunca mostramos uma tabela vazia por engano.
 console.warn('Consulta paginada do histórico indisponível:', e);
+// Os dados salvos continuam valendo; a tabela fica como está.
+if (exibindoDadosSalvos) return;
 historicoFechadoIndexado = false;
 aplicarFiltrosFrontend(opcoes);
 }
@@ -4564,8 +4713,8 @@ prepararPrimeiraPaginaFechadas();
 }
 function aplicarFiltros(opcoes = {}) {
 if (abaAtual === "ao-vivo") return renderAoVivo(opcoes);
-if (abaAtual === "fechado" && historicoIndiceEmSincronizacao) return;
-if (abaAtual === "fechado" && historicoFechadoIndexado) return aplicarFiltrosHistoricoFechadoDb(opcoes);
+if (abaAtual === "fechado" && historicoIndiceEmSincronizacao && !exibindoDadosSalvos) return;
+if (abaAtual === "fechado" && indiceDisponivel()) return aplicarFiltrosHistoricoFechadoDb(opcoes);
 return aplicarFiltrosFrontend(opcoes);
 }
 // Digitar na busca chama aplicarFiltros() a cada tecla; com muitas posições
@@ -4967,17 +5116,17 @@ const endKey = period === "stats" ? (dataFimEstat || "") : "";
 return { mode, period, startTs: intervalo?.inicio || 0, endTs: intervalo?.fim || 0, key: [mode, period, casaGraficoAtual, startKey, endKey, chavePeriodoFechadasConfigurado()].join("|") };
 }
 async function carregarPnlHistoricoDb() {
-if (!historicoFechadoIndexado || historicoIndiceEmSincronizacao) return null;
+if (!indiceHistoricoLegivel()) return null;
 const cfg = chavePnlHistoricoDb();
 const scope=escopoConsultaPosicoes();
 const cache=carregarPnlHistoricoDb.cache ||= {scope:'',entries:new Map(),pending:new Map(),bytes:0};
 if(cache.scope!==scope){cache.scope=scope;cache.entries.clear();cache.pending.clear();cache.bytes=0;pnlHistoricoDb=null;}
 const hit=cache.entries.get(cfg.key);
 if(hit){cache.entries.delete(cfg.key);cache.entries.set(cfg.key,hit);pnlHistoricoDb=hit;pnlHistoricoDbEmAndamento=null;return hit.serie;}
-const versao = versaoIndiceHistorico;
+const versao = versaoLeituraHistorico();
 if(cache.pending.has(cfg.key)){pnlHistoricoDbEmAndamento=cache.pending.get(cfg.key);return pnlHistoricoDbEmAndamento.promise;}
 const params = new URLSearchParams({ mode: cfg.mode, period: cfg.period, platform: casaGraficoAtual, now: String(Date.now()), startTs: String(cfg.startTs), endTs: String(cfg.endTs) });
-const promise = fetch('/api/history/closed/pnl?' + params.toString(), { cache: 'no-store' })
+const promise = fetch(urlLeituraHistorico('/api/history/closed/pnl?' + params.toString()), { cache: 'no-store' })
 .then(r => { if (!r.ok) throw new Error('PnL HTTP ' + r.status); return r.json(); })
 .then(data => {
 if (!data?.ok || !Array.isArray(data.serie)) throw new Error('PnL inválido');
@@ -4998,7 +5147,7 @@ return promise;
 }
 function historicoPnlAcumulado(periodoDias) {
 const cfg = chavePnlHistoricoDb();
-if (historicoFechadoIndexado && cfg.mode === "accumulated" && pnlHistoricoDb?.key === cfg.key) return pnlHistoricoDb.serie;
+if (indiceDisponivel() && cfg.mode === "accumulated" && pnlHistoricoDb?.key === cfg.key) return pnlHistoricoDb.serie;
 // Série pura de resultado: começa em zero e acumula somente o PnL realizado
 // na data de realização. Depósitos, saldo atual e stake aberto não participam.
 const eventos = fechadosDoGrafico()
@@ -5153,9 +5302,9 @@ if (area && !area.querySelector("svg")) area.innerHTML = '<div class="chart-empt
 }
 return;
 }
-const versaoHistorico = versaoIndiceHistorico;
+const versaoHistorico = versaoLeituraHistorico();
 atualizarControlePeriodoEstatGrafico(pintar);
-if (historicoFechadoIndexado) {
+if (indiceDisponivel()) {
 const chave = chavePnlHistoricoDb().key;
 if (pnlHistoricoDb?.key !== chave) {
 carregarPnlHistoricoDb().then(() => {
@@ -6055,15 +6204,15 @@ ganhoStake: Number(dados.ganhoStake) || 0, perdaStake: Number(dados.perdaStake) 
 };
 }
 function resumoEstatDbAtual() {
-return historicoFechadoIndexado && resumoEstatDb && resumoEstatDbChave === chaveResumoEstatDb() ? resumoEstatDb : null;
+return indiceDisponivel() && resumoEstatDb && resumoEstatDbChave === chaveResumoEstatDb() ? resumoEstatDb : null;
 }
 async function carregarResumoEstatDb(opcoes = {}) {
-if (!historicoFechadoIndexado || historicoIndiceEmSincronizacao) return null;
+if (!indiceHistoricoLegivel()) return null;
 const chave = chaveResumoEstatDb();
 const incluirMercados = opcoes.incluirMercados || subAbaEstat === "mercado";
 const incluirResumo = subAbaEstat === "resumo";
 if (resumoEstatDb && resumoEstatDbChave === chave && (!incluirMercados || Array.isArray(resumoEstatDb.porMercado)) && (!incluirResumo || Array.isArray(resumoEstatDb.segmentos))) return resumoEstatDb;
-const versao = versaoIndiceHistorico;
+const versao = versaoLeituraHistorico();
 if (resumoEstatDbEmAndamento?.chave === chave && resumoEstatDbEmAndamento.versao === versao) {
 const pending = resumoEstatDbEmAndamento;
 const data = await pending.promise;
@@ -6082,7 +6231,7 @@ oddsRange: filtroOddsEstat || "todas",
 start: dataInicioEstat || "",
 end: dataFimEstat || ""
 });
-const promise = fetch('/api/history/closed/stats?' + params.toString(), { cache: 'no-store' })
+const promise = fetch(urlLeituraHistorico('/api/history/closed/stats?' + params.toString()), { cache: 'no-store' })
 .then(r => { if (!r.ok) throw new Error('estatísticas HTTP ' + r.status); return r.json(); })
 .then(data => {
 if (!data?.ok) throw new Error('estatísticas inválidas');
@@ -6210,7 +6359,7 @@ const subContent = document.getElementById("statsSubContent");
 if (subAbaEstat === "site" && subContent && !subContent.hasChildNodes()) subContent.innerHTML = renderPorSite(null, "Aguardando histórico");
 return;
 }
-const versaoHistorico = versaoIndiceHistorico;
+const versaoHistorico = versaoLeituraHistorico();
 sincronizarPeriodoEstatisticas();
 atualizarFiltroEsporteUI();
 const chaveDb = chaveResumoEstatDb();
@@ -6778,7 +6927,7 @@ if (tooltip) tooltip.style.display = "none";
 // ===== PnL por Dia (gráfico de barras) =====
 function bucketsPnlPorDia(periodoDias) {
 const cfgDb = chavePnlHistoricoDb();
-if (historicoFechadoIndexado && cfgDb.mode === "day" && pnlHistoricoDb?.key === cfgDb.key) return pnlHistoricoDb.serie;
+if (indiceDisponivel() && cfgDb.mode === "day" && pnlHistoricoDb?.key === cfgDb.key) return pnlHistoricoDb.serie;
 const agora = new Date();
 const quantidadeDias = Number.isInteger(periodoDias) && periodoDias > 0 ? periodoDias : 30;
 // Monta exatamente os últimos N dias civis, incluindo hoje, no horário de
@@ -6960,7 +7109,7 @@ return ymBrasil.formato.format(dt); // YYYY-MM
 }
 function bucketsPnlPorMes() {
 const cfgDb = chavePnlHistoricoDb();
-if (historicoFechadoIndexado && cfgDb.mode === "month" && pnlHistoricoDb?.key === cfgDb.key) return pnlHistoricoDb.serie;
+if (indiceDisponivel() && cfgDb.mode === "month" && pnlHistoricoDb?.key === cfgDb.key) return pnlHistoricoDb.serie;
 const soma = {};
 fechadosDoGrafico().forEach(d => {
 const ts = getTsResultadoPnL(d);
@@ -7210,7 +7359,8 @@ carregarAba(abaDados, { forcar: true });
 }
 function posAtualizarDados() {
 const positionBadge=document.getElementById('sidebarPositionCount');
-if (positionBadge) { positionBadge.hidden=!snapshotAoVivoConfirmado; positionBadge.textContent=String(abertos.length); }
+// Nos dados salvos, lista vazia pode ser só falta de cache: o zero espera a confirmação.
+if (positionBadge) { positionBadge.hidden=!(snapshotAoVivoConfirmado || (exibindoDadosSalvos && abertos.length)); positionBadge.textContent=String(abertos.length); }
 if (viewAtual === "calendario") renderProfitCalendar();
 atualizarFiltroEsportePosicoes();
 // Ao vivo é apenas uma visualização derivada das posições.
@@ -7451,12 +7601,12 @@ ${casas.length ? `<div class="pbar">${barra}</div><div class="kpi-legenda">${leg
 // Séries diárias dos últimos 30 dias (todas as casas e cada casa) para os mini gráficos.
 let seriesVisao = { chave: "", dados: new Map(), pendente: null };
 function carregarSeriesVisao() {
-  if (!historicoFechadoIndexado || historicoIndiceEmSincronizacao) return Promise.resolve(false);
+  if (!indiceHistoricoLegivel()) return Promise.resolve(false);
   const casas = casasConectadas();
-  const chave = [versaoIndiceHistorico, ymdBrasil(new Date()), chavePeriodoFechadasConfigurado(), casas.join(",")].join("|");
+  const chave = [versaoLeituraHistorico(), ymdBrasil(new Date()), chavePeriodoFechadasConfigurado(), casas.join(",")].join("|");
   if (seriesVisao.chave === chave) return Promise.resolve(true);
   if (seriesVisao.pendente?.chave === chave) return seriesVisao.pendente.promise;
-  const buscar = casa => fetch("/api/history/closed/pnl?" + new URLSearchParams({ mode: "day", period: "30", platform: casa, now: String(Date.now()) }), { cache: "no-store" })
+  const buscar = casa => fetch(urlLeituraHistorico("/api/history/closed/pnl?" + new URLSearchParams({ mode: "day", period: "30", platform: casa, now: String(Date.now()) })), { cache: "no-store" })
     .then(r => r.ok ? r.json() : null)
     .then(j => [casa, Array.isArray(j?.serie) ? j.serie.map(p => Number(p.v) || 0) : []])
     .catch(() => [casa, []]);
