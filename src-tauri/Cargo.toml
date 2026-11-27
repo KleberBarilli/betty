@@ -1,6 +1,6 @@
 [package]
 name = "mybettys"
-version = "0.1.0"
+version = "2.0.0"
 description = "MyBettys: acompanhamento de apostas na Polymarket, Kalshi, Predict.fun e SX Bet"
 authors = ["Kleber Barilli"]
 edition = "2024"
