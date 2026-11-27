@@ -4786,24 +4786,38 @@ if (carregandoAba && !snapshotAoVivoConfirmado) {
 content.innerHTML = `
 <table${classeTabelaAtual()}>
 ${montarThead()}
-<tbody><tr><td colspan="${cols}" style="text-align:center;padding:36px 16px;color:var(--muted);height:auto;white-space:normal;">Carregando posições...</td></tr></tbody>
+<tbody><tr class="linha-vazia"><td colspan="${cols}"><div class="estado-vazio carregando"><span class="giro" aria-hidden="true"></span><span>Carregando posições…</span></div></td></tr></tbody>
 </table>`;
 return;
 }
-let msg = "Nenhuma posição encontrada.";
+const termoBusca = (document.getElementById("filtroTitulo")?.value || "").trim();
+const comFiltro = Boolean(termoBusca || filtroDataDia || filtroCasaAtual !== "todas" || filtroEsportePosicoesAtual !== "todos");
+let titulo, texto, acao = "";
 if (filtroDataDia) {
 const [yy, mm, dd] = filtroDataDia.split("-");
-msg = "Nenhuma aposta em " + dd + "/" + mm + "/" + yy + ".";
+titulo = "Nenhuma aposta em " + dd + "/" + mm + "/" + yy;
+texto = "Escolha outro dia ou veja o período inteiro.";
+acao = '<button type="button" class="btn" data-on-click="limparFiltroData()">Limpar data</button>';
+} else if (comFiltro) {
+titulo = "Nada encontrado com estes filtros";
+texto = termoBusca ? "Nenhuma posição corresponde a \u201c" + escapeHtml(termoBusca) + "\u201d." : "Ajuste a casa ou o esporte.";
+acao = '<button type="button" class="btn" data-on-click="limparBuscaEFiltros()">Limpar filtros</button>';
+} else if (abaAtual === "fechado") {
+titulo = "Nenhuma aposta fechada ainda";
+texto = "As apostas aparecem aqui quando são vendidas ou resolvidas.";
+} else if (abaAtual === "ao-vivo") {
+titulo = "Nenhum jogo ao vivo agora";
+texto = "As posições em jogos que já começaram aparecem aqui.";
+} else {
+titulo = "Nenhuma posição em aberto";
+texto = "Suas apostas em aberto nas casas conectadas aparecem aqui.";
 }
 content.innerHTML = `
 <table${classeTabelaAtual()}>
 ${montarThead()}
 <tbody>
-<tr>
-<td colspan="${cols}" style="text-align:center;padding:36px 16px;color:var(--muted);height:auto;white-space:normal;">
-${msg}
-${filtroDataDia ? '<br><button type="button" data-on-click="limparFiltroData()" style="margin-top:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;">Limpar data</button>' : ""}
-</td>
+<tr class="linha-vazia">
+<td colspan="${cols}"><div class="estado-vazio"><b>${titulo}</b><span>${texto}</span>${acao}</div></td>
 </tr>
 </tbody>
 </table>`;
@@ -7518,4 +7532,11 @@ function linhaGrupoCasa(d, casaAnterior, cols) {
   const pnl = semValor ? "—" : `${g.pnl >= 0 ? "+" : "-"}$${Math.abs(g.pnl).toFixed(2)}`;
   const classe = semValor ? "" : g.pnl > 0 ? "pnl-positive" : g.pnl < 0 ? "pnl-negative" : "";
   return `<tr class="grupo-casa"><td colspan="${cols}"><div class="grupo-casa-linha"><img class="casa-logo" src="/assets/platforms/${casa}.png" alt=""><strong>${escapeHtml(nome)}</strong><span class="grupo-casa-meta">${g.n} ${g.n === 1 ? "aberta" : "abertas"}</span><span class="grupo-casa-tot">Stake <b>$${g.stake.toFixed(2)}</b> · PnL <b class="${classe}">${pnl}</b></span></div></td></tr>`;
+}
+
+// Estado vazio das tabelas: limpa a busca e todos os filtros de uma vez.
+function limparBuscaEFiltros() {
+  const busca = document.getElementById("filtroTitulo");
+  if (busca) busca.value = "";
+  resetarFiltrosTabela({ renderizar: true });
 }
