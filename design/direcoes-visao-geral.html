@@ -1,0 +1,290 @@
+<title>Direções da Visão geral</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a mesma Visão geral do app, três vezes, mudando só o que acontece
+   abaixo do gráfico. Tokens copiados da paleta Grafite do MyBettys. */
+:root {
+  color-scheme: dark;
+  --bg: #08080a;
+  --card: #131316;
+  --card-2: #1b1b20;
+  --border: #2b2b33;
+  --border-soft: #1e1e24;
+  --text: #f4f4f6;
+  --muted: #a8a8b4;
+  --muted-2: #878792;
+  --accent: #9785ff;
+  --accent-soft: rgba(151, 133, 255, 0.16);
+  --pos: #3ddc84;
+  --pos-soft: rgba(61, 220, 132, 0.15);
+  --danger: #ff6369;
+  --danger-soft: rgba(255, 99, 105, 0.15);
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.4;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.pagina { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+/* Seletor de direção */
+.seletor { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+.abas { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.abas button {
+  min-height: 34px; padding: 0 14px; border: 0; border-radius: 7px; background: none;
+  color: var(--muted); font: inherit; font-weight: 600; cursor: pointer;
+}
+.abas button:hover { color: var(--text); }
+.abas button[aria-selected="true"] { background: var(--accent); color: #0c0920; }
+.abas button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nota { flex: 1 1 320px; min-width: 0; margin: 0; color: var(--muted); font-size: 0.86rem; max-width: 70ch; }
+.nota b { color: var(--text); font-weight: 650; }
+
+/* Peças comuns */
+.titulo-pagina { margin: 0; font: 700 1.45rem/1.2 var(--font-display); letter-spacing: -0.02em; }
+.sub-pagina { margin: 2px 0 0; color: var(--muted); font-size: 0.8rem; }
+.mock { display: flex; flex-direction: column; gap: 16px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
+.k { color: var(--muted-2); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.sm { font-size: 0.76rem; }
+.mu { color: var(--muted); }
+.pos { color: var(--pos); }
+.neg { color: var(--danger); }
+.num { font-variant-numeric: tabular-nums; }
+.v { margin-top: 4px; font: 700 1.65rem/1.2 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.v2 { margin-top: 2px; font-size: 1.12rem; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; background: var(--card-2); color: var(--muted); font-size: 0.74rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip.pos { background: var(--pos-soft); color: var(--pos); }
+.chip.neg { background: var(--danger-soft); color: var(--danger); }
+.card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.link { color: var(--accent); font-size: 0.76rem; font-weight: 600; }
+.el { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.split { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
+.hero { flex: 3 1 560px; min-width: 0; display: flex; flex-direction: column; }
+.hero-topo { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; padding: 18px 20px 6px; }
+.hn { font: 700 2.6rem/1.1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 6px 0; }
+.hero-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hero-ctrl { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
+.seg span { padding: 5px 11px; border-radius: 6px; color: var(--muted); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.seg span.on { background: var(--card-2); color: var(--text); }
+.grafico { display: block; width: 100%; height: 300px; padding: 0 20px; }
+.hero-rodape { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 10px 20px; border-top: 1px solid var(--border-soft); color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+
+.casas { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.casa { padding: 12px 14px; }
+.casa-topo { display: flex; align-items: center; gap: 10px; }
+.logo { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: #fff; font-weight: 800; font-size: 0.86rem; }
+.casa-nome { flex: 1 1 auto; min-width: 0; }
+.casa-nome b { font-weight: 650; }
+.casa-valor { text-align: right; }
+.casa-valor .v2 { margin: 0; }
+.spark { display: block; width: 100%; height: 26px; margin-top: 8px; }
+.barras { flex: none; width: 150px; height: 44px; }
+.pbar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
+.pbar i { display: block; background: var(--accent); }
+.pbar i + i { opacity: 0.6; }
+.grupo-t { margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 0.95rem; font-weight: 700; }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 20px 48px; }
+.cols2 > div { min-width: 0; }
+
+/* Direção 1: faixa de números */
+.faixa { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 0; }
+.faixa > div { min-width: 0; padding: 2px 20px; border-left: 1px solid var(--border); }
+.faixa > div:first-child { padding-left: 0; border-left: 0; }
+.faixa .v2 { font-size: 1.3rem; margin-top: 4px; }
+.d1-linha { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border-soft); }
+.d1-linha:last-child { border-bottom: 0; }
+.d1-linha > div { min-width: 0; }
+.d1-linha .pbar { width: 100%; margin-top: 8px; }
+@media (max-width: 860px) {
+  .faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 0; }
+  .faixa > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+}
+
+/* Direção 2: painel único dividido */
+.painel { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--border-soft); display: grid; gap: 1px; }
+.painel .hero, .p-cel, .p-casa { background: var(--card); }
+.p-top { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr); gap: 1px; }
+.p-casas { display: grid; gap: 1px; grid-auto-rows: 1fr; }
+.p-casa { padding: 12px 16px; display: flex; flex-direction: column; justify-content: center; }
+.p-casa .spark { height: 18px; margin-top: 6px; }
+.p-row { display: grid; gap: 1px; }
+.p-row.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.p-row.cinco { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 2fr) minmax(0, 1.4fr); }
+.p-cel { min-width: 0; padding: 14px 18px; }
+.p-cel .topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.p-cel .linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.p-cel .pbar { margin-top: 10px; }
+@media (max-width: 900px) {
+  .p-top, .p-row.tres, .p-row.cinco { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Direção 3: extrato */
+.extrato dl { margin: 0; }
+.extrato .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.extrato .row:last-child { border-bottom: 0; }
+.extrato dt { min-width: 0; color: var(--muted); }
+.extrato dt small { display: block; color: var(--muted-2); font-size: 0.74rem; }
+.extrato dd { margin: 0; flex: none; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.extrato .row.forte dt { color: var(--text); font-weight: 650; }
+.extrato .row.forte dd { font-size: 1.25rem; letter-spacing: -0.01em; }
+.extrato .row.sub dt { padding-left: 14px; }
+.extrato .meio { flex: 1 1 80px; max-width: 170px; align-self: center; }
+.extrato .meio .barras { width: 100%; height: 28px; display: block; }
+.extrato dt.el { flex: 1 1 0; }
+</style>
+
+<div class="pagina">
+  <div class="seletor">
+    <div class="abas" role="tablist" aria-label="Direção de arte">
+      <button type="button" role="tab" id="aba1" data-d="1" aria-selected="true">1 · Faixa de números</button>
+      <button type="button" role="tab" id="aba2" data-d="2" aria-selected="false">2 · Painel único</button>
+      <button type="button" role="tab" id="aba3" data-d="3" aria-selected="false">3 · Extrato</button>
+    </div>
+    <p class="nota" id="nota"></p>
+  </div>
+  <div class="mock" id="mock" role="tabpanel"></div>
+</div>
+
+<script>
+const CASAS = [
+  { nome: "Polymarket", sigla: "P", cor: "#2d6bff", saldo: "$214.87", abertas: 14, risco: "$38.63", v7: "+$15.66", sinal: "pos", pts: "0,8 8,16 16,13 30,13 44,11 58,12 72,9 80,8 92,10 104,11 112,7 120,7" },
+  { nome: "Kalshi", sigla: "K", cor: "#0b8f6a", saldo: "$433.00", abertas: 14, risco: "$91.15", v7: "-$32.45", sinal: "neg", pts: "0,22 12,22 24,20 36,18 48,14 60,13 72,11 84,9 96,8 104,6 112,7 120,10" },
+  { nome: "Predict.fun", sigla: "P", cor: "#6c4df0", saldo: "$29.72", abertas: 0, risco: "$0.00", v7: "+$1.79", sinal: "pos", pts: "0,22 96,22 104,20 110,6 114,11 120,11" },
+  { nome: "SX Bet", sigla: "SX", cor: "#1c9bd6", saldo: "$20.88", abertas: 0, risco: "$0.00", v7: "+$10.88", sinal: "pos", pts: "0,22 108,22 112,14 116,12 120,4" }
+];
+const DIAS14 = [3, 9, 1, -1, 2, -1, 1, 10, 4, -12, 3, 4, -5, -14];
+
+const grafico = `<svg class="grafico" viewBox="0 0 1000 340" preserveAspectRatio="none" role="img" aria-label="PnL acumulado desde o início, terminando em -$134.49">
+<defs>
+<linearGradient id="traco" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#9785ff"/><stop offset="0.55" stop-color="#9785ff"/><stop offset="0.72" stop-color="#ff6369"/><stop offset="1" stop-color="#ff6369"/></linearGradient>
+<linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#9785ff" stop-opacity="0.2"/><stop offset="1" stop-color="#9785ff" stop-opacity="0"/></linearGradient>
+</defs>
+<path fill="url(#area)" d="M0,62 L28,88 L58,46 L78,52 L88,18 L118,30 L128,84 L158,78 L188,34 L250,28 L330,48 L420,50 L480,36 L530,24 L552,12 L566,150 L600,122 L630,120 L645,104 L665,118 L690,214 L702,218 L735,326 L750,290 L765,322 L785,290 L800,318 L830,292 L860,254 L890,222 L920,196 L945,188 L962,162 L978,180 L990,168 L1000,190 L1000,340 L0,340 Z"/>
+<path fill="none" stroke="url(#traco)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke" d="M0,62 L28,88 L58,46 L78,52 L88,18 L118,30 L128,84 L158,78 L188,34 L250,28 L330,48 L420,50 L480,36 L530,24 L552,12 L566,150 L600,122 L630,120 L645,104 L665,118 L690,214 L702,218 L735,326 L750,290 L765,322 L785,290 L800,318 L830,292 L860,254 L890,222 L920,196 L945,188 L962,162 L978,180 L990,168 L1000,190"/>
+</svg>`;
+
+function hero(moldura) {
+  return `<section class="hero${moldura ? " card" : ""}">
+<div class="hero-topo">
+<div><div class="k">Patrimônio acompanhado</div><div class="hn">$798.57</div>
+<div class="hero-chips"><span class="chip neg">▼ -$22.96 hoje</span><span class="chip neg">-$4.12 em 7 dias · antes +$30.07</span><span class="sm mu">Inclui Polymarket, Kalshi, Predict.fun</span></div></div>
+<div class="hero-ctrl" aria-hidden="true">
+<div class="seg"><span class="on">PnL Acumulado</span><span>PnL por Dia</span><span>PnL por Mês</span></div>
+<div class="seg"><span>7 dias</span><span>30 dias</span><span class="on">Tudo</span></div>
+</div>
+</div>
+${grafico}
+<div class="hero-rodape"><span>Evolução do PnL Acumulado</span><span>Período e casa escolhidos <b class="neg num">-$134.49</b></span></div>
+</section>`;
+}
+function spark(c) {
+  return `<svg class="spark" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="var(--${c.sinal === "pos" ? "pos" : "danger"})" stroke-width="1.5" vector-effect="non-scaling-stroke" points="${c.pts}"/></svg>`;
+}
+function casa(c, classe) {
+  return `<div class="${classe}"><div class="casa-topo"><span class="logo" style="background:${c.cor}">${c.sigla}</span>
+<div class="casa-nome"><b>${c.nome}</b><div class="sm mu">${c.abertas} abertas · ${c.risco} em risco</div></div>
+<div class="casa-valor"><div class="v2">${c.saldo}</div><div class="sm ${c.sinal} num">${c.v7} · 7d</div></div></div>${spark(c)}</div>`;
+}
+function barras() {
+  const max = Math.max(...DIAS14.map(Math.abs));
+  const rects = DIAS14.map((v, i) => {
+    const h = Math.max(2, Math.abs(v) / max * 28);
+    return `<rect x="${i * 16 + 2}" y="${v >= 0 ? 30 - h : 30}" width="10" height="${h}" rx="1.5" fill="var(--${v >= 0 ? "pos" : "danger"})"/>`;
+  }).join("");
+  return `<svg class="barras" viewBox="0 0 224 60" preserveAspectRatio="none" role="img" aria-label="Resultado por dia nos últimos 14 dias">${rects}</svg>`;
+}
+const pbar = `<div class="pbar" role="img" aria-label="Kalshi 70%, Polymarket 30%"><i style="width:70%"></i><i style="width:30%"></i></div>`;
+const topo = (moldura) => `<div><h1 class="titulo-pagina">Visão geral</h1><p class="sub-pagina">Resultados no horário de São Paulo</p></div>`;
+const MERCADO = "Club Atletico La Paz vs Atletico Morelia - Atletico Morelia Advances";
+
+const DIRECOES = {
+  1: {
+    nota: "<b>Faixa de números.</b> Gráfico e casas continuam como estão. Abaixo, os números principais numa linha sem moldura, e o resto em duas colunas com título.",
+    html: () => `${topo()}
+<div class="split">${hero(true)}<div class="casas">${CASAS.map(c => casa(c, "card casa")).join("")}</div></div>
+<div class="faixa">
+<div><div class="k">PnL realizado</div><div class="v2 neg">-$134.49</div></div>
+<div><div class="k">PnL não realizado</div><div class="v2 neg">-$8.81</div></div>
+<div><div class="k">Exposição</div><div class="v2">$129.78</div></div>
+<div><div class="k">ROI</div><div class="v2 neg">-0.96%</div></div>
+<div><div class="k">Taxa de acerto</div><div class="v2">73%</div></div>
+<div><div class="k">Odd média</div><div class="v2">1.63</div></div>
+</div>
+<div class="cols2">
+<div><h2 class="grupo-t">Resultado</h2>
+<div class="d1-linha"><div><div>Últimos 14 dias</div><div class="sm mu">4,232 apostas fechadas no total</div></div>${barras()}</div>
+<div class="d1-linha"><div><div>Stake média</div></div><b class="num">$3.30</b></div>
+<div class="d1-linha"><div><div>Posições com cotação</div><div class="sm mu">A SX Bet informa só a exposição</div></div><b class="num">28 de 28</b></div>
+</div>
+<div><h2 class="grupo-t">Risco</h2>
+<div class="d1-linha"><div style="flex:1"><div>28 posições abertas <span class="link" style="margin-left:8px">Ver posições</span></div>${pbar}<div class="sm mu" style="margin-top:6px">Kalshi 70% · Polymarket 30%</div></div></div>
+<div class="d1-linha"><div><div class="el">${MERCADO}</div><div class="sm mu">Maior exposição atual · 11.7% do total</div></div><b class="num">$15.15</b></div>
+<div class="d1-linha"><div><div>Drawdown diário</div><div class="sm mu">Máximo no histórico <span class="neg num">-$328.16</span></div></div><b class="neg num">-$183.79</b></div>
+</div>
+</div>`
+  },
+  2: {
+    nota: "<b>Painel único.</b> Tudo dentro de uma só superfície, cortada por linhas de 1px. Continua com cara de dashboard, mas com uma moldura em vez de quinze.",
+    html: () => `${topo()}
+<div class="painel">
+<div class="p-top">${hero(false)}<div class="p-casas">${CASAS.map(c => casa(c, "p-casa")).join("")}</div></div>
+<div class="p-row tres">
+<div class="p-cel"><div class="topo"><span class="k">PnL realizado</span><span class="chip neg">ROI -0.96%</span></div><div class="linha"><div><div class="v neg">-$134.49</div><div class="sm mu">4,232 apostas fechadas</div></div>${barras()}</div></div>
+<div class="p-cel"><div class="topo"><span class="k">PnL não realizado</span><span class="chip">28 de 28 com cotação</span></div><div class="v neg">-$8.81</div><div class="sm mu">A SX Bet informa só a exposição</div></div>
+<div class="p-cel"><div class="topo"><span class="k">Exposição · 28 abertas</span><span class="link">Ver posições</span></div><div class="v">$129.78</div>${pbar}<div class="sm mu" style="margin-top:6px">Kalshi 70% · Polymarket 30%</div></div>
+</div>
+<div class="p-row cinco">
+<div class="p-cel"><div class="k">Taxa de acerto</div><div class="v2">73%</div></div>
+<div class="p-cel"><div class="k">Odd média</div><div class="v2">1.63</div></div>
+<div class="p-cel"><div class="k">Stake média</div><div class="v2">$3.30</div></div>
+<div class="p-cel"><div class="k">Maior exposição atual</div><div class="v2 el" style="font-size:.95rem">${MERCADO}</div><div class="sm mu">$15.15 · 11.7% da exposição</div></div>
+<div class="p-cel"><div class="k">Drawdown diário</div><div class="v2 neg">-$183.79</div><div class="sm mu">Máximo <span class="neg num">-$328.16</span></div></div>
+</div>
+</div>`
+  },
+  3: {
+    nota: "<b>Extrato.</b> Abaixo do gráfico não há caixa nenhuma: duas listas de rótulo e valor, como um extrato. É a que mais muda a cara do app e a que melhor combina com as telas de lista.",
+    html: () => `${topo()}
+<div class="split">${hero(true)}<div class="casas">${CASAS.map(c => casa(c, "card casa")).join("")}</div></div>
+<div class="cols2 extrato">
+<div><h2 class="grupo-t">Resultado</h2><dl>
+<div class="row forte"><dt>PnL realizado<small>4,232 apostas fechadas · 14 dias ao lado</small></dt><span class="meio">${barras()}</span><dd class="neg">-$134.49</dd></div>
+<div class="row sub"><dt>ROI</dt><dd class="neg">-0.96%</dd></div>
+<div class="row forte"><dt>PnL não realizado<small>28 de 28 com cotação</small></dt><dd class="neg">-$8.81</dd></div>
+<div class="row"><dt>Taxa de acerto</dt><dd>73%</dd></div>
+<div class="row"><dt>Odd média</dt><dd>1.63</dd></div>
+<div class="row"><dt>Stake média</dt><dd>$3.30</dd></div>
+</dl></div>
+<div><h2 class="grupo-t">Risco</h2><dl>
+<div class="row forte"><dt>Exposição<small>28 posições abertas · <span class="link">Ver posições</span></small></dt><span class="meio">${pbar}</span><dd>$129.78</dd></div>
+<div class="row sub"><dt>Kalshi · 70%</dt><dd>$91.15</dd></div>
+<div class="row sub"><dt>Polymarket · 30%</dt><dd>$38.63</dd></div>
+<div class="row"><dt class="el">${MERCADO}<small>Maior exposição atual · 11.7% do total</small></dt><dd>$15.15</dd></div>
+<div class="row"><dt>Drawdown diário</dt><dd class="neg">-$183.79</dd></div>
+<div class="row sub"><dt>Máximo no histórico</dt><dd class="neg">-$328.16</dd></div>
+</dl></div>
+</div>`
+  }
+};
+
+function mostrar(d) {
+  if (!DIRECOES[d]) d = "1";
+  document.getElementById("mock").innerHTML = DIRECOES[d].html();
+  document.getElementById("mock").setAttribute("aria-labelledby", "aba" + d);
+  document.getElementById("nota").innerHTML = DIRECOES[d].nota;
+  for (const b of document.querySelectorAll(".abas button")) b.setAttribute("aria-selected", String(b.dataset.d === String(d)));
+}
+for (const b of document.querySelectorAll(".abas button")) b.addEventListener("click", () => mostrar(b.dataset.d));
+document.addEventListener("keydown", e => { if (["1", "2", "3"].includes(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) mostrar(e.key); });
+mostrar("1");
+</script>
