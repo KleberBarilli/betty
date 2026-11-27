@@ -249,10 +249,12 @@ function pintarProfitCalendar() {
   const today = ymdBrasil(new Date());
   const dates = BettyProfitCalendar.monthDays(state.month);
   let html = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Semana'].map((label, i) => `<div class="calendar-weekday${i === 7 ? ' calendar-week-total' : ''}">${label}</div>`).join('');
+  // Intensidade: dias com pelo menos metade do maior resultado do mês ficam mais fortes.
+  const maiorDia = Math.max(0, ...dates.filter(Boolean).map(d => byDay.get(d)?.total ? Math.abs(Number(profitCalendarValue(byDay.get(d))) || 0) : 0));
   dates.forEach((day, i) => {
     if (!day) html += '<div class="calendar-blank" aria-hidden="true"></div>';
     else {
-      const row = byDay.get(day), value = profitCalendarValue(row), tone = row?.total ? profitCalendarTone(value) : 'calendar-no-bets';
+      const row = byDay.get(day), value = profitCalendarValue(row), forte = row?.total && maiorDia > 0 && Math.abs(Number(value) || 0) >= maiorDia / 2, tone = row?.total ? profitCalendarTone(value) + (forte ? ' is-strong' : '') : 'calendar-no-bets';
       const label = `${profitCalendarDate(day)}: ${ready ? row?.total ? profitCalendarAmount(value, true) + ', ' + row.total + ' apostas' : 'sem apostas fechadas' : 'aguardando histórico'}`;
       html += `<button type="button" class="calendar-day ${tone}${day === today ? ' is-today' : ''}${day === state.selected ? ' is-selected' : ''}" data-day="${day}" aria-label="${escapeHtml(label)}" aria-pressed="${day === state.selected}" ${ready ? '' : 'disabled'}>
         <span class="calendar-day-number">${Number(day.slice(-2))}${day === today ? '<span class="calendar-today-label">Hoje</span>' : ''}</span>

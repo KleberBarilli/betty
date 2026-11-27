@@ -4564,6 +4564,7 @@ if (filtroDataDia) {
 lista = lista.filter(d => apostaNoDia(d, filtroDataDia));
 }
 lista.sort((a, b) => compararLinhas(a, b));
+agruparAbertasPorCasa(lista);
 listaFiltradaAtual = lista;
 if (!opcoes.manterPagina) paginaAtual = 1;
 renderizarStats();
@@ -4843,7 +4844,10 @@ return;
 }
 const isAberto = abaAtual === "aberto";
 const isAoVivo = abaAtual === "ao-vivo";
+let casaAnterior = null;
 const rows = lista.map(d => {
+const grupo = linhaGrupoCasa(d, casaAnterior, cols);
+casaAnterior = casaDaAposta(d);
 const pnl = getPnl(d);
 const pnlClass = pnl > 0 ? "pnl-positive" : pnl < 0 ? "pnl-negative" : "";
 const stake = getStake(d);
@@ -4874,10 +4878,10 @@ const dataCol = dtInicio ? renderizarTabela.formatoData.format(dtInicio) : "—"
 const tituloPosicao = tituloExibicao(d) || '—';
 const colunasPosicao = BettyMarketTitles.positionColumns(tituloPosicao,d.outcome,d);
 const descricaoJogo = inicioJogo ? " · Início " + renderizarTabela.formatoData.format(inicioJogo) : "";
-return `
+return `${grupo}
 <tr>
 <td class="col-data" data-label="${abaAtual === 'fechado' ? 'Data de fechamento' : 'Data do evento'}">${dataCol}</td>
-<td class="col-casa" data-label="Casa"><span class="casa-badge casa-${plat}">${casaLabel}</span></td>
+<td class="col-casa" data-label="Casa"><img class="casa-logo" src="/assets/platforms/${plat}.png" alt="${escapeHtml(casaLabel)}" title="${escapeHtml(casaLabel)}"></td>
 <td class="title-cell col-jogo" data-label="Jogo"><a href="${link}" target="_blank" rel="noopener" title="${escapeHtml(esporteLabel + ' — ' + tituloPosicao + descricaoJogo)}" aria-label="${escapeHtml(esporteLabel + ': ' + colunasPosicao.game + descricaoJogo)}">${iconeCategoria(esporteLabel)}${escapeHtml(colunasPosicao.game)}</a></td>
 <td class="title-cell col-aposta" data-label="Aposta"><a href="${link}" target="_blank" rel="noopener" title="${escapeHtml(tituloPosicao)}">${escapeHtml(colunasPosicao.bet)}</a></td>
 <td class="col-mid mono" data-label="Odd"${plat === "predict" && d.avgPrice > 0 ? ` title="Preço médio de entrada: ${(100 * d.avgPrice).toFixed(1).replace(".", ",")}¢ por cota"` : ""}>${odd}</td>
@@ -6323,19 +6327,19 @@ ${i.status ? `<div class="divbar-status">${escapeHtml(i.status)}</div>` : `<div 
 <div class="divbar-neg" style="width:${wP.toFixed(1)}%"></div>
 <div class="divbar-pos" style="width:${wG.toFixed(1)}%"></div>
 </div>
-<div class="divbar-val" style="color:${net >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(net, true)}</div>`}
+<div class="divbar-val" style="color:${net >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(net, true)}</div>`}
 </div>`;
 }).join("")}</div>`;
 }
 function celulasMetricasExtras(row) {
-return `<td style="color:${row.avgPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(row.avgPnl || 0, true)}</td>
+return `<td style="color:${row.avgPnl >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(row.avgPnl || 0, true)}</td>
 <td>${fmtProfitFactor(row.profitFactor)}</td>`;
 }
 function gerarBarrasHorizontais(itens) {
 const maxAbs = Math.max(1, ...itens.map(i => Math.abs(i.value)));
 return itens.map((i, idx) => {
 const pct = Math.max(2, (Math.abs(i.value) / maxAbs) * 100);
-const cor = i.value >= 0 ? "#22c55e" : "#ef4444";
+const cor = i.value >= 0 ? "#3ddc84" : "#ff6369";
 return `
 <div class="barh-row">
 <div class="barh-label" title="${escapeHtml(i.label)}">${escapeHtml(i.label)}</div>
@@ -6357,7 +6361,7 @@ const months = (avancadas?.pnlMes || []).slice(-12);
 if (!weeks.length && !months.length) return "";
 const linhas = arr => arr.map(r => {
 const valor = unidadeEstat === "stake" ? r.vStake : r.v;
-return `<tr><td>${escapeHtml(r.d)}</td><td style="color:${valor >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(valor, true)}</td></tr>`;
+return `<tr><td>${escapeHtml(r.d)}</td><td style="color:${valor >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(valor, true)}</td></tr>`;
 }).join("");
 return `<div class="stat-grid-2 pnl-period-grid" style="margin-top:14px;">
 <div class="card" style="padding:20px;">
@@ -6392,11 +6396,11 @@ const vazio = resumoDb
 : estadoPendente;
 const linhas = grupos.map(({ casa, label, row }) => `
 <tr>
-<td><span class="site-cell"><span class="dot" style="background:${CORES_SITE[casa]}"></span>${escapeHtml(label)}</span></td>
+<td><span class="site-cell"><img class="casa-logo" src="/assets/platforms/${casa}.png" alt="">${escapeHtml(label)}</span></td>
 ${row ? `<td>${row.total}</td>
 <td>${fmtEstat(row.volume, false)}</td>
-<td style="color:${row.lucro >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(row.lucro, true)}</td>
-<td style="color:${row.roi >= 0 ? 'var(--accent)' : 'var(--danger)'}">${row.roi >= 0 ? '+' : ''}${row.roi.toFixed(2)}%</td>
+<td style="color:${row.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(row.lucro, true)}</td>
+<td style="color:${row.roi >= 0 ? 'var(--pos)' : 'var(--danger)'}">${row.roi >= 0 ? '+' : ''}${row.roi.toFixed(2)}%</td>
 <td>${row.taxaAcerto.toFixed(1)}%</td>
 <td>${row.oddMedia > 0 ? row.oddMedia.toFixed(2) : '—'}</td>
 ${celulasMetricasExtras(row)}` : `<td colspan="8" class="site-status">${escapeHtml(status(casa))}</td>`}
@@ -6421,8 +6425,8 @@ ${filtroEsporteEstat === "todos" ? "" : '<button type="button" data-on-click="al
 ${linhas || `<tr><td class="site-status" colspan="9">${escapeHtml(vazio)}</td></tr>`}
 ${g?.total ? `<tr class="total-row">
 <td>Total</td><td>${g.total}</td><td>${fmtEstat(g.volume, false)}</td>
-<td style="color:${g.lucro >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(g.lucro, true)}</td>
-<td style="color:${g.roi >= 0 ? 'var(--accent)' : 'var(--danger)'}">${g.roi >= 0 ? '+' : ''}${g.roi.toFixed(2)}%</td>
+<td style="color:${g.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(g.lucro, true)}</td>
+<td style="color:${g.roi >= 0 ? 'var(--pos)' : 'var(--danger)'}">${g.roi >= 0 ? '+' : ''}${g.roi.toFixed(2)}%</td>
 <td>${g.taxaAcerto.toFixed(1)}%</td><td>${g.oddMedia > 0 ? g.oddMedia.toFixed(2) : '—'}</td>
 ${celulasMetricasExtras(g)}
 </tr>` : ""}
@@ -6460,8 +6464,8 @@ const linhas = grupos.map(row => `
 <td><span class="site-cell">${iconeCategoria(row.chave)}${escapeHtml(row.chave)}</span></td>
 <td>${row.total}</td>
 <td>${fmtEstat(row.volume, false)}</td>
-<td style="color:${row.lucro >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(row.lucro, true)}</td>
-<td style="color:${row.roi >= 0 ? 'var(--accent)' : 'var(--danger)'}">${row.roi >= 0 ? '+' : ''}${row.roi.toFixed(2)}%</td>
+<td style="color:${row.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(row.lucro, true)}</td>
+<td style="color:${row.roi >= 0 ? 'var(--pos)' : 'var(--danger)'}">${row.roi >= 0 ? '+' : ''}${row.roi.toFixed(2)}%</td>
 <td>${row.taxaAcerto.toFixed(1)}%</td>
 <td>${row.oddMedia > 0 ? row.oddMedia.toFixed(2) : '—'}</td>
 ${celulasMetricasExtras(row)}
@@ -6484,8 +6488,8 @@ return `
 ${linhas || `<tr><td colspan="9" style="color:var(--muted);text-align:center;">Sem dados</td></tr>`}
 <tr class="total-row">
 <td>Total</td><td>${g.total}</td><td>${fmtEstat(g.volume, false)}</td>
-<td style="color:${g.lucro >= 0 ? 'var(--accent)' : 'var(--danger)'}">${fmtEstat(g.lucro, true)}</td>
-<td style="color:${g.roi >= 0 ? 'var(--accent)' : 'var(--danger)'}">${g.roi >= 0 ? '+' : ''}${g.roi.toFixed(2)}%</td>
+<td style="color:${g.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(g.lucro, true)}</td>
+<td style="color:${g.roi >= 0 ? 'var(--pos)' : 'var(--danger)'}">${g.roi >= 0 ? '+' : ''}${g.roi.toFixed(2)}%</td>
 <td>${g.taxaAcerto.toFixed(1)}%</td><td>${g.oddMedia > 0 ? g.oddMedia.toFixed(2) : '—'}</td>
 ${celulasMetricasExtras(g)}
 </tr>
@@ -6541,7 +6545,7 @@ const [category, market] = JSON.parse(row.chave);
 if (!categories.has(category)) categories.set(category, []);
 categories.get(category).push({ ...row, market });
 }
-const color = v => v > 0 ? 'var(--accent)' : v < 0 ? 'var(--danger)' : 'var(--text)';
+const color = v => v > 0 ? 'var(--pos)' : v < 0 ? 'var(--danger)' : 'var(--text)';
 const cells = r => `<td>${r.total}</td><td>${fmtEstat(r.volume,false)}</td><td style="color:${color(r.lucro)}">${fmtEstat(r.lucro,true)}</td><td style="color:${color(r.roi)}">${r.roi > 0 ? '+' : ''}${r.roi.toFixed(2)}%</td><td>${r.taxaAcerto.toFixed(1)}%</td><td>${r.oddMedia > 0 ? r.oddMedia.toFixed(2) : '—'}</td>${celulasMetricasExtras(r)}`;
 const totals = resumo ? new Map(resumo.porCategoria.map(r => [r.chave, metricasResumoDb(r)]))
   : new Map(agruparPor(dadosEstat(),classificarAposta).map(r => [r.chave,r]));
@@ -6607,7 +6611,7 @@ const resumoDb = resumoEstatDbAtual();
 if (!resumoDb || !Array.isArray(resumoDb.segmentos)) return '<p style="color:var(--muted);">Não foi possível carregar os segmentos. Tente abrir a aba novamente.</p>';
 const g = metricasResumoDb(resumoDb.total);
 if (!g.total) return '<div class="card" style="padding:20px;"><div class="stat-card-title">Resumo</div><p style="color:var(--muted);">Sem posições fechadas para os filtros selecionados.</p></div>';
-const color = n => n > 0 ? 'var(--accent)' : n < 0 ? 'var(--danger)' : 'var(--text)';
+const color = n => n > 0 ? 'var(--pos)' : n < 0 ? 'var(--danger)' : 'var(--text)';
 const segmentos = resumoDb.segmentos.map(raw => {
 const [category,market,odds] = JSON.parse(raw.chave);
 return { ...metricasResumoDb(raw), category, market, odds };
@@ -6831,7 +6835,7 @@ const barsHtml = dias.map((d, i) => {
 const valY = padT + (1 - (d.v - min) / range) * plotH;
 const yTop = d.v >= 0 ? valY : zeroY;
 const hgt = Math.max(1, Math.abs(zeroY - valY));
-const cor = d.v > 0 ? "#22c55e" : d.v < 0 ? "#ef4444" : "#3a4150";
+const cor = d.v > 0 ? "#3ddc84" : d.v < 0 ? "#ff6369" : "#3a4150";
 return `<rect class="pnl-bar" data-i="${i}" x="${(centros[i] - barW / 2).toFixed(2)}" width="${barW.toFixed(2)}" y="${zeroY.toFixed(2)}" height="0" data-y="${yTop.toFixed(2)}" data-h="${hgt.toFixed(2)}" rx="2.5" fill="${cor}"/>`;
 }).join("");
 const fmtLabel = (ymd) => { const [yy, mm, dd] = ymd.split("-"); return `${dd}/${mm}`; };
@@ -6843,7 +6847,7 @@ ${gridHtml}
 ${barsHtml}
 <line class="zero-line" x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}"/>
 <line class="hover-line" x1="0" y1="${padT}" x2="0" y2="${plotBottom}"/>
-<circle class="hover-dot" r="4.5" stroke="#22c55e"/>
+<circle class="hover-dot" r="4.5" stroke="#3ddc84"/>
 <rect class="hit-rect" x="${padL}" y="0" width="${plotW}" height="${h}"/>
 </svg>
 <div class="chart-labels">${labels}</div>
@@ -6865,7 +6869,7 @@ const mx = ((e.clientX - rect.left) / rect.width) * w;
 let idx = Math.floor((mx - padL) / slotW);
 idx = Math.max(0, Math.min(dias.length - 1, idx));
 const cx = centros[idx];
-const cor = dias[idx].v > 0 ? "#22c55e" : dias[idx].v < 0 ? "#ef4444" : "#3a4150";
+const cor = dias[idx].v > 0 ? "#3ddc84" : dias[idx].v < 0 ? "#ff6369" : "#3a4150";
 hoverLine.setAttribute("x1", cx); hoverLine.setAttribute("x2", cx);
 hoverLine.style.display = "block";
 const valY = padT + (1 - (dias[idx].v - min) / range) * plotH;
@@ -6974,7 +6978,7 @@ const barsHtml = meses.map((d, i) => {
 const valY = padT + (1 - (d.v - min) / range) * plotH;
 const yTop = d.v >= 0 ? valY : zeroY;
 const hgt = Math.max(1, Math.abs(zeroY - valY));
-const cor = d.v > 0 ? "#22c55e" : d.v < 0 ? "#ef4444" : "#3a4150";
+const cor = d.v > 0 ? "#3ddc84" : d.v < 0 ? "#ff6369" : "#3a4150";
 return `<rect class="pnl-bar" data-i="${i}" x="${(centros[i] - barW / 2).toFixed(2)}" width="${barW.toFixed(2)}" y="${zeroY.toFixed(2)}" height="0" data-y="${yTop.toFixed(2)}" data-h="${hgt.toFixed(2)}" rx="2.5" fill="${cor}"/>`;
 }).join("");
 const fmtMes = (ym) => {
@@ -6989,7 +6993,7 @@ ${gridHtml}
 ${barsHtml}
 <line class="zero-line" x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}"/>
 <line class="hover-line" x1="0" y1="${padT}" x2="0" y2="${(padT + plotH).toFixed(1)}"/>
-<circle class="hover-dot" r="4.5" stroke="#22c55e"/>
+<circle class="hover-dot" r="4.5" stroke="#3ddc84"/>
 <rect class="hit-rect" x="${padL}" y="0" width="${plotW}" height="${h}"/>
 </svg>
 <div class="chart-labels">${labels}</div>
@@ -7011,7 +7015,7 @@ const mx = ((e.clientX - rect.left) / rect.width) * w;
 let idx = Math.floor((mx - padL) / slotW);
 idx = Math.max(0, Math.min(meses.length - 1, idx));
 const cx = centros[idx];
-const cor = meses[idx].v > 0 ? "#22c55e" : meses[idx].v < 0 ? "#ef4444" : "#3a4150";
+const cor = meses[idx].v > 0 ? "#3ddc84" : meses[idx].v < 0 ? "#ff6369" : "#3a4150";
 hoverLine.setAttribute("x1", cx); hoverLine.setAttribute("x2", cx);
 hoverLine.style.display = "block";
 const valY = padT + (1 - (meses[idx].v - min) / range) * plotH;
@@ -7513,4 +7517,39 @@ function pintarMiniGraficosVisao() {
         : `<rect class="neg" x="${x}" y="30" width="10" height="${h.toFixed(1)}" rx="2"/>`;
     }).join("") + `<line x1="0" y1="30" x2="222" y2="30" class="base"/>`;
   }
+}
+
+// ===== Abertas agrupadas por casa (layout v2) =====
+// Sem ordenação manual, as abertas ficam agrupadas por casa (na ordem do
+// menu), mantendo a ordem por data dentro de cada grupo. O cabeçalho de cada
+// grupo traz o total da casa no filtro atual, não só da página.
+let gruposAbertasAtuais = null;
+function agruparAbertasPorCasa(lista) {
+  gruposAbertasAtuais = null;
+  if (abaAtual !== "aberto" || sortCol) return;
+  const ordem = new Map(CASAS_STAKE.map((casa, i) => [casa, i]));
+  const posicao = new Map(lista.map((d, i) => [d, i]));
+  lista.sort((a, b) => (ordem.get(casaDaAposta(a)) ?? 99) - (ordem.get(casaDaAposta(b)) ?? 99) || posicao.get(a) - posicao.get(b));
+  gruposAbertasAtuais = new Map();
+  for (const d of lista) {
+    const casa = casaDaAposta(d);
+    const g = gruposAbertasAtuais.get(casa) || { n: 0, stake: 0, pnl: 0, semCotacao: 0 };
+    g.n += 1;
+    g.stake += getStake(d);
+    if (d._platform === "sxbet" && d.cashPnl == null) g.semCotacao += 1;
+    else g.pnl += getPnl(d);
+    gruposAbertasAtuais.set(casa, g);
+  }
+}
+function linhaGrupoCasa(d, casaAnterior, cols) {
+  if (!gruposAbertasAtuais || abaAtual !== "aberto") return "";
+  const casa = casaDaAposta(d);
+  if (casa === casaAnterior) return "";
+  const g = gruposAbertasAtuais.get(casa);
+  if (!g) return "";
+  const nome = NOMES_CASAS[casa] || casa;
+  const semValor = g.semCotacao === g.n;
+  const pnl = semValor ? "—" : `${g.pnl >= 0 ? "+" : "-"}$${Math.abs(g.pnl).toFixed(2)}`;
+  const classe = semValor ? "" : g.pnl > 0 ? "pnl-positive" : g.pnl < 0 ? "pnl-negative" : "";
+  return `<tr class="grupo-casa"><td colspan="${cols}"><div class="grupo-casa-linha"><img class="casa-logo" src="/assets/platforms/${casa}.png" alt=""><strong>${escapeHtml(nome)}</strong><span class="grupo-casa-meta">${g.n} ${g.n === 1 ? "aberta" : "abertas"}</span><span class="grupo-casa-tot">Stake <b>$${g.stake.toFixed(2)}</b> · PnL <b class="${classe}">${pnl}</b></span></div></td></tr>`;
 }
