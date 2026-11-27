@@ -550,49 +550,33 @@ try {
 localStorage.setItem(DATE_CACHE_KEY, JSON.stringify({ t: Date.now(), map: map }));
 } catch (e) { registrarFalhaPersistenciaCache(DATE_CACHE_KEY, e); }
 }
+// As datas e os mercados de cada evento ficam no SQLite
+// (`polymarket_metadata_cache`), não no localStorage: com o evento inteiro de
+// centenas de mercados eles passavam da cota do navegador, a gravação falhava
+// sem aviso depois de serializar dezenas de MB e a leitura voltava sempre vazia.
 let metasDatasPnl = null;
 function lerCacheMetasDatasGamma() {
-try {
-const raw = localStorage.getItem(GAMMA_DATE_META_CACHE_KEY);
-if (!raw) return {};
-const o = JSON.parse(raw);
-if (!o || o.v !== GAMMA_DATE_META_CACHE_VERSION || !o.map || Date.now() - (o.t || 0) > DATE_CACHE_TTL_MS) return {};
-return o.map;
-} catch (e) { return {}; }
+return {};
 }
 function salvarCacheMetasDatasGamma(map) {
 metasDatasPnl = map;
-try {
-localStorage.setItem(GAMMA_DATE_META_CACHE_KEY, JSON.stringify({ v: GAMMA_DATE_META_CACHE_VERSION, t: Date.now(), map: compactarMetasDatasGammaParaCache(map) }));
-} catch (e) { registrarFalhaPersistenciaCache(GAMMA_DATE_META_CACHE_KEY, e); }
 }
+try { localStorage.removeItem(GAMMA_DATE_META_CACHE_KEY); } catch (_) {}
 // Metadados de esporte vindos do Gamma/Polymarket.
 // O endpoint de eventos expõe category/subcategory/tags/series/markets,
 // que são muito mais confiáveis do que tentar adivinhar pelo "vs.".
 const SPORT_META_CACHE_KEY = "betty_sport_meta_v3";
-const SPORT_META_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const SPORT_META_CACHE_VERSION = 3;
-const GAMMA_DATE_META_CACHE_VERSION = 2;
 const avisosFalhaCachePersistente = new Set();
 function registrarFalhaPersistenciaCache(chave, erro) {
 if (avisosFalhaCachePersistente.has(chave)) return;
 avisosFalhaCachePersistente.add(chave);
 console.warn(`[Betty] O cache local \"${chave}\" não pôde ser persistido; os dados atuais continuam em memória.`, erro?.name || erro);
 }
+// Ver `lerCacheMetasDatasGamma()`: os mercados do evento ficam no SQLite.
 function lerCacheEsportes() {
-try {
-const raw = localStorage.getItem(SPORT_META_CACHE_KEY);
-if (!raw) return {};
-const o = JSON.parse(raw);
-if (!o || o.v !== SPORT_META_CACHE_VERSION || !o.map || Date.now() - (o.t || 0) > SPORT_META_CACHE_TTL_MS) return {};
-return o.map;
-} catch (e) { return {}; }
+return {};
 }
-function salvarCacheEsportes(map) {
-try {
-localStorage.setItem(SPORT_META_CACHE_KEY, JSON.stringify({ v: SPORT_META_CACHE_VERSION, t: Date.now(), map: compactarMetasEsporteParaCache(map) }));
-} catch (e) { registrarFalhaPersistenciaCache(SPORT_META_CACHE_KEY, e); }
-}
+try { localStorage.removeItem(SPORT_META_CACHE_KEY); } catch (_) {}
 function tokenIdsDoMercado(m) {
 const out = [];
 const add = v => { if (v != null && String(v).trim()) out.push(String(v).trim()); };
@@ -3039,9 +3023,23 @@ return !startBySlug[s] || !metasBySlug[s] || !meta || !Array.isArray(markets) ||
 // Consultas forçadas e contratos novos continuam exigindo dados da fonte.
 const candidatosCache=slugs.filter(s=>!forcarSlugs.has(s)&&incompleto(s));
 const candidatosCacheSet=new Set(candidatosCache);
+// O backend recorta cada evento nos mercados destas apostas (e nos das apostas
+// do ledger): o evento inteiro tem centenas de mercados que ninguém aqui lê.
+const necessidadeDoEvento = slug => {
+const assets = [], conditions = [], slugsMercado = [];
+const juntar = (lista, valor) => { if (valor != null && String(valor).trim()) lista.push(String(valor)); };
+for (const d of linhasPorSlug.get(slug) || []) {
+juntar(assets, d?.asset); juntar(assets, d?.assetId); juntar(assets, d?.tokenId);
+juntar(conditions, d?.conditionId); juntar(conditions, d?.condition_id);
+juntar(slugsMercado, d?.slug);
+}
+return { assets, conditions, slugs: slugsMercado };
+};
 for(let i=0;i<candidatosCache.length;i+=400) {
 try {
-const response=await fetch('/api/polymarket-metadata/cache',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slugs:candidatosCache.slice(i,i+400)}),cache:'no-store'});
+const lote=candidatosCache.slice(i,i+400);
+const need=Object.fromEntries(lote.map(slug=>[slug,necessidadeDoEvento(slug)]));
+const response=await fetch('/api/polymarket-metadata/cache',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slugs:lote,need}),cache:'no-store'});
 if(!response.ok)continue;
 const saved=await response.json();
 if(saved?.ok&&Array.isArray(saved.entries))for(const entry of saved.entries) {
@@ -3086,7 +3084,6 @@ await Promise.all(faltando.slice(inicio, inicio + 12).map(carregarSlug));
 }
 salvarCacheDatas(startBySlug);
 salvarCacheMetasDatasGamma(metasBySlug);
-salvarCacheEsportes(sportBySlug);
 // Persistência limitada aos eventos consultados, não ao mapa histórico inteiro.
 for(let i=0;i<novosMetadados.length;i+=12) {
 try {await fetch('/api/polymarket-metadata/cache',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entries:novosMetadados.slice(i,i+12)}),cache:'no-store'});}catch(_){ /* Melhor esforço; dados atuais já estão em memória. */ }

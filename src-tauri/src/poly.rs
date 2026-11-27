@@ -5,7 +5,7 @@
 //! Data API v2 (com o contrato antigo de arrays preservado para o frontend),
 //! Gamma, saldo pUSD na Polygon e um cache de metadados públicos.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -904,7 +904,151 @@ fn metadado_valido(e: &Value) -> bool {
         })
 }
 
-/// `POST /api/polymarket-metadata/cache`: grava (entries) ou lê (slugs).
+/// Mercados de um evento que uma consulta do cache precisa: os das apostas que
+/// pediram (`need` da interface) e os de todas as apostas da conta naquele
+/// evento que estão no ledger.
+#[derive(Default)]
+struct Necessidade {
+    ativos: HashSet<String>,
+    condicoes: HashSet<String>,
+    slugs: HashSet<String>,
+}
+
+/// Forma frouxa de comparar identificadores: sem espaços nem aspas e em
+/// minúsculas. Tudo o que o `exactMarket()` (com `clean`) e o `selectedMarket`
+/// dos títulos (com `trim`) consideram igual também é igual aqui, então o
+/// recorte nunca deixa de fora um mercado que eles achariam.
+fn frouxo(v: Option<&Value>) -> String {
+    let texto = match v {
+        None | Some(Value::Null) => return String::new(),
+        Some(Value::String(s)) => s.clone(),
+        outro => js::string(outro),
+    };
+    texto.chars().filter(|c| !c.is_whitespace() && *c != '"').flat_map(char::to_lowercase).collect()
+}
+
+impl Necessidade {
+    /// Junta os identificadores de uma aposta (`asset`, `conditionId`, `slug`...)
+    /// ou de um pedido da interface (listas `assets`, `conditions` e `slugs`).
+    fn juntar(&mut self, d: &Value) {
+        let campos: [(&[&str], &str, &mut HashSet<String>); 3] = [
+            (&["asset", "assetId", "tokenId"], "assets", &mut self.ativos),
+            (&["conditionId", "condition_id"], "conditions", &mut self.condicoes),
+            (&["slug"], "slugs", &mut self.slugs),
+        ];
+        for (chaves, lista, conjunto) in campos {
+            let soltos = chaves.iter().map(|k| d.get(*k));
+            let da_lista = d.get(lista).and_then(Value::as_array).into_iter().flatten().map(Some);
+            for v in soltos.chain(da_lista) {
+                let v = frouxo(v);
+                if !v.is_empty() {
+                    conjunto.insert(v);
+                }
+            }
+        }
+    }
+
+    fn mercado(&self, m: &Value) -> bool {
+        m.get("tokenIds").and_then(Value::as_array).is_some_and(|ids| ids.iter().any(|t| self.ativos.contains(&frouxo(Some(t)))))
+            || ["conditionId", "condition_id"].iter().any(|k| self.condicoes.contains(&frouxo(m.get(*k))))
+            || self.slugs.contains(&frouxo(m.get("slug")))
+    }
+}
+
+/// Reduz o metadado de um evento aos mercados que alguém da conta usa.
+///
+/// - Datas: o evento inteiro e, dos mercados, só os das apostas. As datas são
+///   lidas por `markets[slug da aposta]`.
+/// - Esporte: `texts`, tipos e o resto do evento ficam; dos mercados, só os
+///   que casam com alguma aposta. `eventTexts` vai calculado com a lista
+///   inteira, como `sinaisDaAposta()` faria. Se nenhum mercado mantido tiver
+///   `tokenIds`, o primeiro que tiver fica junto, porque a interface exige um.
+///
+/// Com algum mercado que não é objeto (o JS lançaria exceção), o esporte não é
+/// recortado.
+fn recortar_evento(dado: &mut Value, n: &Necessidade) {
+    if let Some(Value::Object(mercados)) = dado.pointer_mut("/dates/markets") {
+        mercados.retain(|k, _| n.slugs.contains(&frouxo(Some(&Value::String(k.clone())))));
+    }
+    let Some(esporte) = dado.get_mut("sport").and_then(Value::as_object_mut) else { return };
+    let Some(Value::Array(lista)) = esporte.get("markets") else { return };
+    if !lista.iter().all(Value::is_object) {
+        return;
+    }
+    let textos_evento = match esporte.get("eventTexts") {
+        Some(Value::Array(_)) => None,
+        _ => {
+            let textos_mercado: HashSet<String> = lista
+                .iter()
+                .flat_map(|m| ["slug", "question", "groupItemTitle", "sportsMarketType"].map(|k| m.get(k)))
+                .filter(|v| js::truthy(*v))
+                .map(|v| js::string(v).to_lowercase())
+                .collect();
+            let lista_textos = match esporte.get("texts") {
+                Some(Value::Array(a)) => {
+                    a.iter().filter(|v| !textos_mercado.contains(&js::string(Some(v)).to_lowercase())).cloned().collect()
+                }
+                _ => Vec::new(),
+            };
+            Some(Value::Array(lista_textos))
+        }
+    };
+    let tem_token = |m: &Value| m.get("tokenIds").and_then(Value::as_array).is_some_and(|t| !t.is_empty());
+    let mut manter: Vec<bool> = lista.iter().map(|m| n.mercado(m)).collect();
+    if !lista.iter().zip(&manter).any(|(m, &k)| k && tem_token(m))
+        && let Some(i) = lista.iter().position(tem_token)
+    {
+        manter[i] = true;
+    }
+    let novos: Vec<Value> = lista.iter().zip(manter).filter(|(_, k)| *k).map(|(m, _)| m.clone()).collect();
+    esporte.insert("markets".into(), Value::Array(novos));
+    if let Some(t) = textos_evento {
+        esporte.insert("eventTexts".into(), t);
+    }
+}
+
+/// Mercados que cada evento pedido precisa: os do pedido mais os das apostas do
+/// ledger que ainda não têm data de resultado confirmada (`_confirmedClosedTs`).
+/// Para essas, a data do PnL na interface pode vir do mapa de datas da última
+/// consulta (`metasDatasPnl`), lido pelo mercado da própria aposta.
+fn necessidades(c: &rusqlite::Connection, user: &str, pedido: Option<&Value>, chaves: &[String]) -> Result<HashMap<String, Necessidade>> {
+    let Some(pedido) = pedido.and_then(Value::as_object).filter(|p| !p.is_empty()) else { return Ok(HashMap::new()) };
+    let mut mapa: HashMap<String, Necessidade> = HashMap::new();
+    for slug in chaves {
+        if let Some(n) = pedido.get(slug) {
+            mapa.entry(slug.clone()).or_default().juntar(n);
+        }
+    }
+    if mapa.is_empty() {
+        return Ok(mapa);
+    }
+    let mut s = c.prepare(
+        "SELECT json_extract(data_json,'$.eventSlug'),json_extract(data_json,'$.slug'),json_extract(data_json,'$.asset'),
+                json_extract(data_json,'$.conditionId') FROM closed_bets_ledger WHERE user_id=? AND platform='polymarket'
+         AND json_extract(data_json,'$._confirmedClosedTs') IS NULL",
+    )?;
+    let texto = |r: &rusqlite::Row<'_>, i: usize| -> Value {
+        match r.get_ref(i) {
+            Ok(rusqlite::types::ValueRef::Text(t)) => Value::String(String::from_utf8_lossy(t).into_owned()),
+            Ok(rusqlite::types::ValueRef::Integer(n)) => json!(n),
+            _ => Value::Null,
+        }
+    };
+    let linhas = s.query_map([user], |r| Ok((texto(r, 0), texto(r, 1), texto(r, 2), texto(r, 3))))?;
+    for linha in linhas {
+        let (evento, slug, ativo, condicao) = linha?;
+        // `d.eventSlug || d.slug`, como a interface agrupa.
+        let chave = if js::truthy(Some(&evento)) { js::string(Some(&evento)) } else { js::string(Some(&slug)) };
+        if let Some(n) = mapa.get_mut(&chave) {
+            n.juntar(&json!({ "slug": slug, "asset": ativo, "conditionId": condicao }));
+        }
+    }
+    Ok(mapa)
+}
+
+/// `POST /api/polymarket-metadata/cache`: grava (entries) ou lê (slugs). Na
+/// leitura, `need` diz de que apostas a interface precisa em cada evento e a
+/// resposta vem recortada nesses mercados.
 pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
     let tamanho = |k: &str| -> usize {
         match corpo.get(k) {
@@ -946,6 +1090,7 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
                     }
                 }
             }
+            let precisa = necessidades(c, &u, corpo.get("need"), &chaves)?;
             let mut entradas = Vec::new();
             for lote in chaves.chunks(400) {
                 let marcas = vec!["?"; lote.len()].join(",");
@@ -962,8 +1107,11 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
                 for row in s.query_map(p.as_slice(), |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
                     let (slug, d) = row?;
                     if let Ok(dado) = serde_json::from_str::<Value>(&d) {
-                        let e = json!({ "slug": slug, "data": dado });
+                        let mut e = json!({ "slug": slug, "data": dado });
                         if metadado_valido(&e) {
+                            if let Some(n) = precisa.get(&slug) {
+                                recortar_evento(&mut e["data"], n);
+                            }
                             entradas.push(e);
                         }
                     }
@@ -984,6 +1132,92 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn evento() -> Value {
+        json!({
+            "start": "2026-09-20T18:00:00Z",
+            "dates": { "event": { "startTime": "2026-09-20T18:00:00Z" }, "markets": {
+                "jogo-ml": { "closedTime": "2026-09-20T20:00:00Z" },
+                "jogo-total": { "closedTime": "2026-09-20T20:01:00Z" },
+                "jogo-handicap": { "closedTime": "2026-09-20T20:02:00Z" }
+            } },
+            "sport": {
+                "texts": ["A vs B", "Soccer", "jogo-ml", "Will A win?", "jogo-total", "O/U 2.5"],
+                "sportsMarketTypes": ["moneyline", "totals"],
+                "markets": [
+                    { "conditionId": "0xC1", "slug": "jogo-ml", "question": "Will A win?", "tokenIds": ["11", "12"] },
+                    { "conditionId": "0xC2", "slug": "jogo-total", "question": "O/U 2.5", "tokenIds": ["21", "22"] },
+                    { "conditionId": "0xC3", "slug": "jogo-handicap", "question": "Handicap", "tokenIds": ["31", "32"] }
+                ],
+                "eventId": "9"
+            }
+        })
+    }
+
+    fn necessidade(d: Value) -> Necessidade {
+        let mut n = Necessidade::default();
+        n.juntar(&d);
+        n
+    }
+
+    #[test]
+    fn recorte_mantem_so_os_mercados_das_apostas() {
+        let mut e = evento();
+        recortar_evento(&mut e, &necessidade(json!({ "assets": [" 22 "], "conditions": [], "slugs": ["jogo-total"] })));
+        assert_eq!(e["dates"]["markets"], json!({ "jogo-total": { "closedTime": "2026-09-20T20:01:00Z" } }));
+        assert_eq!(e["dates"]["event"], evento()["dates"]["event"], "as datas do evento ficam");
+        let mercados = e["sport"]["markets"].as_array().unwrap();
+        assert_eq!(mercados.len(), 1);
+        assert_eq!(mercados[0]["conditionId"], "0xC2");
+        assert_eq!(e["sport"]["texts"], evento()["sport"]["texts"], "texts não muda");
+        assert_eq!(e["sport"]["eventTexts"], json!(["A vs B", "Soccer"]), "calculado com todos os mercados");
+        assert_eq!(e["sport"]["sportsMarketTypes"], json!(["moneyline", "totals"]));
+        assert_eq!(e["start"], "2026-09-20T18:00:00Z");
+    }
+
+    #[test]
+    fn recorte_guarda_um_mercado_com_tokens_e_respeita_mercado_invalido() {
+        // A aposta casa só pelo slug com um mercado sem tokenIds.
+        let mut e = evento();
+        e["sport"]["markets"][2]["tokenIds"] = json!([]);
+        recortar_evento(&mut e, &necessidade(json!({ "slugs": ["JOGO-HANDICAP"] })));
+        let slugs: Vec<&str> = e["sport"]["markets"].as_array().unwrap().iter().map(|m| m["slug"].as_str().unwrap()).collect();
+        assert_eq!(slugs, ["jogo-ml", "jogo-handicap"], "o primeiro mercado com tokenIds vai junto, na ordem original");
+
+        let mut e = evento();
+        e["sport"]["markets"].as_array_mut().unwrap().push(Value::Null);
+        recortar_evento(&mut e, &necessidade(json!({ "slugs": ["jogo-ml"] })));
+        assert_eq!(e["sport"]["markets"].as_array().unwrap().len(), 4, "com mercado nulo o esporte fica inteiro");
+        assert_eq!(e["dates"]["markets"].as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn apostas_do_ledger_sem_data_confirmada_entram_no_recorte() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        let u = crate::db::usuario_local(&mut c).unwrap().id;
+        let t = agora();
+        for (chave, dado) in [
+            ("k1", json!({ "eventSlug": "jogo", "slug": "jogo-handicap", "asset": "31", "conditionId": "0xC3" })),
+            ("k2", json!({ "eventSlug": "jogo", "slug": "jogo-ml", "asset": "11", "conditionId": "0xC1", "_confirmedClosedTs": 1 })),
+            ("k3", json!({ "eventSlug": "outro", "slug": "outro-ml", "asset": "99" })),
+        ] {
+            c.execute(
+                "INSERT INTO closed_bets_ledger(user_id,platform,bet_key,data_json,first_seen_at,updated_at) VALUES(?,'polymarket',?,?,?,?)",
+                rusqlite::params![u, chave, dado.to_string(), t, t],
+            )
+            .unwrap();
+        }
+        let pedido = json!({ "jogo": { "slugs": ["jogo-total"] } });
+        let mapa = necessidades(&c, &u, Some(&pedido), &["jogo".to_string(), "outro".to_string()]).unwrap();
+        let mut e = evento();
+        recortar_evento(&mut e, &mapa["jogo"]);
+        let mut slugs: Vec<&String> = e["dates"]["markets"].as_object().unwrap().keys().collect();
+        slugs.sort();
+        assert_eq!(slugs, ["jogo-handicap", "jogo-total"], "a do pedido e a do ledger sem data confirmada");
+        assert!(!mapa.contains_key("outro"), "evento sem pedido não é recortado");
+        assert!(necessidades(&c, &u, None, &["jogo".to_string()]).unwrap().is_empty(), "sem `need`, resposta inteira");
+    }
 
     #[test]
     fn caches_vencidos_saem_e_o_gamma_tem_teto() {
