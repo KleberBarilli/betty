@@ -34,6 +34,17 @@ gravar("metadata_vazio.json", {"keys": []})
 gravar("cache_slugs.json", {"slugs": slugs})
 gravar("cache_need.json", {"slugs": slugs[:60], "need": {s: {"slugs": [], "assets": [], "conditions": []} for s in slugs[:30]}})
 
+# Como na abertura: cada evento com apostas no ledger pede os mercados delas.
+por_evento = {}
+for (dj,) in c.execute("SELECT data_json FROM closed_bets_ledger WHERE user_id=? AND platform='polymarket' ORDER BY rowid", [user]):
+    d = json.loads(dj)
+    n = por_evento.setdefault(d.get("eventSlug") or d.get("slug"), {"assets": [], "conditions": [], "slugs": []})
+    for lista, k in (("assets", "asset"), ("conditions", "conditionId"), ("slugs", "slug")):
+        if d.get(k):
+            n[lista].append(d[k])
+com_apostas = [r[0] for r in c.execute("SELECT slug FROM polymarket_metadata_cache ORDER BY slug") if r[0] in por_evento][:400]
+gravar("cache_apostas.json", {"slugs": com_apostas, "need": {s: por_evento[s] for s in com_apostas}})
+
 # `now` fixo no PnL: sem ele, o último ponto da série leva o instante do pedido.
 AGORA = "now=1795800000000"
 rotas = [
@@ -83,6 +94,7 @@ rotas += [
     "POST /api/history/closed/metadata metadata_vazio.json",
     "POST /api/polymarket-metadata/cache cache_slugs.json",
     "POST /api/polymarket-metadata/cache cache_need.json",
+    "POST /api/polymarket-metadata/cache cache_apostas.json",
     "/api/history/closed",
     "/api/history/closed/export",
 ]

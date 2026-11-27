@@ -15,9 +15,11 @@ use rusqlite::OptionalExtension;
 use serde_json::{Map, Value, json};
 use tauri::http::StatusCode;
 
+use serde_json::value::RawValue;
+
 use crate::api::{ApiResponse, Estado};
 use crate::db::{Db, agora};
-use crate::{js, net};
+use crate::{js, json_bruto as bruto, net};
 
 const DATA_V2: &str = "https://data-api.polymarket.com/v2";
 pub const GAMMA: &str = "https://gamma-api.polymarket.com";
@@ -1007,6 +1009,178 @@ fn recortar_evento(dado: &mut Value, n: &Necessidade) {
     }
 }
 
+/// Os campos de um mercado que a validação e o recorte leem.
+#[derive(serde::Deserialize)]
+struct MercadoParcial<'a> {
+    #[serde(borrow, default)]
+    slug: Option<&'a RawValue>,
+    #[serde(borrow, default)]
+    question: Option<&'a RawValue>,
+    #[serde(borrow, default, rename = "groupItemTitle")]
+    grupo: Option<&'a RawValue>,
+    #[serde(borrow, default, rename = "sportsMarketType")]
+    tipo: Option<&'a RawValue>,
+    #[serde(borrow, default, rename = "tokenIds")]
+    tokens: Option<&'a RawValue>,
+    #[serde(borrow, default, rename = "conditionId")]
+    condicao: Option<&'a RawValue>,
+    #[serde(borrow, default)]
+    condition_id: Option<&'a RawValue>,
+}
+
+impl MercadoParcial<'_> {
+    /// `tokenIds` é uma lista com algum item.
+    fn tem_token(&self) -> bool {
+        self.tokens.filter(|t| bruto::e_lista(t)).and_then(bruto::lista).is_some_and(|l| !l.is_empty())
+    }
+}
+
+impl Necessidade {
+    /// `mercado()` sobre os campos lidos de um mercado.
+    fn mercado_parcial(&self, m: &MercadoParcial) -> bool {
+        let frouxo_bruto = |r: Option<&RawValue>| frouxo(r.map(bruto::valor).as_ref());
+        m.tokens.filter(|t| bruto::e_lista(t)).and_then(bruto::lista).is_some_and(|ids| ids.iter().any(|t| self.ativos.contains(&frouxo(Some(&bruto::valor(t))))))
+            || [m.condicao, m.condition_id].iter().any(|c| self.condicoes.contains(&frouxo_bruto(*c)))
+            || self.slugs.contains(&frouxo_bruto(m.slug))
+    }
+}
+
+/// Uma entrada do cache já em texto JSON (`{"slug":...,"data":...}`), sem
+/// decodificar o evento: o mesmo que montar o `Value`, passar por
+/// `metadado_valido` e por `recortar_evento` e serializar.
+///
+/// `Some(None)` quando o metadado é inválido. `None` quando o texto foge da
+/// forma de sempre (escape `\u` ou `\/`, chave repetida, `dates` ou `sport` que não
+/// são objeto, mercado que não é objeto...): aí quem chama usa o `Value`.
+fn entrada_rapida(slug: &str, texto: &str, n: Option<&Necessidade>) -> Option<Option<Vec<u8>>> {
+    if !bruto::escapes_como_o_serde(texto) {
+        return None;
+    }
+    let dado = bruto::Objeto::ler(texto)?;
+    let datas = bruto::Objeto::ler(dado.get("dates")?.get())?;
+    let esporte = bruto::Objeto::ler(dado.get("sport")?.get())?;
+    let lista = bruto::lista(esporte.get("markets")?)?;
+    let mercados: Vec<MercadoParcial> = lista.iter().map(|m| serde_json::from_str(m.get()).ok()).collect::<Option<_>>()?;
+    if !lista.iter().all(|m| bruto::e_objeto(m)) {
+        return None;
+    }
+    // `metadado_valido()`.
+    let valido = !slug.is_empty()
+        && slug.encode_utf16().count() <= 500
+        && dado.get("start").map(bruto::valor).as_ref().and_then(Value::as_str).is_some_and(|s| js::data_ms(s).is_some())
+        && bruto::verdadeiro(datas.get("event"))
+        && bruto::verdadeiro(datas.get("markets"))
+        && !lista.is_empty()
+        && mercados.iter().any(MercadoParcial::tem_token);
+    if !valido {
+        return Some(None);
+    }
+    let mut saida = Vec::with_capacity(texto.len() / 4 + slug.len() + 32);
+    saida.extend_from_slice(b"{\"slug\":");
+    saida.extend(js::para_vec(slug));
+    saida.extend_from_slice(b",\"data\":");
+    let Some(n) = n else {
+        saida.extend_from_slice(texto.as_bytes());
+        saida.push(b'}');
+        return Some(Some(saida));
+    };
+
+    // Datas: dos mercados, só os das apostas.
+    let mut datas_txt = Vec::new();
+    let mut mercados_datas = Vec::new();
+    let campos_datas: Vec<(&str, &[u8])> = match datas.get("markets").filter(|m| bruto::e_objeto(m)) {
+        Some(m) => {
+            let m = bruto::Objeto::ler(m.get())?;
+            bruto::escrever_objeto(
+                &mut mercados_datas,
+                m.0.iter().filter(|(k, _)| n.slugs.contains(&frouxo(Some(&Value::String(k.clone()))))).map(|(k, v)| (k.as_str(), v.get().as_bytes())),
+            );
+            datas.0.iter().map(|(k, v)| (k.as_str(), if k == "markets" { &mercados_datas[..] } else { v.get().as_bytes() })).collect()
+        }
+        None => datas.0.iter().map(|(k, v)| (k.as_str(), v.get().as_bytes())).collect(),
+    };
+    bruto::escrever_objeto(&mut datas_txt, campos_datas);
+
+    // Esporte: `eventTexts` calculado com a lista inteira, só os mercados que casam.
+    let textos_evento: Option<Vec<u8>> = match esporte.get("eventTexts") {
+        Some(t) if bruto::e_lista(t) => None,
+        _ => {
+            let textos_mercado: HashSet<String> = mercados
+                .iter()
+                .flat_map(|m| [m.slug, m.question, m.grupo, m.tipo])
+                .flatten()
+                .map(bruto::valor)
+                .filter(|v| js::truthy(Some(v)))
+                .map(|v| js::string(Some(&v)).to_lowercase())
+                .collect();
+            let mut t = Vec::new();
+            match esporte.get("texts").filter(|t| bruto::e_lista(t)) {
+                Some(textos) => {
+                    let textos = bruto::lista(textos)?;
+                    let mantidos = textos.iter().filter(|v| !textos_mercado.contains(&js::string(Some(&bruto::valor(v))).to_lowercase()));
+                    bruto::escrever_lista(&mut t, mantidos.map(|v| v.get().as_bytes()));
+                }
+                None => t.extend_from_slice(b"[]"),
+            }
+            Some(t)
+        }
+    };
+    let mut manter: Vec<bool> = mercados.iter().map(|m| n.mercado_parcial(m)).collect();
+    if !mercados.iter().zip(&manter).any(|(m, &k)| k && m.tem_token())
+        && let Some(i) = mercados.iter().position(MercadoParcial::tem_token)
+    {
+        manter[i] = true;
+    }
+    let mut mercados_txt = Vec::new();
+    bruto::escrever_lista(&mut mercados_txt, lista.iter().zip(&manter).filter(|(_, k)| **k).map(|(m, _)| m.get().as_bytes()));
+    let mut campos_esporte: Vec<(&str, &[u8])> = esporte
+        .0
+        .iter()
+        .map(|(k, v)| {
+            let valor = match (k.as_str(), &textos_evento) {
+                ("markets", _) => &mercados_txt[..],
+                ("eventTexts", Some(t)) => &t[..],
+                _ => v.get().as_bytes(),
+            };
+            (k.as_str(), valor)
+        })
+        .collect();
+    if let Some(t) = &textos_evento
+        && esporte.get("eventTexts").is_none()
+    {
+        campos_esporte.push(("eventTexts", &t[..]));
+    }
+    let mut esporte_txt = Vec::new();
+    bruto::escrever_objeto(&mut esporte_txt, campos_esporte);
+
+    bruto::escrever_objeto(
+        &mut saida,
+        dado.0.iter().map(|(k, v)| {
+            let valor = match k.as_str() {
+                "dates" => &datas_txt[..],
+                "sport" => &esporte_txt[..],
+                _ => v.get().as_bytes(),
+            };
+            (k.as_str(), valor)
+        }),
+    );
+    saida.push(b'}');
+    Some(Some(saida))
+}
+
+/// A mesma entrada pelo caminho com `Value` (a referência do caminho rápido).
+fn entrada_completa(slug: &str, texto: &str, n: Option<&Necessidade>) -> Option<Vec<u8>> {
+    let dado = serde_json::from_str::<Value>(texto).ok()?;
+    let mut e = json!({ "slug": slug, "data": dado });
+    if !metadado_valido(&e) {
+        return None;
+    }
+    if let Some(n) = n {
+        recortar_evento(&mut e["data"], n);
+    }
+    Some(js::para_vec(&e))
+}
+
 /// Mercados que cada evento pedido precisa: os do pedido mais os das apostas do
 /// ledger que ainda não têm data de resultado confirmada (`_confirmedClosedTs`).
 /// Para essas, a data do PnL na interface pode vir do mapa de datas da última
@@ -1022,11 +1196,19 @@ fn necessidades(c: &rusqlite::Connection, user: &str, pedido: Option<&Value>, ch
     if mapa.is_empty() {
         return Ok(mapa);
     }
-    let mut s = c.prepare(
+    // Com o índice parcial da manutenção, só as apostas sem data confirmada são
+    // lidas. O SQLite não o escolhe sozinho, daí o `INDEXED BY`. A ordem das
+    // linhas não importa: elas só preenchem conjuntos.
+    let indice = if crate::db::tem_indice(c, crate::db::INDICE_SEM_CONFIRMACAO)? {
+        format!("INDEXED BY {}", crate::db::INDICE_SEM_CONFIRMACAO)
+    } else {
+        String::new()
+    };
+    let mut s = c.prepare(&format!(
         "SELECT json_extract(data_json,'$.eventSlug'),json_extract(data_json,'$.slug'),json_extract(data_json,'$.asset'),
-                json_extract(data_json,'$.conditionId') FROM closed_bets_ledger WHERE user_id=? AND platform='polymarket'
-         AND json_extract(data_json,'$._confirmedClosedTs') IS NULL",
-    )?;
+                json_extract(data_json,'$.conditionId') FROM closed_bets_ledger {indice} WHERE user_id=? AND platform='polymarket'
+         AND json_extract(data_json,'$._confirmedClosedTs') IS NULL"
+    ))?;
     let texto = |r: &rusqlite::Row<'_>, i: usize| -> Value {
         match r.get_ref(i) {
             Ok(rusqlite::types::ValueRef::Text(t)) => Value::String(String::from_utf8_lossy(t).into_owned()),
@@ -1080,7 +1262,7 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
                 }
             }
             tx.commit()?;
-            return Ok(json!({ "ok": true, "saved": validas.len() }));
+            return Ok(js::para_vec(&json!({ "ok": true, "saved": validas.len() })));
         }
         let mut chaves: Vec<String> = Vec::new();
         for s in corpo.get("slugs").and_then(Value::as_array).map_or(&[][..], |a| a.as_slice()) {
@@ -1091,7 +1273,10 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
             }
         }
         let precisa = necessidades(c, &u, corpo.get("need"), &chaves)?;
-        let mut entradas = Vec::new();
+        // A resposta é montada em texto: cada evento entra pelo caminho rápido
+        // (sem decodificar) ou, se fugir da forma de sempre, pelo `Value`.
+        let mut saida = b"{\"ok\":true,\"entries\":[".to_vec();
+        let mut primeira = true;
         for lote in chaves.chunks(400) {
             let marcas = vec!["?"; lote.len()].join(",");
             let sql = format!(
@@ -1106,18 +1291,19 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
             p.extend(lote.iter().map(|k| k as &dyn rusqlite::types::ToSql));
             for row in s.query_map(p.as_slice(), |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
                 let (slug, d) = row?;
-                if let Ok(dado) = serde_json::from_str::<Value>(&d) {
-                    let mut e = json!({ "slug": slug, "data": dado });
-                    if metadado_valido(&e) {
-                        if let Some(n) = precisa.get(&slug) {
-                            recortar_evento(&mut e["data"], n);
-                        }
-                        entradas.push(e);
+                let n = precisa.get(&slug);
+                let entrada = entrada_rapida(&slug, &d, n).unwrap_or_else(|| entrada_completa(&slug, &d, n));
+                if let Some(e) = entrada {
+                    if !primeira {
+                        saida.push(b',');
                     }
+                    primeira = false;
+                    saida.extend(e);
                 }
             }
         }
-        Ok(json!({ "ok": true, "entries": entradas }))
+        saida.extend_from_slice(b"]}");
+        Ok(saida)
     };
     let r = if grava { estado.db.call(tarefa).await } else { estado.db.ler(tarefa).await };
     r.map_or_else(
@@ -1125,7 +1311,7 @@ pub async fn cache_metadados(estado: &Estado, corpo: &Value) -> ApiResponse {
             eprintln!("[polymarket] cache de metadados: {e:#}");
             resposta(StatusCode::SERVICE_UNAVAILABLE, json!({ "ok": false }))
         },
-        |v| resposta(StatusCode::OK, v),
+        |bytes| bytes_json(StatusCode::OK, bytes),
     )
 }
 
@@ -1158,6 +1344,246 @@ mod tests {
         let mut n = Necessidade::default();
         n.juntar(&d);
         n
+    }
+
+    /// Perfil do `POST /api/polymarket-metadata/cache` por etapa, num banco
+    /// real (cópia em BETTY_COMPARAR_DB): todos os eventos do cache que têm
+    /// apostas no ledger, cada um pedindo os mercados das próprias apostas.
+    #[test]
+    #[ignore]
+    fn medir_cache_metadados() {
+        use std::time::Instant;
+        let mut c = crate::db::abrir(std::path::Path::new(&std::env::var("BETTY_COMPARAR_DB").unwrap())).unwrap();
+        let u = crate::db::usuario_local(&mut c).unwrap().id;
+        let mut pedido = Map::new();
+        {
+            let mut s = c.prepare("SELECT data_json FROM closed_bets_ledger WHERE user_id=? AND platform='polymarket'").unwrap();
+            for d in s.query_map([&u], |r| r.get::<_, String>(0)).unwrap() {
+                let d: Value = serde_json::from_str(&d.unwrap()).unwrap();
+                let chave = js::string(Some(d.get("eventSlug").filter(|v| js::truthy(Some(v))).unwrap_or(&d["slug"])));
+                let n = pedido.entry(chave).or_insert_with(|| json!({ "assets": [], "conditions": [], "slugs": [] }));
+                for (lista, k) in [("assets", "asset"), ("conditions", "conditionId"), ("slugs", "slug")] {
+                    if let Some(v) = d.get(k).filter(|v| js::truthy(Some(v))) {
+                        n[lista].as_array_mut().unwrap().push(v.clone());
+                    }
+                }
+            }
+        }
+        let todos: Vec<String> = c.prepare("SELECT slug FROM polymarket_metadata_cache").unwrap().query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect();
+        let chaves: Vec<String> = todos.into_iter().filter(|s| pedido.contains_key(s)).take(400).collect();
+        let pedido = Value::Object(pedido);
+        let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
+        for volta in 1..=4 {
+            // A partir da 3ª volta, com o índice da manutenção.
+            if volta == 3 {
+                crate::db::criar_indices_da_manutencao(&c).unwrap();
+            }
+            let i = Instant::now();
+            let precisa = necessidades(&c, &u, Some(&pedido), &chaves).unwrap();
+            let t_nec = i.elapsed();
+            let i = Instant::now();
+            let marcas = vec!["?"; chaves.len()].join(",");
+            let mut s = c.prepare(&format!("SELECT slug,data_json FROM polymarket_metadata_cache WHERE user_id=? AND slug IN ({marcas})")).unwrap();
+            let mut p: Vec<&dyn rusqlite::types::ToSql> = vec![&u];
+            p.extend(chaves.iter().map(|k| k as &dyn rusqlite::types::ToSql));
+            let linhas: Vec<(String, String)> = s.query_map(p.as_slice(), |r| Ok((r.get(0)?, r.get(1)?))).unwrap().map(Result::unwrap).collect();
+            let t_sql = i.elapsed();
+            let bytes: usize = linhas.iter().map(|l| l.1.len()).sum();
+            let i = Instant::now();
+            let completo: Vec<Vec<u8>> = linhas.iter().filter_map(|(k, d)| entrada_completa(k, d, precisa.get(k))).collect();
+            let t_completo = i.elapsed();
+            let i = Instant::now();
+            let rapido: Vec<Vec<u8>> =
+                linhas.iter().filter_map(|(k, d)| entrada_rapida(k, d, precisa.get(k)).unwrap_or_else(|| entrada_completa(k, d, precisa.get(k)))).collect();
+            let t_rapido = i.elapsed();
+            assert!(completo == rapido);
+            eprintln!(
+                "volta {volta}: {} eventos, {:.1} MB lidos -> {:.1} MB | necessidades {:.0} ms | sql {:.0} | Value {:.0} ms | rápido {:.0} ms",
+                chaves.len(),
+                bytes as f64 / 1e6,
+                rapido.iter().map(Vec::len).sum::<usize>() as f64 / 1e6,
+                ms(t_nec),
+                ms(t_sql),
+                ms(t_completo),
+                ms(t_rapido)
+            );
+        }
+    }
+
+    /// O caminho rápido dá os mesmos bytes do caminho com `Value`, ou desiste.
+    fn conferir_rapido(slug: &str, dado: &Value, n: Option<&Necessidade>) -> bool {
+        let texto = js::para_texto(dado);
+        let completo = entrada_completa(slug, &texto, n);
+        match entrada_rapida(slug, &texto, n) {
+            Some(rapido) => {
+                assert_eq!(
+                    rapido.as_deref().map(String::from_utf8_lossy),
+                    completo.as_deref().map(String::from_utf8_lossy),
+                    "{texto}"
+                );
+                true
+            }
+            None => false,
+        }
+    }
+
+    #[test]
+    fn caminho_rapido_igual_ao_completo() {
+        let necessidades: Vec<Option<Necessidade>> = vec![
+            None,
+            Some(Necessidade::default()),
+            Some(necessidade(json!({ "assets": [" 22 "], "slugs": ["jogo-total"] }))),
+            Some(necessidade(json!({ "conditions": ["0xc3"] }))),
+            Some(necessidade(json!({ "slugs": ["JOGO-HANDICAP", "jogo-ml"] }))),
+            Some(necessidade(json!({ "assets": ["nenhum"] }))),
+        ];
+        let mut variantes: Vec<Value> = vec![evento()];
+        let mut v = evento();
+        v["sport"]["eventTexts"] = json!(["já calculado"]);
+        variantes.push(v);
+        let mut v = evento();
+        v["sport"]["eventTexts"] = json!("não é lista");
+        variantes.push(v);
+        let mut v = evento();
+        v["sport"].as_object_mut().unwrap().remove("texts");
+        variantes.push(v);
+        let mut v = evento();
+        v["sport"]["markets"][2]["tokenIds"] = json!([]);
+        v["sport"]["markets"][0]["slug"] = Value::Null;
+        v["sport"]["markets"][1]["groupItemTitle"] = json!("Soccer");
+        variantes.push(v);
+        let mut v = evento();
+        v["dates"]["markets"] = json!(["não é objeto"]);
+        variantes.push(v);
+        let mut v = evento();
+        v["sport"]["markets"][1]["tokenIds"] = json!("21");
+        v["sport"]["markets"][0]["condition_id"] = json!("0xC3");
+        variantes.push(v);
+        // Inválidos: sem data, data ruim, sem tokens, sem mercados.
+        let mut v = evento();
+        v.as_object_mut().unwrap().remove("start");
+        variantes.push(v);
+        let mut v = evento();
+        v["start"] = json!("ontem");
+        variantes.push(v);
+        let mut v = evento();
+        for m in v["sport"]["markets"].as_array_mut().unwrap() {
+            m["tokenIds"] = json!([]);
+        }
+        variantes.push(v);
+        let mut v = evento();
+        v["sport"]["markets"] = json!([]);
+        variantes.push(v);
+        let mut v = evento();
+        v["dates"]["event"] = json!("");
+        variantes.push(v);
+        for (i, v) in variantes.iter().enumerate() {
+            for n in &necessidades {
+                assert!(conferir_rapido("jogo", v, n.as_ref()), "a variante {i} devia ir pelo caminho rápido");
+            }
+        }
+        assert!(conferir_rapido("jogo", &evento(), None));
+        assert_eq!(entrada_rapida("", &js::para_texto(&evento()), None), Some(None), "slug vazio é inválido");
+
+        // Formas que vão para o caminho com `Value`.
+        let n = necessidade(json!({ "slugs": ["jogo-ml"] }));
+        let mut v = evento();
+        v["sport"]["markets"].as_array_mut().unwrap().push(Value::Null);
+        assert!(!conferir_rapido("jogo", &v, Some(&n)), "mercado que não é objeto");
+        let mut v = evento();
+        v["sport"]["markets"].as_array_mut().unwrap().push(json!(["lista"]));
+        assert!(!conferir_rapido("jogo", &v, Some(&n)), "mercado que é lista");
+        let mut v = evento();
+        v["sport"]["texts"] = json!(["Café \u{2028}"]);
+        assert!(conferir_rapido("jogo", &v, Some(&n)), "sem escape \\u no texto gravado");
+        let texto = js::para_texto(&evento()).replace("A vs B", "A \\u0076s B");
+        assert_eq!(entrada_rapida("jogo", &texto, Some(&n)), None, "escape \\u");
+        let texto = js::para_texto(&evento()).replacen("\"eventId\":\"9\"", "\"eventId\":\"9\",\"eventId\":\"10\"", 1);
+        assert_eq!(entrada_rapida("jogo", &texto, Some(&n)), None, "chave repetida");
+        let mut v = evento();
+        v["sport"] = json!("sem esporte");
+        assert!(!conferir_rapido("jogo", &v, Some(&n)));
+        assert_eq!(entrada_rapida("jogo", "não é json", None), None);
+        assert_eq!(entrada_completa("jogo", "não é json", None), None);
+    }
+
+    /// Oráculo do caminho rápido num banco real (cópia em BETTY_COMPARAR_DB):
+    /// cada evento do cache, sem pedido, com o pedido de todas as apostas dele
+    /// no ledger, só da primeira, vazio e com um terço dos mercados.
+    #[test]
+    #[ignore]
+    fn oraculo_caminho_rapido() {
+        let c = crate::db::abrir(std::path::Path::new(&std::env::var("BETTY_COMPARAR_DB").unwrap())).unwrap();
+        let mut apostas: HashMap<String, Vec<Value>> = HashMap::new();
+        {
+            let mut s = c.prepare("SELECT data_json FROM closed_bets_ledger WHERE platform='polymarket'").unwrap();
+            for d in s.query_map([], |r| r.get::<_, String>(0)).unwrap() {
+                let d: Value = serde_json::from_str(&d.unwrap()).unwrap();
+                let chave = js::string(Some(d.get("eventSlug").filter(|v| js::truthy(Some(v))).unwrap_or(&d["slug"])));
+                apostas.entry(chave).or_default().push(d);
+            }
+        }
+        let mut s = c.prepare("SELECT slug,data_json FROM polymarket_metadata_cache").unwrap();
+        let linhas: Vec<(String, String)> = s.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().map(Result::unwrap).collect();
+        let (mut casos, mut rapidos, mut invalidos) = (0, 0, 0);
+        for (slug, texto) in &linhas {
+            let mut pedidos: Vec<Option<Necessidade>> = vec![None, Some(Necessidade::default())];
+            if let Some(lista) = apostas.get(slug) {
+                let mut todas = Necessidade::default();
+                lista.iter().for_each(|a| todas.juntar(a));
+                pedidos.push(Some(todas));
+                pedidos.push(Some(necessidade(lista[0].clone())));
+            }
+            if let Ok(v) = serde_json::from_str::<Value>(texto) {
+                let mut terco = Necessidade::default();
+                for m in v.pointer("/sport/markets").and_then(Value::as_array).into_iter().flatten().step_by(3) {
+                    terco.juntar(&json!({ "assets": m.get("tokenIds").cloned().unwrap_or(json!([])), "slugs": [m.get("slug")] }));
+                }
+                pedidos.push(Some(terco));
+            }
+            for n in &pedidos {
+                casos += 1;
+                let completo = entrada_completa(slug, texto, n.as_ref());
+                if let Some(rapido) = entrada_rapida(slug, texto, n.as_ref()) {
+                    rapidos += 1;
+                    invalidos += usize::from(rapido.is_none());
+                    assert!(rapido == completo, "{slug}: o caminho rápido diverge");
+                }
+            }
+        }
+        eprintln!("{} eventos, {casos} casos: {rapidos} pelo caminho rápido ({invalidos} inválidos), {} pelo Value, 0 divergências", linhas.len(), casos - rapidos);
+    }
+
+    #[test]
+    fn necessidades_iguais_com_o_indice_da_manutencao() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        let u = crate::db::usuario_local(&mut c).unwrap().id;
+        for (i, dado) in [
+            json!({ "eventSlug": "jogo", "slug": "jogo-handicap", "asset": "31", "conditionId": "0xC3" }),
+            json!({ "eventSlug": "jogo", "slug": "jogo-ml", "asset": "11", "_confirmedClosedTs": 1 }),
+            json!({ "eventSlug": "jogo", "slug": "jogo-total", "asset": "21", "_confirmedClosedTs": null }),
+        ]
+        .iter()
+        .enumerate()
+        {
+            c.execute(
+                "INSERT INTO closed_bets_ledger(user_id,platform,bet_key,data_json,first_seen_at,updated_at) VALUES(?,'polymarket',?,?,'x','x')",
+                rusqlite::params![u, format!("k{i}"), dado.to_string()],
+            )
+            .unwrap();
+        }
+        let pedido = json!({ "jogo": { "slugs": ["jogo-ml"] } });
+        let ler = |c: &rusqlite::Connection| {
+            let n = necessidades(c, &u, Some(&pedido), &["jogo".to_string()]).unwrap();
+            let mut s: Vec<String> = n["jogo"].slugs.iter().cloned().collect();
+            s.sort();
+            s
+        };
+        let sem = ler(&c);
+        assert_eq!(sem, ["jogo-handicap", "jogo-ml", "jogo-total"], "as sem data confirmada entram, a confirmada não");
+        crate::db::criar_indices_da_manutencao(&c).unwrap();
+        assert_eq!(ler(&c), sem);
     }
 
     #[test]

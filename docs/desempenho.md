@@ -137,12 +137,45 @@ Só compacta quando duas condições valem juntas:
 - Controle negativo: com `ler` mandado para a conexão de escrita, os dois testes de espera falham.
 - Manutenção real (`api::tests::medir_leitura_durante_a_manutencao`, numa cópia sem compactar): o banco foi de 284 MB para 151 MB com as conexões de leitura abertas, e `/api/me` respondeu 44 vezes durante os 4,4 s, com mediana de 0,2 ms. Com `BETTY_CONEXOES_DE_LEITURA=0` (uma conexão só, como antes), o único pedido esperou 4,4 s.
 
+**Corrigido depois:** a conexão de escrita fechava antes das de leitura. Uma conexão só de leitura não consegue juntar o WAL ao arquivo, então o `betty.db-wal` ficava com as últimas gravações (23 MB depois da manutenção) e uma cópia só do `betty.db` saía sem elas. Agora os campos de `db::Db` estão na ordem em que precisam fechar (`db::tests::fechar_junta_o_wal_ao_arquivo`).
+
+### 5. Cache de metadados mais leve
+
+**Polymarket (`POST /api/polymarket-metadata/cache`):** 260 ms por lote grande da abertura (400 eventos, 10 MB lidos), em três partes:
+
+- **Necessidades, 65–90 ms:** `poly::necessidades` rodava `json_extract` em todas as apostas da Polymarket para achar as sem `_confirmedClosedTs` (hoje nenhuma).
+  - Agora há um índice parcial com essa condição (`db::INDICE_SEM_CONFIRMACAO`), criado pela manutenção da abertura (`db::criar_indices_da_manutencao`), e a consulta usa `INDEXED BY` quando ele existe. Caiu para 2–5 ms.
+  - **Tem de ser parcial.** Um índice comum em `closed_bets_ledger(user_id, platform, ...)` fez o SQLite ler o ledger por ele, e as 539 apostas com o mesmo `first_seen_at` de outra saíram em outra ordem no `GET /api/history/closed`. O índice parcial só entra numa consulta que repete a condição dele (`history::tests::indices_da_manutencao_nao_mudam_os_planos_do_ledger`, que falha com o índice comum).
+- **Decodificar e recortar, 110–160 ms:** cada evento virava um `Value` inteiro antes do recorte.
+  - Agora `poly::entrada_rapida` lê o evento com `json_bruto` (só os níveis que importam, com o texto original de cada valor), valida e recorta como `metadado_valido` + `recortar_evento`, e monta a resposta em texto. Caiu para 65–95 ms.
+  - Qualquer forma fora do comum (escape `\u` ou `\/`, chave repetida, mercado que não é objeto...) cai no caminho antigo (`poly::entrada_completa`), que continua sendo a referência.
+- **Validação:**
+  - `poly::tests::oraculo_caminho_rapido`, na cópia do banco real: 868 eventos e 4.310 casos (sem pedido, todas as apostas do evento, só a primeira, pedido vazio, um terço dos mercados), todos pelo caminho rápido e com os mesmos bytes do caminho com `Value`;
+  - `poly::tests::caminho_rapido_igual_ao_completo` cobre as variantes raras.
+
+**Kalshi (`kalshi_metadata_cache`):** 41,8 MB, sendo 36,6 MB de eventos. Em cada evento, `markets` é cópia de `_markets` (11,3 MB no total) e `_milestone` é cópia de um item de `_milestones` (6,4 MB).
+
+- `kalshi::compactar_evento` troca as duas cópias por marcadores na mesma posição, e `kalshi::expandir_evento` desfaz na leitura (`meta_varios`). Quem lê recebe o mesmo `Value` de antes.
+- A comparação é pelo texto: o `==` do `serde_json` ignora a ordem das chaves.
+- `history::metadados_kalshi` lê o cache direto, mas só `title`, `_teamsTitle` e `product_metadata`, que não mudam.
+- Os eventos já gravados são compactados uma vez na manutenção (`kalshi::compactar_cache_uma_vez`, marcador `compact_kalshi_event_cache_v1`), antes do `VACUUM`.
+- **Validação:** `kalshi::tests::oraculo_cache_de_eventos` diz que os 1.748 eventos da cópia voltam com o mesmo texto, e o cache de eventos vai de 36,6 MB para 18,9 MB.
+
+**Rotas:** 64 rotas de leitura, código antigo contra o novo depois da manutenção nova (`rotas_leitura.py` ganhou o pedido da abertura, com as apostas de cada evento): 63 idênticas byte a byte; a outra é o controle do PnL sem `now`.
+
+| Pedido ao cache da Polymarket | Antes | Depois |
+|---|---|---|
+| 120 eventos, sem recorte | 164 ms | 96 ms |
+| 60 eventos, 30 com recorte | 102 ms | 18 ms |
+| 400 eventos, recorte das apostas | 153 ms | 136 ms |
+
 ## Como validar
 
 ### Método
 
 1. **Trabalhe numa cópia do banco, nunca no original.**
    - Copie com `ferramentas/validacao/copiar_banco.py`.
+   - Ao trocar uma cópia por outra, apague antes o `-wal` e o `-shm` dela. Um `-wal` velho ao lado de um `.db` novo é aplicado por cima na abertura e corrompe a cópia ("freelist leaf count too big", rotas com 500).
    - Apague as cópias, os JSONL e as capturas no fim: são dados reais da conta.
 2. **Compare o Rust novo com a referência.**
    - O teste ignorado `api::tests::despejar_rotas_para_comparacao` roda uma lista de rotas sobre um banco e grava as respostas em JSONL.
@@ -181,8 +214,7 @@ Só compacta quando duas condições valem juntas:
 | `observar_abertura.mjs` | Linha do tempo da abertura e capturas pelo CDP (porta da depuração remota). |
 | `oraculo_compactacao.mjs` | Modelo de oráculo: compara o que a interface deriva de dois bancos. |
 | `oraculo_recorte.mjs` + `preparar_meta.py` | Modelo de oráculo para respostas de rota (evento inteiro x recortado). |
-| `rotas_leitura.py` + `comparar_rotas.py` | Lista de 63 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
-
+| `rotas_leitura.py` + `comparar_rotas.py` | Lista de 64 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
 Rode `teste_abertura.mjs` e `teste_versoes.mjs` a cada mudança no `dashboard.js`:
 
 ```powershell
@@ -217,16 +249,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Validar:** memória privada antes e depois, minimizado por 1 minuto; o app volta sem recarregar a página.
 - **Pronto quando:** a queda estiver medida e anotada aqui.
 
-### 3. Cache por evento sem ler o evento inteiro
-
-- **Problema:** `poly::cache_metadados` ainda transforma o evento inteiro em `serde_json::Value` antes de recortar, 300 a 400 ms para cerca de 225 eventos. Desde as leituras em paralelo ela não segura mais a conexão de escrita, mas ocupa uma das duas de leitura. A tabela `polymarket_metadata_cache` tem 65 MB.
-- **Proposta (uma das duas):**
-  - (a) Ler só o primeiro nível com `RawValue` e decodificar só `dates.markets[slug]` e os mercados de `sport.markets` que casam.
-  - (b) Guardar o cache por mercado (uma tabela `slug` + `market_slug`) e consultar só as linhas necessárias.
-- **Na mesma linha:** `kalshi_metadata_cache` tem 40 MB, e boa parte é duplicada dentro de cada linha (`_markets` = `markets` e `_milestones` = `_milestone`, cerca de 17 MB). Antes de tirar a duplicata, confirmar em `kalshi.rs` e `kalshi_dados.rs` quem lê cada chave.
-- **Validar:** respostas da rota idênticas às de hoje (com e sem `need`), com o `oraculo_recorte.mjs`.
-
-### 4. Menos `serde_json::Value` nos caminhos das casas
+### 3. Menos `serde_json::Value` nos caminhos das casas
 
 - **Problema:**
   - O `serde_json` está com `arbitrary_precision` e `preserve_order` no app inteiro. É necessário para o ledger sair byte a byte igual, mas faz cada número virar texto alocado e cada objeto um `IndexMap`.
@@ -237,7 +260,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   - Estimar o tamanho sem serializar.
 - **Validar:** respostas das rotas das casas idênticas (`despejar_rotas_para_comparacao` contra respostas gravadas de uma sessão real) e oráculos existentes (`tracked::tests::oraculo_predict`, `kalshi_dados::tests::oraculo_titulos`, `ledger::tests::oraculo_ledger`).
 
-### 5. Memória do processo Rust parado
+### 4. Memória do processo Rust parado
 
 - **Problema:** 211 MB privados parado no build antigo. Ainda não foi medido depois das mudanças.
 - **Proposta:** medir primeiro (item 1). Se continuar alto, os suspeitos são:
@@ -247,7 +270,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   - as liquidações da Kalshi guardadas em memória (`EstadoKalshi::liquidacoes`, cerca de 1.944 linhas).
 - **Cuidado:** `EstadoKalshi::liquidacoes` e `revisados`, e as agendas de `EstadoTracked`, mudam comportamento (cache da sessão, agenda vencida usada como reserva). Não basta expirar por tempo.
 
-### 6. Dividir o `dashboard.js` por tela (medir antes)
+### 5. Dividir o `dashboard.js` por tela (medir antes)
 
 - **Problema possível:** são 7.700 linhas e 380 KB lidas e compiladas de uma vez na abertura.
 - **Proposta:**
@@ -255,7 +278,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   2. Se for relevante, separar por tela (estatísticas, calendário, configurações) com `import()` dinâmico. O CSP já permite scripts da própria origem.
 - **Cuidado:** o arquivo usa muito estado global e funções chamadas por nome (`data-on-click`, em `acoes.js`).
 
-### 7. Sincronização inteira no Rust (o item grande)
+### 6. Sincronização inteira no Rust (o item grande)
 
 - **Problema:**
   - Toda a sincronização está no `dashboard.js` (`carregarAba`). A interface baixa as listas das casas pelo backend, enriquece, concilia, compara com o ledger, envia o delta e reindexa, com centenas de idas e voltas pelo `betty://` e o histórico inteiro no heap do JS.
@@ -285,7 +308,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   4. Manter o pipeline do JS atrás de uma chave até o Rust dar o mesmo índice, o mesmo ledger e os mesmos números em várias sincronizações reais. Depois, apagar.
 - **Validar:** ledger e índice byte a byte iguais entre o pipeline do JS e o do Rust na mesma cópia de banco e com as mesmas respostas das casas. Gravar as respostas de uma sessão real e reproduzir.
 
-### 8. Sincronização incremental (depois do item 7)
+### 7. Sincronização incremental (depois do item 6)
 
 - **Problema:** cada sincronização baixa o histórico inteiro de fechadas da Polymarket (3 páginas de 1.000 no v2) e conferem tudo de novo. A activity da Polymarket (`poly::atividade_incremental`) e as liquidações da Kalshi (`kalshi::liquidacoes_incrementais`) já são incrementais.
 - **Proposta:** as fechadas vêm em ordem de `TIMESTAMP DESC`. Parar quando aparecerem K linhas seguidas que já estão no ledger com a mesma assinatura. Fazer a varredura completa em segundo plano de tempos em tempos (por exemplo 1 vez por dia ou na abertura).

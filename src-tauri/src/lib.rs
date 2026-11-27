@@ -14,6 +14,7 @@ mod download;
 mod history;
 mod import;
 mod js;
+mod json_bruto;
 mod kalshi;
 mod kalshi_dados;
 mod keystore;
@@ -200,23 +201,38 @@ fn inicializar(pastas: &Pastas) -> anyhow::Result<api::Estado> {
     Ok(api::Estado { db, chave: Arc::new(chave), usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() })
 }
 
+/// O que a manutenção fez: ledger compactado, eventos da Kalshi compactados
+/// (mudados, bytes antes, bytes depois) e bytes devolvidos pelo `VACUUM`.
+pub(crate) type ResumoManutencao = (Option<ledger::Compactacao>, Option<(usize, usize, usize)>, Option<i64>);
+
+/// As etapas da manutenção, na ordem, na conexão de escrita. O `VACUUM` vem
+/// por último, para devolver ao disco o que as compactações liberaram.
+pub(crate) fn manutencao(c: &mut rusqlite::Connection) -> anyhow::Result<ResumoManutencao> {
+    let compactacao = ledger::compactar_ledger_uma_vez(c)?;
+    let kalshi = kalshi::compactar_cache_uma_vez(c)?;
+    db::criar_indices_da_manutencao(c)?;
+    let livre = db::recuperar_espaco(c)?;
+    Ok((compactacao, kalshi, livre))
+}
+
 /// Manutenção que pode levar alguns segundos, fora do caminho de abertura: a
 /// janela já aparece, as leituras seguem pelas conexões de leitura e as
-/// gravações esperam a vez. Hoje é a
-/// compactação única dos metadados do ledger, seguida do `VACUUM` que devolve
+/// gravações esperam a vez. Hoje é a compactação única dos metadados do
+/// ledger, os índices que passam pelo ledger inteiro e o `VACUUM` que devolve
 /// o espaço liberado ao disco.
 fn manutencao_do_banco(db: db::Db) {
     tauri::async_runtime::spawn(async move {
         let inicio = Instant::now();
-        let r = db
-            .call(|c| {
-                let compactacao = ledger::compactar_ledger_uma_vez(c)?;
-                let livre = db::recuperar_espaco(c)?;
-                Ok((compactacao, livre))
-            })
-            .await;
+        let r = db.call(manutencao).await;
         match r {
-            Ok((compactacao, livre)) => {
+            Ok((compactacao, kalshi, livre)) => {
+                if let Some((mudados, antes, depois)) = kalshi {
+                    eprintln!(
+                        "[manutenção] cache de eventos da Kalshi: {mudados} eventos compactados, {} MB -> {} MB",
+                        antes / 1_048_576,
+                        depois / 1_048_576
+                    );
+                }
                 if let Some(c) = compactacao {
                     eprintln!(
                         "[manutenção] metadados do ledger: {}/{} apostas compactadas, {} MB -> {} MB",

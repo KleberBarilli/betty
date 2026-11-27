@@ -160,6 +160,35 @@ CREATE INDEX IF NOT EXISTS idx_closed_bets_index_platform_table_date ON closed_b
 CREATE INDEX IF NOT EXISTS idx_closed_bets_index_platform_pnl_date ON closed_bets_index(user_id, platform, pnl_ts);
 "#;
 
+/// Índices que custam uma passada pelo ledger inteiro para criar: ficam para a
+/// manutenção em segundo plano (`criar_indices_da_manutencao`), depois da
+/// compactação, e nunca atrasam a abertura.
+///
+/// - `INDICE_SEM_CONFIRMACAO`: apostas da Polymarket sem data de resultado
+///   confirmada. Sem ele, cada leitura do cache de metadados
+///   (`poly::necessidades`) rodava `json_extract` em todas as apostas.
+///
+/// Só índices parciais: o SQLite só usa um índice parcial numa consulta que
+/// repete a condição dele, então nenhuma outra consulta muda de plano. Um
+/// índice comum em `closed_bets_ledger(user_id, ...)` fazia o ledger ser lido
+/// por ele e mudava a ordem das apostas com o mesmo `first_seen_at`.
+const INDICES_DA_MANUTENCAO: &str = r#"
+CREATE INDEX IF NOT EXISTS idx_closed_bets_ledger_poly_sem_confirmacao ON closed_bets_ledger(user_id)
+  WHERE platform='polymarket' AND json_extract(data_json,'$._confirmedClosedTs') IS NULL;
+"#;
+
+/// Nome do índice parcial das apostas da Polymarket sem data confirmada.
+pub const INDICE_SEM_CONFIRMACAO: &str = "idx_closed_bets_ledger_poly_sem_confirmacao";
+
+/// O índice existe (a manutenção da abertura já rodou neste banco)?
+pub fn tem_indice(conn: &Connection, nome: &str) -> Result<bool> {
+    Ok(conn.query_row("SELECT 1 FROM sqlite_master WHERE type='index' AND name=?", [nome], |_| Ok(())).optional()?.is_some())
+}
+
+pub fn criar_indices_da_manutencao(conn: &Connection) -> Result<()> {
+    conn.execute_batch(INDICES_DA_MANUTENCAO).context("índices da manutenção")
+}
+
 pub fn agora() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
@@ -459,11 +488,16 @@ pub const CONEXOES_DE_LEITURA: usize = 2;
 /// Em WAL as leituras não esperam as gravações: `ler` vê tudo o que já foi
 /// confirmado, mesmo durante a manutenção da abertura ou um lote longo do
 /// ledger. Toda gravação passa por `call`, uma por vez.
+///
+/// A ordem dos campos importa: eles saem na ordem declarada, e a conexão de
+/// escrita tem de fechar por último. Só ela consegue juntar o WAL ao arquivo
+/// e apagá-lo; se uma de leitura fechar por último, o WAL fica do lado do
+/// `betty.db`, e uma cópia só do `.db` sai sem as últimas gravações.
 #[derive(Clone)]
 pub struct Db {
-    escrita: Conexao,
     leitura: Arc<[Conexao]>,
     vez: Arc<AtomicUsize>,
+    escrita: Conexao,
 }
 
 impl Db {
@@ -472,7 +506,7 @@ impl Db {
     pub fn com_leitura(conn: Connection, n: usize) -> Result<Self> {
         let caminho = conn.path().filter(|p| !p.is_empty()).map(std::path::PathBuf::from).ok_or_else(|| anyhow!("banco sem arquivo"))?;
         let leitura = (0..n).map(|_| abrir_leitura(&caminho).map(Conexao::new)).collect::<Result<Vec<_>>>()?;
-        Ok(Self { escrita: Conexao::new(conn), leitura: leitura.into(), vez: Default::default() })
+        Ok(Self { leitura: leitura.into(), vez: Default::default(), escrita: Conexao::new(conn) })
     }
 
     /// Liga a leitura mapeada (`mmap_size`) nas conexões de leitura, que deixa
@@ -691,6 +725,26 @@ pub(crate) mod tests {
         tauri::async_runtime::block_on(db.mapear_leitura()).unwrap();
         let n = tauri::async_runtime::block_on(db.ler(|c| Ok(c.query_row("SELECT COUNT(*) FROM lixo", [], |r| r.get::<_, i64>(0))?))).unwrap();
         assert_eq!(n, 0, "lê normalmente depois de mapear");
+    }
+
+    #[test]
+    fn fechar_junta_o_wal_ao_arquivo() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.db");
+        let conn = abrir(&p).unwrap();
+        // Sem o checkpoint automático, tudo o que foi gravado fica no WAL até fechar.
+        conn.pragma_update(None, "wal_autocheckpoint", 0).unwrap();
+        let db = Db::com_leitura(conn, 2).unwrap();
+        tauri::async_runtime::block_on(db.mapear_leitura()).unwrap();
+        tauri::async_runtime::block_on(db.call(|c| Ok(c.execute_batch("CREATE TABLE t(x); INSERT INTO t VALUES(randomblob(100000));")?))).unwrap();
+        tauri::async_runtime::block_on(db.ler(|c| Ok(c.query_row("SELECT COUNT(*) FROM t", [], |_| Ok(()))?))).unwrap();
+        let wal = dir.path().join("t.db-wal");
+        assert!(std::fs::metadata(&wal).unwrap().len() > 100_000, "a gravação está no WAL");
+        drop(db);
+        assert!(!wal.exists(), "a conexão de escrita fecha por último e apaga o WAL");
+        // O arquivo sozinho tem tudo.
+        let c = Connection::open(&p).unwrap();
+        assert_eq!(c.query_row("SELECT length(x) FROM t", [], |r| r.get::<_, i64>(0)).unwrap(), 100_000);
     }
 
     #[test]

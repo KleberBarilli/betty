@@ -1183,11 +1183,11 @@ pub(crate) fn anexar_metadados_kalshi(c: &Connection, mut linhas: Vec<Linha>) ->
     Ok(linhas)
 }
 
-/// `readClosedLedger()`: todo o histórico da conta ativa, na ordem de entrada.
-pub(crate) fn ler_ledger(c: &Connection, user_id: &str, com_titulos: bool) -> Result<Vec<Linha>> {
-    // Mesma consulta do Node, mas a ordenação carrega só rowid e título; o
-    // data_json é lido depois, na ordem obtida.
-    let sql = format!(
+/// A consulta da ordem do ledger. Apostas com o mesmo `first_seen_at` saem na
+/// ordem do índice que o SQLite escolhe: um índice novo em
+/// `closed_bets_ledger` pode mudá-la (ver `db::INDICES_DA_MANUTENCAO`).
+fn sql_ordem_ledger(com_titulos: bool) -> String {
+    format!(
         "SELECT l.rowid{} FROM closed_bets_ledger l
     {}
     WHERE l.user_id=? AND {} ORDER BY l.first_seen_at ASC",
@@ -1198,7 +1198,14 @@ pub(crate) fn ler_ledger(c: &Connection, user_id: &str, com_titulos: bool) -> Re
             ""
         },
         conta_ativa_sql("l")
-    );
+    )
+}
+
+/// `readClosedLedger()`: todo o histórico da conta ativa, na ordem de entrada.
+pub(crate) fn ler_ledger(c: &Connection, user_id: &str, com_titulos: bool) -> Result<Vec<Linha>> {
+    // Mesma consulta do Node, mas a ordenação carrega só rowid e título; o
+    // data_json é lido depois, na ordem obtida.
+    let sql = sql_ordem_ledger(com_titulos);
     let ordem: Vec<(i64, Option<String>)> = {
         let mut stmt = c.prepare(&sql)?;
         let rows = stmt.query_map([user_id], |r| Ok((r.get(0)?, if com_titulos { r.get(1)? } else { None })))?;
@@ -1493,6 +1500,42 @@ mod tests {
         };
         assert_eq!(tickers(12), ["EV-E", "EV-B", "EV-A", "EV-C", "EV-D"]);
         assert_eq!(tickers(2), ["EV-E", "EV-B"]);
+    }
+
+    #[test]
+    fn indices_da_manutencao_nao_mudam_os_planos_do_ledger() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        let user = crate::db::usuario_local(&mut c).unwrap().id;
+        for i in 0..50 {
+            let casa = if i % 2 == 0 { "polymarket" } else { "kalshi" };
+            let d = if i % 3 == 0 { json!({ "slug": i }) } else { json!({ "slug": i, "_confirmedClosedTs": 1 }) };
+            c.execute(
+                "INSERT INTO closed_bets_ledger(user_id,platform,bet_key,data_json,first_seen_at,updated_at) VALUES(?,?,?,?,'2026-01-01','x')",
+                rusqlite::params![user, casa, format!("k{i}"), d.to_string()],
+            )
+            .unwrap();
+        }
+        let consultas = [
+            sql_ordem_ledger(false),
+            sql_ordem_ledger(true),
+            format!("SELECT l.rowid,l.platform FROM closed_bets_ledger l WHERE l.user_id=? AND {} ORDER BY l.first_seen_at ASC", conta_ativa_sql("l")),
+            "SELECT bet_key,data_json FROM closed_bets_ledger WHERE user_id=? AND platform='polymarket' AND bet_key IN ('k0','k2')".into(),
+        ];
+        let planos = |c: &Connection| -> Vec<Vec<String>> {
+            consultas
+                .iter()
+                .map(|q| {
+                    let mut s = c.prepare(&format!("EXPLAIN QUERY PLAN {q}")).unwrap();
+                    s.query_map([&user], |r| r.get::<_, String>(3)).unwrap().map(Result::unwrap).collect()
+                })
+                .collect()
+        };
+        let ordem = |c: &Connection| ler_ledger(c, &user, false).unwrap().iter().map(|l| l["slug"].get().to_string()).collect::<Vec<_>>();
+        let (antes, ordem_antes) = (planos(&c), ordem(&c));
+        crate::db::criar_indices_da_manutencao(&c).unwrap();
+        assert_eq!(planos(&c), antes, "o índice parcial não entra em outras consultas");
+        assert_eq!(ordem(&c), ordem_antes, "a ordem do ledger com empates não muda");
     }
 
     /// Mede as etapas da exportação num banco real (cópia).

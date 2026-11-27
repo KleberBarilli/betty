@@ -846,7 +846,7 @@ mod tests {
         let escrita = e.db.clone();
         let manutencao = std::thread::spawn(move || {
             let i = Instant::now();
-            let r = tauri::async_runtime::block_on(escrita.call(|c| Ok((ledger::compactar_ledger_uma_vez(c)?, db::recuperar_espaco(c)?))));
+            let r = tauri::async_runtime::block_on(escrita.call(crate::manutencao));
             (i.elapsed().as_secs_f64() * 1000.0, r.unwrap())
         });
         std::thread::sleep(Duration::from_millis(50));
@@ -855,11 +855,11 @@ mod tests {
             durante.push(me(&e));
             std::thread::sleep(Duration::from_millis(100));
         }
-        let (ms, (compactacao, livre)) = manutencao.join().unwrap();
+        let (ms, (compactacao, kalshi, livre)) = manutencao.join().unwrap();
         durante.sort_by(f64::total_cmp);
         let mediana = |v: &[f64]| v.get(v.len() / 2).copied().unwrap_or(f64::NAN);
         eprintln!(
-            "conexões de leitura: {n} | manutenção {ms:.0} ms (compactadas: {:?}, VACUUM: {:?} MB)\n/api/me normal: mediana {:.1} ms | durante: {} pedidos, mediana {:.1} ms, máximo {:.1} ms",
+            "conexões de leitura: {n} | manutenção {ms:.0} ms (compactadas: {:?}, Kalshi: {kalshi:?}, VACUUM: {:?} MB)\n/api/me normal: mediana {:.1} ms | durante: {} pedidos, mediana {:.1} ms, máximo {:.1} ms",
             compactacao.map(|c| c.compactadas),
             livre.map(|b| b / 1_048_576),
             mediana(&normal),

@@ -490,7 +490,13 @@ mod tests {
             s.query_map([kind], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
                 .unwrap()
                 .map(|r| r.unwrap())
-                .map(|(k, d)| (k, serde_json::from_str(&d).unwrap()))
+                .map(|(k, d)| {
+                    let mut v = serde_json::from_str(&d).unwrap();
+                    if kind == "event" {
+                        crate::kalshi::expandir_evento(&mut v);
+                    }
+                    (k, v)
+                })
                 .collect()
         };
         let (mercados, eventos) = (meta("market"), meta("event"));

@@ -96,6 +96,83 @@ fn ou<'a>(a: Option<&'a Value>, b: Option<&'a Value>) -> Option<&'a Value> {
 // Cache de metadados (kalshi_metadata_cache)
 // ---------------------------------------------------------------------------
 
+/// Começo dos marcadores que tomam o lugar de uma cópia dentro do evento
+/// gravado. O caractere nulo nunca aparece num texto da API.
+const COPIA: &str = "\u{0}betty:";
+
+/// O evento como vai para o cache: `markets` (igual a `_markets`) e
+/// `_milestone` (um dos `_milestones`) viram marcadores na mesma posição,
+/// porque as cópias eram quase metade do cache. `expandir_evento` desfaz.
+/// A comparação é pelo texto, porque o `==` do `serde_json` ignora a ordem
+/// das chaves.
+fn compactar_evento(ev: &Value) -> Value {
+    let mut ev = ev.clone();
+    let Some(o) = ev.as_object_mut() else { return ev };
+    let texto = |v: Option<&Value>| v.map(js::para_texto);
+    if o.contains_key("markets") && texto(o.get("markets")) == texto(o.get("_markets")) {
+        o.insert("markets".into(), Value::String(format!("{COPIA}_markets")));
+    }
+    if let (Some(m), Some(Value::Array(lista))) = (o.get("_milestone"), o.get("_milestones")) {
+        let m = js::para_texto(m);
+        if let Some(i) = lista.iter().position(|x| js::para_texto(x) == m) {
+            o.insert("_milestone".into(), Value::String(format!("{COPIA}_milestones/{i}")));
+        }
+    }
+    ev
+}
+
+/// Põe de volta as cópias que `compactar_evento` trocou por marcadores.
+pub(crate) fn expandir_evento(ev: &mut Value) {
+    let Some(o) = ev.as_object_mut() else { return };
+    if o.get("markets").and_then(Value::as_str) == Some(&format!("{COPIA}_markets"))
+        && let Some(m) = o.get("_markets").cloned()
+    {
+        o.insert("markets".into(), m);
+    }
+    let indice = o.get("_milestone").and_then(Value::as_str).and_then(|s| s.strip_prefix(COPIA)).and_then(|s| s.strip_prefix("_milestones/"));
+    if let Some(m) = indice.and_then(|i| i.parse::<usize>().ok()).and_then(|i| o.get("_milestones")?.get(i).cloned()) {
+        o.insert("_milestone".into(), m);
+    }
+}
+
+/// Compacta uma vez os eventos já gravados no cache (`compactar_evento`).
+/// Roda na manutenção da abertura, antes do `VACUUM`. Devolve quantos
+/// eventos mudaram e os bytes antes e depois, ou `None` se já tinha rodado.
+pub fn compactar_cache_uma_vez(c: &mut rusqlite::Connection) -> Result<Option<(usize, usize, usize)>> {
+    const CHAVE: &str = "compact_kalshi_event_cache_v1";
+    let feito = c.query_row("SELECT 1 FROM database_maintenance WHERE maintenance_key=?", [CHAVE], |_| Ok(())).optional()?.is_some();
+    if feito {
+        return Ok(None);
+    }
+    let linhas: Vec<(String, String)> = {
+        let mut s = c.prepare("SELECT cache_key,data_json FROM kalshi_metadata_cache WHERE kind='event'")?;
+        let rows = s.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    let (mut mudados, mut antes, mut depois) = (0, 0, 0);
+    let tx = c.transaction()?;
+    {
+        // `updated_at` fica: o prazo de validade do metadado não muda.
+        let mut s = tx.prepare("UPDATE kalshi_metadata_cache SET data_json=? WHERE kind='event' AND cache_key=?")?;
+        for (chave, texto) in linhas {
+            antes += texto.len();
+            let Ok(ev) = serde_json::from_str::<Value>(&texto) else {
+                depois += texto.len();
+                continue;
+            };
+            let novo = js::para_texto(&compactar_evento(&ev));
+            depois += novo.len();
+            if novo != texto {
+                s.execute(rusqlite::params![novo, chave])?;
+                mudados += 1;
+            }
+        }
+    }
+    tx.execute("INSERT INTO database_maintenance(maintenance_key,completed_at) VALUES(?,?)", rusqlite::params![CHAVE, agora()])?;
+    tx.commit()?;
+    Ok(Some((mudados, antes, depois)))
+}
+
 /// `cacheGet()`: metadado persistido ainda dentro do TTL de 6 h.
 async fn meta_varios(db: &Db, tipo: &'static str, chaves: Vec<String>, com_ttl: bool) -> Result<HashMap<String, Value>> {
     if chaves.is_empty() {
@@ -119,7 +196,10 @@ async fn meta_varios(db: &Db, tipo: &'static str, chaves: Vec<String>, com_ttl: 
                         _ => continue,
                     }
                 }
-                if let Ok(v) = serde_json::from_str(&d) {
+                if let Ok(mut v) = serde_json::from_str(&d) {
+                    if tipo == "event" {
+                        expandir_evento(&mut v);
+                    }
                     achados.insert(k, v);
                 }
             }
@@ -149,7 +229,8 @@ async fn meta_gravar(db: &Db, tipo: &'static str, itens: Vec<(String, Value)>) {
         ON CONFLICT(kind, cache_key) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at",
                 )?;
                 for (k, v) in &itens {
-                    s.execute(rusqlite::params![tipo, k, js::para_texto(v), t])?;
+                    let texto = if tipo == "event" { js::para_texto(&compactar_evento(v)) } else { js::para_texto(v) };
+                    s.execute(rusqlite::params![tipo, k, texto, t])?;
                 }
             }
             tx.commit()?;
@@ -948,4 +1029,104 @@ pub async fn desconectar(c: &Estado) -> Result<ApiResponse> {
     .await?;
     limpar_caches(c).await?;
     Ok(resposta(StatusCode::OK, json!({ "ok": true })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn evento() -> Value {
+        json!({
+            "event_ticker": "EV-1", "title": "A vs B",
+            "markets": [{ "ticker": "M-1", "yes_sub_title": "A", "volume": 1.50 }, { "ticker": "M-2", "z": { "b": 1, "a": 2 } }],
+            "product_metadata": { "competition_scope": "Liga" },
+            "_milestones": [{ "id": "x", "type": "soccer_tournament_multi_leg" }, { "id": "y", "type": "football_game", "start_date": "2026-09-20" }],
+            "_milestone": { "id": "y", "type": "football_game", "start_date": "2026-09-20" },
+            "_markets": [{ "ticker": "M-1", "yes_sub_title": "A", "volume": 1.50 }, { "ticker": "M-2", "z": { "b": 1, "a": 2 } }],
+            "_teamsTitle": "A vs B", "_occurrenceDate": null, "_startDate": "2026-09-20"
+        })
+    }
+
+    fn ida_e_volta(ev: &Value) -> (String, String) {
+        let gravado = js::para_texto(&compactar_evento(ev));
+        let mut lido: Value = serde_json::from_str(&gravado).unwrap();
+        expandir_evento(&mut lido);
+        (gravado, js::para_texto(&lido))
+    }
+
+    #[test]
+    fn evento_compactado_volta_igual() {
+        let ev = evento();
+        let (gravado, lido) = ida_e_volta(&ev);
+        assert_eq!(lido, js::para_texto(&ev), "a leitura devolve o evento como era");
+        assert!(gravado.len() < lido.len(), "as cópias saem do texto gravado");
+        let o: Value = serde_json::from_str(&gravado).unwrap();
+        assert_eq!(o["markets"], json!(format!("{COPIA}_markets")));
+        assert_eq!(o["_milestone"], json!(format!("{COPIA}_milestones/1")));
+        let chaves: Vec<&String> = o.as_object().unwrap().keys().collect();
+        let originais: Vec<&String> = ev.as_object().unwrap().keys().collect();
+        assert_eq!(chaves, originais, "as chaves ficam na mesma ordem");
+
+        // Sem cópia de verdade, nada muda.
+        let mut v = evento();
+        v["_markets"][1]["z"] = json!({ "a": 2, "b": 1 });
+        v["_milestone"] = json!({ "id": "outro" });
+        assert_eq!(ida_e_volta(&v).0, js::para_texto(&v), "mesmo conteúdo em outra ordem não é cópia");
+        for remover in ["markets", "_markets", "_milestones", "_milestone"] {
+            let mut v = evento();
+            v.as_object_mut().unwrap().remove(remover);
+            let (_, lido) = ida_e_volta(&v);
+            assert_eq!(lido, js::para_texto(&v), "sem {remover}");
+        }
+        let mut v = evento();
+        v["_milestones"] = json!("não é lista");
+        assert_eq!(ida_e_volta(&v).1, js::para_texto(&v));
+        assert_eq!(ida_e_volta(&json!(["não é objeto"])).1, "[\"não é objeto\"]");
+    }
+
+    #[test]
+    fn cache_de_eventos_compacta_uma_vez_e_le_igual() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        // Um evento gravado antes da compactação e um mercado (que fica como está).
+        c.execute(
+            "INSERT INTO kalshi_metadata_cache(kind,cache_key,data_json,updated_at) VALUES('event','EV-1',?,'2026-01-01T00:00:00.000Z'),('market','M-1',?,'x')",
+            rusqlite::params![js::para_texto(&evento()), js::para_texto(&evento()["markets"][0])],
+        )
+        .unwrap();
+        let (mudados, antes, depois) = compactar_cache_uma_vez(&mut c).unwrap().unwrap();
+        assert_eq!(mudados, 1);
+        assert!(depois < antes);
+        assert!(compactar_cache_uma_vez(&mut c).unwrap().is_none(), "roda uma vez só");
+        let em: String = c.query_row("SELECT updated_at FROM kalshi_metadata_cache WHERE cache_key='EV-1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(em, "2026-01-01T00:00:00.000Z", "o prazo de validade não muda");
+        let db = crate::db::Db::com_leitura(c, 1).unwrap();
+        let lidos = tauri::async_runtime::block_on(meta_varios(&db, "event", vec!["EV-1".into()], false)).unwrap();
+        assert_eq!(js::para_texto(&lidos["EV-1"]), js::para_texto(&evento()));
+        tauri::async_runtime::block_on(meta_gravar(&db, "event", vec![("EV-2".into(), evento())]));
+        let lidos = tauri::async_runtime::block_on(meta_varios(&db, "event", vec!["EV-2".into()], true)).unwrap();
+        assert_eq!(js::para_texto(&lidos["EV-2"]), js::para_texto(&evento()), "gravado agora e lido de volta");
+    }
+
+    /// Num banco real (cópia em BETTY_COMPARAR_DB): cada evento do cache,
+    /// compactado e lido de volta, dá o mesmo texto de antes.
+    #[test]
+    #[ignore]
+    fn oraculo_cache_de_eventos() {
+        let c = crate::db::abrir(std::path::Path::new(&std::env::var("BETTY_COMPARAR_DB").unwrap())).unwrap();
+        let mut s = c.prepare("SELECT cache_key,data_json FROM kalshi_metadata_cache WHERE kind='event'").unwrap();
+        let (mut n, mut antes, mut depois, mut com_markets, mut com_milestone) = (0, 0, 0, 0, 0);
+        for linha in s.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))).unwrap() {
+            let (chave, texto) = linha.unwrap();
+            let ev: Value = serde_json::from_str(&texto).unwrap();
+            let (gravado, lido) = ida_e_volta(&ev);
+            assert_eq!(lido, js::para_texto(&ev), "{chave}");
+            n += 1;
+            antes += texto.len();
+            depois += gravado.len();
+            com_markets += usize::from(gravado.contains(&format!("\"markets\":\"{}", "\\u0000betty:")));
+            com_milestone += usize::from(gravado.contains("\"_milestone\":\"\\u0000betty:"));
+        }
+        eprintln!("{n} eventos iguais na ida e volta | {:.1} MB -> {:.1} MB | markets: {com_markets}, _milestone: {com_milestone}", antes as f64 / 1e6, depois as f64 / 1e6);
+    }
 }
