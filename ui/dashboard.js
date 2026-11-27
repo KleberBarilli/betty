@@ -5326,6 +5326,21 @@ console.warn("Título não normalizado na exportação CSV:", erro);
 return String(d?.title || "");
 }
 }
+// Chamado pelo backend (on_download) quando um download da interface termina.
+// Mostra onde o arquivo foi salvo; o texto entra só como textContent.
+let temporizadorAvisoDownload = null;
+function avisarDownload(info) {
+const aviso = document.getElementById("avisoDownload");
+if (!aviso) return;
+const ok = Boolean(info?.ok);
+aviso.textContent = ok
+? `CSV salvo em ${info.pasta || "Downloads"}: ${info.nome || ""}`
+: "Não foi possível salvar o CSV. Tente exportar novamente.";
+aviso.classList.toggle("erro", !ok);
+aviso.hidden = false;
+clearTimeout(temporizadorAvisoDownload);
+temporizadorAvisoDownload = setTimeout(() => { aviso.hidden = true; }, 8000);
+}
 async function baixarCSVPosicoes() {
 const botao = document.querySelector(".csv-export-confirm");
 if (botao?.disabled) return;
@@ -5417,8 +5432,9 @@ syncExportAt[casaDaAposta(d)] || '', dadosFechados.exportedAt || ''
 const nomeArquivo = `betty-apostas-${scope}-${new Date().toISOString().slice(0,10)}.csv`;
 const conteudoCsv = "\ufeff" + lines.join("\r\n");
 const blob = new Blob([conteudoCsv], { type:"text/csv;charset=utf-8;" });
-// Mantém compatibilidade com navegadores baseados em Edge antigos. No Electron
-// e nos navegadores atuais, o link temporário abaixo inicia o download nativo.
+// Mantém compatibilidade com navegadores baseados em Edge antigos. No app, o
+// link temporário abaixo inicia o download e o backend (on_download) salva o
+// arquivo na pasta Downloads e chama avisarDownload() ao terminar.
 if (navigator.msSaveOrOpenBlob) {
 navigator.msSaveOrOpenBlob(blob, nomeArquivo);
 return;
@@ -5430,7 +5446,7 @@ a.download = nomeArquivo;
 a.style.display = "none";
 document.body.appendChild(a);
 // O clique ocorre no mesmo gesto do usuário, necessário para o Chromium
-// aceitar downloads programáticos dentro da janela do Electron.
+// (WebView2) aceitar downloads programáticos.
 a.click();
 a.remove();
 setTimeout(() => URL.revokeObjectURL(url), 30000);

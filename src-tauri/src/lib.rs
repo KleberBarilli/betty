@@ -10,6 +10,7 @@ mod audit;
 mod breakdown;
 mod crypto;
 mod db;
+mod download;
 mod history;
 mod import;
 mod js;
@@ -70,6 +71,8 @@ pub fn run() {
                     protocol::abrir_no_navegador(&app_janela, &url);
                     NewWindowResponse::Deny
                 })
+                // Exportação em CSV: salva na pasta Downloads com o nome sugerido.
+                .on_download(download::tratar)
                 .build()?;
             Ok(())
         })

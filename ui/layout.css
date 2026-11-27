@@ -599,3 +599,23 @@ body:not([data-secao="visao"]) #visaoGeral { display: none !important; }
   .positions-table th.col-mid, .positions-table td.col-mid { width: 50px !important; }
   .positions-table th.col-stake, .positions-table td.col-stake { width: 70px !important; }
 }
+
+/* ---------- Aviso de download (exportação CSV) ---------- */
+.aviso-download {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1000;
+  max-width: min(520px, calc(100vw - 40px));
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pos);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.aviso-download.erro { border-left-color: var(--danger); }
+.aviso-download[hidden] { display: none; }
