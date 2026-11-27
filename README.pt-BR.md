@@ -68,6 +68,10 @@ cargo tauri build
 
 O instalador sai em `src-tauri/target/release/bundle/nsis/`.
 
+## Desempenho
+
+O que já foi medido e otimizado, o que falta e como validar sem mudar o comportamento: [docs/desempenho.md](docs/desempenho.md).
+
 ## Licença
 
 [MIT](LICENSE). Pode modificar e redistribuir; basta dar o crédito a este repositório.

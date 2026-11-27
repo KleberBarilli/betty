@@ -68,6 +68,10 @@ cargo tauri build
 
 The installer is written to `src-tauri/target/release/bundle/nsis/`.
 
+## Performance
+
+What has been measured and optimized, what is left, and how to validate without changing behavior (in Portuguese): [docs/desempenho.md](docs/desempenho.md).
+
 ## License
 
 [MIT](LICENSE). You can modify and redistribute it; just credit this repository.
