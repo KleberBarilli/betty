@@ -17,7 +17,7 @@ use crate::api::{ApiResponse, Estado};
 use crate::db::{Db, agora};
 use crate::kalshi_dados as kd;
 use crate::net::{self, ErroHttp};
-use crate::{history, js, titles};
+use crate::{history, js, ledger, titles};
 
 const BASE: &str = "https://external-api.kalshi.com";
 const TTL_ENDPOINT: Duration = Duration::from_secs(45);
@@ -349,6 +349,44 @@ async fn metadados_para(db: &Db, tickers: &[String]) -> (HashMap<String, Value>,
         }
     }
     (mercados, eventos)
+}
+
+/// `atualizarModalidadesKalshiNoLedger()`, chamada pelo `GET /api/history/closed`.
+///
+/// Migração preguiçosa: só as 12 linhas Kalshi mais recentes que ainda guardam
+/// a categoria raiz "Sports" consultam o evento (6 por vez). A modalidade vem
+/// do milestone oficial do evento, nunca é deduzida sem fonte; linhas cujo
+/// evento não pôde ser lido ficam para a próxima leitura do histórico.
+pub async fn atualizar_modalidades_no_ledger(estado: &Estado) -> Result<()> {
+    let user = estado.usuario.id.clone();
+    let pendentes = estado.db.call(move |c| history::pendentes_modalidade_kalshi(c, &user, 12)).await?;
+    if pendentes.is_empty() {
+        return Ok(());
+    }
+    let mut atualizadas = Vec::new();
+    for lote in pendentes.chunks(6) {
+        let eventos = futures::future::join_all(lote.iter().map(|linha| {
+            let ticker = js::string(linha.get("_eventTicker"));
+            async move { evento(&estado.db, &ticker).await }
+        }))
+        .await;
+        for (linha, ev) in lote.iter().zip(eventos) {
+            let Some(ev) = ev else { continue };
+            // `{...row, ...metadadoEsporteKalshi(event)}`.
+            let mut o = linha.as_object().cloned().unwrap_or_default();
+            insere_esporte(&mut o, Some(&ev), None);
+            if truthy(o.get("_sportMetaChecked")) {
+                atualizadas.push(Value::Object(o));
+            }
+        }
+    }
+    if atualizadas.is_empty() {
+        return Ok(());
+    }
+    let user = estado.usuario.id.clone();
+    // O Node usa a gravação completa; a incremental lê do banco só as chaves
+    // destas linhas e grava exatamente o mesmo resultado.
+    estado.db.call(move |c| ledger::gravar(c, &user, atualizadas, true).map(|_| ())).await
 }
 
 fn insere_esporte(o: &mut Map<String, Value>, evento: Option<&Value>, mercado: Option<&Value>) {

@@ -106,6 +106,10 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
             }
         }
         ("GET", "/api/history/closed") => {
+            // Como o Node: a falha na atualização dos metadados não impede a leitura.
+            if let Err(e) = kalshi::atualizar_modalidades_no_ledger(estado).await {
+                eprintln!("[api] metadados Kalshi do ledger: {e:#}");
+            }
             historico(estado, query, ERRO_GENERICO, "", |c, u, _| h::ledger(c, u).map(|b| Some(b.into()))).await
         }
         ("GET", "/api/history/closed/export") => {

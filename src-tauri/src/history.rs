@@ -1203,6 +1203,57 @@ pub(crate) fn ler_ledger(c: &Connection, user_id: &str, com_titulos: bool) -> Re
     anexar_metadados_kalshi(c, saida)
 }
 
+/// Candidatas da migração preguiçosa de `atualizarModalidadesKalshiNoLedger()`:
+/// linhas Kalshi do `readClosedLedger()` que ainda guardam a categoria raiz
+/// "Sports", sem `_sportMetaChecked` e com `_eventTicker`. Vêm da mais recente
+/// para a mais antiga (`_settledTime`, senão `_startDate`), com ordenação
+/// estável sobre a ordem do ledger, e no máximo `limite` linhas.
+pub(crate) fn pendentes_modalidade_kalshi(c: &Connection, user_id: &str, limite: usize) -> Result<Vec<Value>> {
+    // Mesma ordem do `ler_ledger`; o data_json só é lido para as linhas da
+    // Kalshi (a coluna `platform` é o `casaHistorico(_platform)` da linha).
+    let sql = format!(
+        "SELECT l.rowid,l.platform FROM closed_bets_ledger l
+    WHERE l.user_id=? AND {} ORDER BY l.first_seen_at ASC",
+        conta_ativa_sql("l")
+    );
+    let ordem: Vec<i64> = {
+        let mut stmt = c.prepare(&sql)?;
+        let rows = stmt.query_map([user_id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+        rows.filter_map(|r| match r {
+            Ok((rowid, casa)) if casa == "kalshi" => Some(Ok(rowid)),
+            Ok(_) => None,
+            Err(e) => Some(Err(e)),
+        })
+        .collect::<rusqlite::Result<_>>()?
+    };
+    let texto_minusculo = |v: Option<Value>| texto_truthy(v.as_ref()).to_lowercase();
+    let mut stmt = c.prepare_cached("SELECT data_json FROM closed_bets_ledger WHERE rowid=?")?;
+    let mut candidatas: Vec<(f64, Value)> = Vec::new();
+    for rowid in ordem {
+        let data: String = stmt.query_row([rowid], |r| r.get(0))?;
+        let Ok(aposta) = ler_linha(&data) else { continue };
+        let pendente = texto_minusculo(campo(&aposta, "_platform")) == "kalshi"
+            && texto_minusculo(campo(&aposta, "sport")) == "sports"
+            && !js::truthy(campo(&aposta, "_sportMetaChecked").as_ref())
+            && js::truthy(campo(&aposta, "_eventTicker").as_ref());
+        if !pendente {
+            continue;
+        }
+        // `Date.parse(_settledTime || _startDate || '') || 0`.
+        let quando = [campo(&aposta, "_settledTime"), campo(&aposta, "_startDate")]
+            .into_iter()
+            .find(|v| js::truthy(v.as_ref()))
+            .flatten()
+            .and_then(|v| js::data_ms(&js::string(Some(&v))))
+            .unwrap_or(0.0);
+        if let Ok(linha) = serde_json::from_str::<Value>(&data) {
+            candidatas.push((quando, linha));
+        }
+    }
+    candidatas.sort_by(|a, b| b.0.total_cmp(&a.0));
+    Ok(candidatas.into_iter().take(limite).map(|(_, linha)| linha).collect())
+}
+
 pub fn ledger(c: &Connection, user_id: &str) -> Result<Vec<u8>> {
     #[derive(Serialize)]
     struct Corpo {
@@ -1390,6 +1441,38 @@ pub fn layout(c: &Connection, user_id: &str, raw: &Consulta) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pendentes_de_modalidade_kalshi() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = crate::db::abrir(&dir.path().join("t.db")).unwrap();
+        let user = crate::db::usuario_local(&mut c).unwrap().id;
+        let inserir = |chave: &str, casa: &str, visto: &str, d: Value| {
+            c.execute(
+                "INSERT INTO closed_bets_ledger(user_id,platform,bet_key,data_json,first_seen_at,updated_at) VALUES(?,?,?,?,?,?)",
+                rusqlite::params![user, casa, chave, d.to_string(), visto, visto],
+            )
+            .unwrap();
+        };
+        let k = |ticker: &str, quando: &str| json!({ "_platform": "kalshi", "sport": "Sports", "_eventTicker": ticker, "_settledTime": quando });
+        inserir("a", "kalshi", "2026-01-01", k("EV-A", "2026-10-01T00:00:00Z"));
+        inserir("b", "kalshi", "2026-01-02", k("EV-B", "2026-11-01T00:00:00Z"));
+        // Empate de data: fica a ordem do ledger (first_seen_at).
+        inserir("c", "kalshi", "2026-01-03", k("EV-C", "2026-10-01T00:00:00Z"));
+        // Sem data conta como 0 e vai para o fim; `_startDate` substitui `_settledTime`.
+        inserir("d", "kalshi", "2026-01-04", json!({ "_platform": "Kalshi", "sport": "SPORTS", "_eventTicker": "EV-D" }));
+        inserir("e", "kalshi", "2026-01-05", json!({ "_platform": "kalshi", "sport": "Sports", "_eventTicker": "EV-E", "_startDate": "2026-12-01" }));
+        // Fora: já checada, outra modalidade, sem evento, outra casa.
+        inserir("f", "kalshi", "2026-01-06", json!({ "_platform": "kalshi", "sport": "Sports", "_eventTicker": "EV-F", "_sportMetaChecked": true }));
+        inserir("g", "kalshi", "2026-01-07", json!({ "_platform": "kalshi", "sport": "Soccer", "_eventTicker": "EV-G" }));
+        inserir("h", "kalshi", "2026-01-08", json!({ "_platform": "kalshi", "sport": "Sports", "_eventTicker": "" }));
+        inserir("i", "polymarket", "2026-01-09", json!({ "_platform": "polymarket", "sport": "Sports", "_eventTicker": "EV-I" }));
+        let tickers = |limite| -> Vec<String> {
+            pendentes_modalidade_kalshi(&c, &user, limite).unwrap().iter().map(|l| l["_eventTicker"].as_str().unwrap().to_string()).collect()
+        };
+        assert_eq!(tickers(12), ["EV-E", "EV-B", "EV-A", "EV-C", "EV-D"]);
+        assert_eq!(tickers(2), ["EV-E", "EV-B"]);
+    }
 
     /// Mede as etapas da exportação num banco real (cópia).
     #[test]
