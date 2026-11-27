@@ -1,4 +1,4 @@
-//! Rotas `/api/*` do MyBettys, com o mesmo contrato JSON do `server.js`.
+//! Rotas `/api/*` do Betty, com o mesmo contrato JSON do `server.js`.
 //!
 //! Rotas que não existem no app desktop respondem 501.
 
@@ -61,7 +61,7 @@ pub async fn handle(estado: &Estado, method: &Method, path: &str, query: Option<
     use history as h;
 
     let resultado = match (method.as_str(), path) {
-        ("GET", "/health") => Ok(ok(json!({ "ok": true, "service": "mybettys", "engine": "rust" }))),
+        ("GET", "/health") => Ok(ok(json!({ "ok": true, "service": "betty", "engine": "rust" }))),
         ("GET", "/api/me") => me(estado).await,
         // No app desktop não há sessão: sair só volta para a tela inicial.
         ("POST", "/api/auth/logout") => Ok(ok(json!({ "ok": true }))),
@@ -663,17 +663,17 @@ mod tests {
     }
 
     /// Despeja as respostas de uma lista de URLs num banco real (cópia), para
-    /// comparar com o `server.js`. Variáveis: MYBETTYS_COMPARAR_DB,
-    /// MYBETTYS_COMPARAR_URLS e MYBETTYS_COMPARAR_SAIDA.
+    /// comparar com o `server.js`. Variáveis: BETTY_COMPARAR_DB,
+    /// BETTY_COMPARAR_URLS e BETTY_COMPARAR_SAIDA.
     #[test]
     #[ignore]
     fn despejar_rotas_para_comparacao() {
         use std::io::Write;
         let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("defina {k}"));
-        let mut conn = db::abrir(std::path::Path::new(&var("MYBETTYS_COMPARAR_DB"))).unwrap();
+        let mut conn = db::abrir(std::path::Path::new(&var("BETTY_COMPARAR_DB"))).unwrap();
         let usuario = db::usuario_local(&mut conn).unwrap();
         // Chave real (opcional) lida do local-config.json, para as rotas que decifram credenciais.
-        let hex = std::env::var("MYBETTYS_COMPARAR_CONFIG")
+        let hex = std::env::var("BETTY_COMPARAR_CONFIG")
             .ok()
             .map(|p| {
                 let v: Value = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
@@ -682,10 +682,10 @@ mod tests {
             .unwrap_or_else(|| "00".repeat(32));
         let chave = Arc::new(MasterKey::from_hex(&hex).unwrap());
         let e = Estado { db: Db::new(conn), chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default() };
-        let arquivo_urls = var("MYBETTYS_COMPARAR_URLS");
+        let arquivo_urls = var("BETTY_COMPARAR_URLS");
         let pasta = std::path::Path::new(&arquivo_urls).parent().unwrap().to_path_buf();
         let urls = std::fs::read_to_string(&arquivo_urls).unwrap();
-        let mut saida = std::fs::File::create(var("MYBETTYS_COMPARAR_SAIDA")).unwrap();
+        let mut saida = std::fs::File::create(var("BETTY_COMPARAR_SAIDA")).unwrap();
         for url in urls.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
             let partes: Vec<&str> = url.split_whitespace().collect();
             let (metodo, rota, corpo) = if url.starts_with('/') {
@@ -706,14 +706,14 @@ mod tests {
         }
     }
 
-    /// Perfil do `delta` por fase, com os lotes de `MYBETTYS_COMPARAR_URLS`
-    /// sobre `MYBETTYS_COMPARAR_DB` (5 voltas; a partir da 2ª tudo é inalterado).
+    /// Perfil do `delta` por fase, com os lotes de `BETTY_COMPARAR_URLS`
+    /// sobre `BETTY_COMPARAR_DB` (5 voltas; a partir da 2ª tudo é inalterado).
     #[test]
     #[ignore]
     fn medir_delta() {
         use std::time::Instant;
         let var = |k: &str| std::env::var(k).unwrap();
-        let caminho = var("MYBETTYS_COMPARAR_URLS");
+        let caminho = var("BETTY_COMPARAR_URLS");
         let pasta = std::path::Path::new(&caminho).parent().unwrap().to_path_buf();
         let corpos: Vec<Vec<u8>> = std::fs::read_to_string(&caminho)
             .unwrap()
@@ -721,7 +721,7 @@ mod tests {
             .filter_map(|l| l.split_whitespace().nth(2))
             .map(|f| std::fs::read(pasta.join(f)).unwrap())
             .collect();
-        let mut conn = db::abrir(std::path::Path::new(&var("MYBETTYS_COMPARAR_DB"))).unwrap();
+        let mut conn = db::abrir(std::path::Path::new(&var("BETTY_COMPARAR_DB"))).unwrap();
         let usuario = db::usuario_local(&mut conn).unwrap();
         let user = usuario.id.clone();
         for volta in 1..=5 {

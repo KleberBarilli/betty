@@ -427,11 +427,11 @@ mod tests {
     use super::*;
 
     /// Compara com as saídas do `market-breakdown.js` original. Rodar com
-    /// `MYBETTYS_ORACULO_BREAKDOWN=<arquivo.jsonl> cargo test -- --ignored oraculo`.
+    /// `BETTY_ORACULO_BREAKDOWN=<arquivo.jsonl> cargo test -- --ignored oraculo`.
     #[test]
     #[ignore]
     fn oraculo_js() {
-        let caminho = std::env::var("MYBETTYS_ORACULO_BREAKDOWN").expect("defina MYBETTYS_ORACULO_BREAKDOWN");
+        let caminho = std::env::var("BETTY_ORACULO_BREAKDOWN").expect("defina BETTY_ORACULO_BREAKDOWN");
         let texto = std::fs::read_to_string(caminho).unwrap();
         let (mut total, mut erros) = (0, Vec::new());
         for linha in texto.lines() {

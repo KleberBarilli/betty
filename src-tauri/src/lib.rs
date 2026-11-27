@@ -1,4 +1,4 @@
-//! MyBettys em Rust.
+//! Betty em Rust.
 //!
 //! A interface roda num WebView e conversa com o backend pelo protocolo interno
 //! `betty://`, atendido dentro do próprio processo. Diferente da versão Electron,
@@ -86,49 +86,99 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("erro ao iniciar o MyBettys");
+        .expect("erro ao iniciar o Betty");
+}
+
+/// Nomes de quando o app se chamava MyBettys. Só existem para trazer os dados de
+/// quem já usava o app com o nome antigo; nada novo é gravado com eles.
+mod legado {
+    /// Pasta de dados da versão Rust anterior, dentro de `%APPDATA%`.
+    pub const PASTA_RUST: &str = "com.mybettys.desktop";
+    /// Pasta de dados da versão Electron, dentro de `%APPDATA%`.
+    pub const PASTA_ELECTRON: &str = "MyBettys";
+    pub const BANCO: &str = "mybettys.db";
+    pub const SERVICO_COFRE: &str = "MyBettys";
 }
 
 struct Pastas {
-    /// Dados do app Rust: `%APPDATA%\com.mybettys.desktop`.
+    /// Dados do app: `%APPDATA%\com.betty.desktop`.
     dados: PathBuf,
-    /// Dados do MyBettys Electron: `%APPDATA%\MyBettys`.
+    /// Dados da versão Rust com o nome antigo, se houver de onde trazer.
+    dados_legado: Option<PathBuf>,
+    /// Dados da versão Electron: `%APPDATA%\MyBettys`.
     electron: PathBuf,
     servico_cofre: String,
+    servico_cofre_legado: Option<String>,
 }
 
 impl Pastas {
     fn resolver(app: &App) -> anyhow::Result<Self> {
         let mut pastas = Self {
             dados: app.path().app_data_dir()?,
-            electron: app.path().data_dir()?.join("MyBettys"),
-            servico_cofre: "MyBettys".into(),
+            dados_legado: Some(app.path().data_dir()?.join(legado::PASTA_RUST)),
+            electron: app.path().data_dir()?.join(legado::PASTA_ELECTRON),
+            servico_cofre: "Betty".into(),
+            servico_cofre_legado: Some(legado::SERVICO_COFRE.into()),
         };
-        // Só em desenvolvimento: permite testar com cópias, sem tocar nos dados reais.
+        // Só em desenvolvimento: permite testar com cópias, sem tocar nos dados reais
+        // (por isso quem troca a pasta ou o cofre também deixa de olhar os antigos).
         if cfg!(debug_assertions) {
-            if let Ok(v) = std::env::var("MYBETTYS_DATA_DIR") {
+            if let Ok(v) = std::env::var("BETTY_DATA_DIR") {
                 pastas.dados = v.into();
+                pastas.dados_legado = std::env::var("BETTY_DATA_DIR_LEGADO").ok().map(Into::into);
             }
-            if let Ok(v) = std::env::var("MYBETTYS_ELECTRON_DIR") {
+            if let Ok(v) = std::env::var("BETTY_ELECTRON_DIR") {
                 pastas.electron = v.into();
             }
-            if let Ok(v) = std::env::var("MYBETTYS_KEYRING_SERVICE") {
+            if let Ok(v) = std::env::var("BETTY_KEYRING_SERVICE") {
                 pastas.servico_cofre = v;
+                pastas.servico_cofre_legado = std::env::var("BETTY_KEYRING_SERVICE_LEGADO").ok();
             }
         }
         Ok(pastas)
     }
 }
 
+/// Move o banco da versão com o nome antigo para a pasta nova, na primeira vez
+/// que o Betty abre. É um `rename` (instantâneo, sem duplicar centenas de MB).
+/// O `.db` vai por último: se algo falhar no meio, a próxima abertura repete.
+fn trazer_banco_legado(antigo: &std::path::Path, novo: &std::path::Path) -> anyhow::Result<bool> {
+    if novo.exists() || !antigo.exists() {
+        return Ok(false);
+    }
+    let com_sufixo = |base: &std::path::Path, sufixo: &str| {
+        let mut nome = base.as_os_str().to_owned();
+        nome.push(sufixo);
+        PathBuf::from(nome)
+    };
+    for sufixo in ["-wal", "-shm", ""] {
+        let de = com_sufixo(antigo, sufixo);
+        if de.exists() {
+            std::fs::rename(&de, com_sufixo(novo, sufixo))
+                .with_context(|| format!("não foi possível trazer {} da pasta antiga", de.display()))?;
+        }
+    }
+    Ok(true)
+}
+
 fn inicializar(pastas: &Pastas) -> anyhow::Result<api::Estado> {
     let inicio = Instant::now();
     std::fs::create_dir_all(&pastas.dados).context("não foi possível criar a pasta de dados")?;
-    let banco = pastas.dados.join("mybettys.db");
+    let banco = pastas.dados.join("betty.db");
 
-    let importacao = import::importar_se_necessario(&banco, &pastas.electron.join("mybettys.db"))?;
+    if let Some(antiga) = &pastas.dados_legado
+        && trazer_banco_legado(&antiga.join(legado::BANCO), &banco)?
+    {
+        eprintln!("[início] banco trazido da pasta com o nome antigo");
+    }
+    let importacao = import::importar_se_necessario(&banco, &pastas.electron.join(legado::BANCO))?;
     eprintln!("[início] banco: {importacao:?}");
 
-    let (chave, origem) = keystore::carregar_ou_criar(&pastas.servico_cofre, &pastas.electron.join("local-config.json"))?;
+    let (chave, origem) = keystore::carregar_ou_criar(
+        &pastas.servico_cofre,
+        pastas.servico_cofre_legado.as_deref(),
+        &pastas.electron.join("local-config.json"),
+    )?;
     eprintln!("[início] chave mestra: {origem:?}");
 
     let mut conn = db::abrir(&banco)?;
@@ -154,5 +204,30 @@ fn registrar_falha(pastas: &Pastas, erro: &anyhow::Error) {
     let _ = std::fs::create_dir_all(&pastas.dados);
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(pastas.dados.join("startup-error.log")) {
         let _ = f.write_all(texto.as_bytes());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn traz_o_banco_da_pasta_antiga_uma_unica_vez() {
+        let dir = tempfile::tempdir().unwrap();
+        let antigo = dir.path().join(legado::BANCO);
+        let novo = dir.path().join("nova").join("betty.db");
+        std::fs::create_dir_all(novo.parent().unwrap()).unwrap();
+        assert!(!trazer_banco_legado(&antigo, &novo).unwrap(), "sem banco antigo não faz nada");
+
+        std::fs::write(&antigo, b"banco").unwrap();
+        std::fs::write(dir.path().join("mybettys.db-wal"), b"wal").unwrap();
+        assert!(trazer_banco_legado(&antigo, &novo).unwrap());
+        assert_eq!(std::fs::read(&novo).unwrap(), b"banco");
+        assert_eq!(std::fs::read(novo.with_file_name("betty.db-wal")).unwrap(), b"wal");
+        assert!(!antigo.exists(), "o banco foi movido, não copiado");
+
+        std::fs::write(&antigo, b"outro").unwrap();
+        assert!(!trazer_banco_legado(&antigo, &novo).unwrap(), "com banco novo, o antigo é ignorado");
+        assert_eq!(std::fs::read(&novo).unwrap(), b"banco");
     }
 }

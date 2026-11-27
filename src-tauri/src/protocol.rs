@@ -72,7 +72,7 @@ pub fn abrir_no_navegador<R: Runtime>(app: &AppHandle<R>, url: &Url) {
     }
     let endereco = url.as_str().to_owned();
     // Só em desenvolvimento: registra o link sem abrir o navegador.
-    if cfg!(debug_assertions) && std::env::var_os("MYBETTYS_LINKS_SEM_ABRIR").is_some() {
+    if cfg!(debug_assertions) && std::env::var_os("BETTY_LINKS_SEM_ABRIR").is_some() {
         eprintln!("[links] abriria no navegador: {endereco}");
         return;
     }
@@ -95,8 +95,8 @@ pub async fn handle<R: Runtime>(app: &AppHandle<R>, request: Request<Vec<u8>>) -
             Some(bytes) => bytes,
             None => crate::js::para_vec(&resposta.body),
         };
-        // Diagnóstico de desempenho, só em desenvolvimento: MYBETTYS_LOG_API=1.
-        if cfg!(debug_assertions) && std::env::var_os("MYBETTYS_LOG_API").is_some() {
+        // Diagnóstico de desempenho, só em desenvolvimento: BETTY_LOG_API=1.
+        if cfg!(debug_assertions) && std::env::var_os("BETTY_LOG_API").is_some() {
             eprintln!(
                 "[api-tempo] {} {path} {} recebido={} enviado={} {:.1}ms",
                 request.method(),

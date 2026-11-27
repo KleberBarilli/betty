@@ -1,4 +1,4 @@
-# Layout v2 do MyBettys (referência)
+# Layout v2 do Betty (referência)
 
 Protótipo aprovado em 2026-11-26. Original interativo (privado):
 https://claude.ai/artifact/GAKSNUwpRSgRM9BAeCCS35
@@ -16,7 +16,7 @@ reaproveitado.
 - Sem saudação ("Bem-vindo de volta"); tudo em dólar, no formato `$3,184.70`.
 - Fechadas saem de Posições e vão para Histórico (Lista e Calendário).
 - Abertas agrupadas por casa.
-- Primeira carga como no `AGENTS.md` do MyBettys.
+- Primeira carga como no `AGENTS.md` do Betty.
 - Não usar o design system ChronoCase.
 
 ## Telas

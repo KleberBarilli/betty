@@ -14,7 +14,7 @@ use tauri::{Manager, Runtime, Url, Webview};
 
 use crate::protocol;
 
-const NOME_PADRAO: &str = "mybettys-exportacao.csv";
+const NOME_PADRAO: &str = "betty-exportacao.csv";
 
 /// Handler do `on_download` da janela principal.
 pub fn tratar<R: Runtime>(webview: Webview<R>, evento: DownloadEvent<'_>) -> bool {
@@ -54,7 +54,7 @@ pub fn download_permitido(url: &Url) -> bool {
 fn pasta_destino<R: Runtime>(webview: &Webview<R>) -> Option<PathBuf> {
     // Só em desenvolvimento: testes salvam numa pasta temporária.
     if cfg!(debug_assertions) {
-        if let Some(p) = std::env::var_os("MYBETTYS_DOWNLOAD_DIR") {
+        if let Some(p) = std::env::var_os("BETTY_DOWNLOAD_DIR") {
             return Some(p.into());
         }
     }

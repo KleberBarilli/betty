@@ -1,7 +1,7 @@
 document.body.append(document.getElementById('syncProgress'));
 // A wallet Polymarket nunca é exposta ao navegador. O backend identifica a conta pela sessão.
 const KALSHI_PROXY = "/api/kalshi";
-// Polymarket: backend próprio do MyBettys. Nenhum Worker externo é usado.
+// Polymarket: backend próprio do Betty. Nenhum Worker externo é usado.
 const POLY_API = "/api/polymarket";
 const GAMMA_API = "/api/polymarket-gamma";
 const CACHE_KEY = "betty_pos_cache_v3";
@@ -11,7 +11,7 @@ const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min — cache stale-while-revalidate;
 const DATE_CACHE_KEY = "betty_date_cache_v1";
 const DATE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias — datas de jogo
 const GAMMA_DATE_META_CACHE_KEY = "betty_gamma_date_meta_v1";
-const PAGE_SIZE_KEY = 'mybettys_page_size_v1';
+const PAGE_SIZE_KEY = 'betty_page_size_v1';
 let pageSize = Number(localStorage.getItem(PAGE_SIZE_KEY) || 20);
 if (![10,20,50].includes(pageSize)) pageSize = 20;
 function itensPorPagina() { return pageSize; }
@@ -550,7 +550,7 @@ const avisosFalhaCachePersistente = new Set();
 function registrarFalhaPersistenciaCache(chave, erro) {
 if (avisosFalhaCachePersistente.has(chave)) return;
 avisosFalhaCachePersistente.add(chave);
-console.warn(`[MyBettys] O cache local \"${chave}\" não pôde ser persistido; os dados atuais continuam em memória.`, erro?.name || erro);
+console.warn(`[Betty] O cache local \"${chave}\" não pôde ser persistido; os dados atuais continuam em memória.`, erro?.name || erro);
 }
 function lerCacheEsportes() {
 try {
@@ -747,12 +747,12 @@ let dashboardVisualPendente = false;
 function dashboardEstaVisivel() { return viewAtual === "dashboard"; }
 // Estado visual inicial: impede que a toolbar de Posições apareça no Dashboard
 // enquanto a página ainda está inicializando os dados.
-try { document.body.setAttribute("data-mybettys-view", "dashboard"); } catch (_) {}
+try { document.body.setAttribute("data-betty-view", "dashboard"); } catch (_) {}
 // As caixas só mostram números depois de um snapshot completo confirmado pela API.
 // O cache local pode aparecer na tabela durante o carregamento, mas nunca é usado
 // como valor final de Dashboard/Estatísticas.
 let snapshotAoVivoConfirmado = false;
-const SYNC_STATUS_KEY = "mybettys:syncStatus:v1";
+const SYNC_STATUS_KEY = "betty:syncStatus:v1";
 function casaSyncPadrao(casa) {
 return { casa, connected: false, lastOk: 0, lastError: null, openCount: 0, closedCount: 0, state: "idle" };
 }
@@ -774,14 +774,14 @@ localStorage.setItem(SYNC_STATUS_KEY, JSON.stringify({ polymarket, kalshi }));
 }
 lerSyncPersistido();
 let syncPanelAberto = false;
-let MYBETTYS_USER = null;
-let MYBETTYS_CONNECTIONS = null;
-async function inicializarContaMyBettys() {
+let BETTY_USER = null;
+let BETTY_CONNECTIONS = null;
+async function inicializarContaBetty() {
 const res = await fetch("/api/me", { cache: "no-store", headers: { "Accept": "application/json" } });
 if (!res.ok) { location.href = "/"; throw new Error("Sessão necessária"); }
 const data = await res.json();
-MYBETTYS_USER = data.user;
-MYBETTYS_CONNECTIONS = data.connections || {};
+BETTY_USER = data.user;
+BETTY_CONNECTIONS = data.connections || {};
 atualizarSaldosFixos();
 // O filtro de Estatísticas é individual por usuário. Releia-o somente depois
 // de conhecer a conta e deixe o gráfico escolher seu padrão correto: Período
@@ -794,26 +794,26 @@ if (h1 && viewAtual === "dashboard") h1.textContent = TITULOS_SECAO.visao[0];
 const sub = document.getElementById("topbarSub");
 if (sub && viewAtual === "dashboard") sub.textContent = TITULOS_SECAO.visao[1];
 const footer = document.querySelector(".sidebar-footer");
-if (footer && !document.getElementById("mybettysUserBox")) {
+if (footer && !document.getElementById("bettyUserBox")) {
 const box = document.createElement("div");
-box.id = "mybettysUserBox";
-box.innerHTML = `<span class="sidebar-account-avatar" aria-hidden="true">${escapeHtml(MYBETTYS_USER.name.trim().charAt(0).toUpperCase())}</span><div class="sidebar-account-info"><strong class="sidebar-user-name">${escapeHtml(MYBETTYS_USER.name)}</strong><small>Conta local</small></div><button type="button" class="sidebar-user-logout" aria-label="Sair" data-on-click="logoutMyBettys()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button>`;
+box.id = "bettyUserBox";
+box.innerHTML = `<span class="sidebar-account-avatar" aria-hidden="true">${escapeHtml(BETTY_USER.name.trim().charAt(0).toUpperCase())}</span><div class="sidebar-account-info"><strong class="sidebar-user-name">${escapeHtml(BETTY_USER.name)}</strong><small>Conta local</small></div><button type="button" class="sidebar-user-logout" aria-label="Sair" data-on-click="logoutBetty()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button>`;
 footer.append(box);
 }
 // A configuração passa a ser do usuário logado, não global.
 await sincronizarConfiguracaoRemota(false);
-if (!casasConectadas().length && !MYBETTYS_CONNECTIONS?.trackedHistory) {
+if (!casasConectadas().length && !BETTY_CONNECTIONS?.trackedHistory) {
 setTimeout(() => irPara("conexoes"), 100);
 }
 }
-async function logoutMyBettys() {
+async function logoutBetty() {
 await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
 location.href = "/";
 }
 document.addEventListener("DOMContentLoaded", async () => {
 posicionarStatusResponsivo();
 renderizarConfiguracaoNovasCasas();
-await inicializarContaMyBettys().catch(() => { location.href = "/"; return; });
+await inicializarContaBetty().catch(() => { location.href = "/"; return; });
 renderFiltroDataBox();
 atualizarFiltroEsportePosicoes();
 // Cache local só pode ser exibido para casas atualmente conectadas.
@@ -826,7 +826,7 @@ const cache = (cacheNormal && ((cacheNormal.abertos || []).length || (cacheNorma
 ? cacheNormal
 : lerUltimoSnapshotNaoVazio();
 if (cache) {
-const filtroPlataforma = d => Boolean(MYBETTYS_CONNECTIONS?.[casaDaAposta(d)]);
+const filtroPlataforma = d => Boolean(BETTY_CONNECTIONS?.[casaDaAposta(d)]);
 abertos = (cache.abertos || []).filter(filtroPlataforma);
 fechados = (cache.fechados || []).filter(filtroPlataforma);
 if (abertos.length || fechados.length) {
@@ -841,7 +841,7 @@ fechados = [];
 }
 snapshotAoVivoConfirmado = false;
 // Sem casas conectadas, a conta começa vazia e não consulta nenhuma API.
-if (casasConectadas().length || MYBETTYS_CONNECTIONS?.trackedHistory) carregarAba("aberto", { forcar: true });
+if (casasConectadas().length || BETTY_CONNECTIONS?.trackedHistory) carregarAba("aberto", { forcar: true });
 else {
 liberarNavegacaoInicial();
 document.getElementById('syncProgress').hidden = true;
@@ -850,7 +850,7 @@ posAtualizarDados();
 // Atualização automática começa DESATIVADA por padrão.
 // Se o usuário já escolheu uma preferência anteriormente, respeitamos essa escolha.
 try {
-const prefAuto = localStorage.getItem("mybettys:autoRefresh");
+const prefAuto = localStorage.getItem("betty:autoRefresh");
 if (prefAuto === "1") autoRefreshAtivo = true;
 else if (prefAuto === "0") autoRefreshAtivo = false;
 } catch (_) {}
@@ -921,7 +921,7 @@ function atualizarStatusConexoes() {
 for (const casa of CASAS_STAKE) {
 const card=document.querySelector('#connectionGrid [data-house="' + casa + '"]');
 if (!card) continue;
-const connected=Boolean(MYBETTYS_CONNECTIONS?.[casa]);
+const connected=Boolean(BETTY_CONNECTIONS?.[casa]);
 card.classList.toggle('is-connected',connected);
 const status=card.querySelector('.hint');
 status.textContent=connected ? 'Conectada' : 'Não conectada';
@@ -931,7 +931,7 @@ detail=document.createElement('span');
 detail.className='connection-detail';
 status.after(detail);
 }
-detail.textContent=connected ? (casa==='polymarket' ? MYBETTYS_CONNECTIONS.polymarketWalletHint || '' : 'Protegida') : '';
+detail.textContent=connected ? (casa==='polymarket' ? BETTY_CONNECTIONS.polymarketWalletHint || '' : 'Protegida') : '';
 const primary=card.querySelector('.btn-save');
 primary.textContent=connected ? 'Alterar' : '+ Conectar';
 if (!card.querySelector('[data-connection-test]')) {
@@ -1057,7 +1057,7 @@ for (const [card,content] of [[section,scroll],[oldStake,stakeScroll]]) {
 const heading=card.querySelector('h2'),toggle=document.createElement('button');
 content.id=card.id+'Content';
 toggle.type='button';toggle.className='config-section-toggle';
-const preferenceKey='mybettys:configCollapsed:'+card.id;
+const preferenceKey='betty:configCollapsed:'+card.id;
 try {content.hidden=localStorage.getItem(preferenceKey)==='1';}catch(_){}
 toggle.setAttribute('aria-expanded',String(!content.hidden));toggle.setAttribute('aria-controls',content.id);
 toggle.append(...heading.childNodes);
@@ -1143,7 +1143,7 @@ body: credentials ? JSON.stringify(credentials) : undefined
 });
 const data = await response.json();
 if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível atualizar a conexão.");
-MYBETTYS_CONNECTIONS = data.connections;
+BETTY_CONNECTIONS = data.connections;
 if (casa === "predict") {
 PREDICT_API_BALANCE = null;
 saldoPredictFalhou = false;
@@ -1204,11 +1204,11 @@ return;
 }
 const r=await fetch("/api/connections/polymarket",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({wallet})});
 const d=await r.json(); if(!r.ok)throw new Error(d.error||"Não foi possível salvar a conexão.");
-MYBETTYS_CONNECTIONS=d.connections; KALSHI_API_BALANCE=null; POLY_API_BALANCE=null; atualizarStatusConexoes(); limparCachesBetty(); abertos=[]; fechados=[]; snapshotAoVivoConfirmado=false; carregado={aberto:false,fechado:false}; fecharContaModal(); await atualizarAgora();
+BETTY_CONNECTIONS=d.connections; KALSHI_API_BALANCE=null; POLY_API_BALANCE=null; atualizarStatusConexoes(); limparCachesBetty(); abertos=[]; fechados=[]; snapshotAoVivoConfirmado=false; carregado={aberto:false,fechado:false}; fecharContaModal(); await atualizarAgora();
 }else{
 const r=await fetch("/api/connections/kalshi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apiKey:document.getElementById("modalKalshiKey").value.trim(),privateKey:document.getElementById("modalKalshiPrivate").value.trim()})});
 const d=await r.json(); if(!r.ok)throw new Error(d.error||"Não foi possível salvar a conexão.");
-MYBETTYS_CONNECTIONS=d.connections; KALSHI_API_BALANCE=null; POLY_API_BALANCE=null; atualizarStatusConexoes(); limparCachesBetty(); abertos=[]; fechados=[]; snapshotAoVivoConfirmado=false; carregado={aberto:false,fechado:false}; fecharContaModal(); await atualizarAgora();
+BETTY_CONNECTIONS=d.connections; KALSHI_API_BALANCE=null; POLY_API_BALANCE=null; atualizarStatusConexoes(); limparCachesBetty(); abertos=[]; fechados=[]; snapshotAoVivoConfirmado=false; carregado={aberto:false,fechado:false}; fecharContaModal(); await atualizarAgora();
 }
 }catch(e){err.textContent=e.message}finally{btn.disabled=false}
 };
@@ -1216,10 +1216,10 @@ async function conectarPolymarket(){abrirContaModal("poly")}
 async function desconectarPolymarket() {
 if(!confirm("Desconectar a Polymarket desta conta?")) return;
 const r=await fetch("/api/connections/polymarket",{method:"DELETE"}); const d=await r.json();
-if(r.ok){MYBETTYS_CONNECTIONS=d.connections;POLY_API_BALANCE=null;atualizarStatusConexoes();atualizarSaldosFixos();limparCachesBetty();abertos=[];fechados=[];snapshotAoVivoConfirmado=false;carregado={aberto:false,fechado:false};posAtualizarDados()}
+if(r.ok){BETTY_CONNECTIONS=d.connections;POLY_API_BALANCE=null;atualizarStatusConexoes();atualizarSaldosFixos();limparCachesBetty();abertos=[];fechados=[];snapshotAoVivoConfirmado=false;carregado={aberto:false,fechado:false};posAtualizarDados()}
 }
 async function fetchPolymarketSaldo() {
-if (!MYBETTYS_CONNECTIONS?.polymarket) return null;
+if (!BETTY_CONNECTIONS?.polymarket) return null;
 const res = await fetch("/api/polymarket/balance", { cache: "no-store" });
 if (!res.ok) throw new Error("Polymarket balance HTTP " + res.status);
 const data = await res.json();
@@ -1229,7 +1229,7 @@ if (!Number.isFinite(balance)) throw new Error("Saldo da Polymarket inválido.")
 return balance;
 }
 async function fetchKalshiSaldo() {
-if (!MYBETTYS_CONNECTIONS?.kalshi) return null;
+if (!BETTY_CONNECTIONS?.kalshi) return null;
 const res = await fetchComRetry(KALSHI_PROXY + "/balance", { cache: "no-store" });
 if (!res.ok) throw new Error("Kalshi balance HTTP " + res.status);
 const data = await res.json();
@@ -1254,7 +1254,7 @@ throw new Error(data?.error || "Não foi possível consultar o saldo da SX Bet."
 return data;
 }
 async function atualizarSaldoKalshiAPI() {
-if (!MYBETTYS_CONNECTIONS?.kalshi) {
+if (!BETTY_CONNECTIONS?.kalshi) {
 KALSHI_API_BALANCE = null;
 atualizarSaldosFixos();
 return;
@@ -1283,10 +1283,10 @@ testeConexaoFoco?.focus();
 }
 async function testarKalshi(){ return testarConexaoCasa('kalshi'); }
 async function testarConexaoCasa(casa) {
-if (!MYBETTYS_CONNECTIONS?.[casa]) return;
+if (!BETTY_CONNECTIONS?.[casa]) return;
 const versao=++testeConexaoVersao;
-const conta=MYBETTYS_USER?.id;
-const conexoes=MYBETTYS_CONNECTIONS;
+const conta=BETTY_USER?.id;
+const conexoes=BETTY_CONNECTIONS;
 testeConexaoFoco=document.activeElement;
 const modal=document.getElementById('connectionTestModal');
 const status=document.getElementById('connectionTestStatus');
@@ -1326,7 +1326,7 @@ portfolio=sxBetSaldo.escrowedAmount;
 portfolioLabel='Em garantia nas apostas';
 }
 }
-if (versao!==testeConexaoVersao || conta!==MYBETTYS_USER?.id || conexoes!==MYBETTYS_CONNECTIONS) return;
+if (versao!==testeConexaoVersao || conta!==BETTY_USER?.id || conexoes!==BETTY_CONNECTIONS) return;
 if (sxBetBalanceError) {
 status.textContent='Conexão confirmada. '+sxBetBalanceError;
 return;
@@ -1341,7 +1341,7 @@ term.textContent=label; detail.textContent=money(value);
 values.append(term,detail);
 }
 } catch(error) {
-if (versao!==testeConexaoVersao || conta!==MYBETTYS_USER?.id || conexoes!==MYBETTYS_CONNECTIONS) return;
+if (versao!==testeConexaoVersao || conta!==BETTY_USER?.id || conexoes!==BETTY_CONNECTIONS) return;
 status.textContent=error.message || 'Não foi possível concluir o teste.';
 status.className='account-error';
 }
@@ -1361,7 +1361,7 @@ async function desconectarKalshi() {
 if(!confirm("Desconectar a Kalshi desta conta?")) return;
 const r=await fetch("/api/connections/kalshi",{method:"DELETE"}); const d=await r.json();
 if(r.ok){
-MYBETTYS_CONNECTIONS=d.connections;
+BETTY_CONNECTIONS=d.connections;
 KALSHI_API_BALANCE = null;
 abertos=abertos.filter(d => (d?._platform||"").toLowerCase() !== "kalshi");
 fechados=fechados.filter(d => (d?._platform||"").toLowerCase() !== "kalshi");
@@ -1380,12 +1380,12 @@ function limparCachesBetty(){
 paginasHistoricoPosicoes.clear();
 escopoPaginasHistoricoPosicoes = '';
 try{
-const userId=MYBETTYS_USER?.id||"local";
+const userId=BETTY_USER?.id||"local";
 localStorage.removeItem(CACHE_KEY);localStorage.removeItem(LAST_NONEMPTY_CACHE_KEY);
 for(const k of (LEGACY_CACHE_KEYS||[])) localStorage.removeItem(k);
 localStorage.removeItem(DATE_CACHE_KEY);localStorage.removeItem(GAMMA_DATE_META_CACHE_KEY);localStorage.removeItem(SPORT_META_CACHE_KEY);localStorage.removeItem(POLY_ACTIVITY_AT_KEY);
 localStorage.removeItem(POLY_CLOSED_ENRICH_CACHE_PREFIX+userId);
-localStorage.removeItem('mybettys:lastConfirmedClosed:'+userId);
+localStorage.removeItem('betty:lastConfirmedClosed:'+userId);
 }catch(e){}
 try { polyActivityCache={at:0,conditionIds:[]}; } catch (_) {}
 try { polyFluxoCache={at:0,porMercado:null}; } catch (_) {}
@@ -1404,7 +1404,7 @@ viewAtual = view;
 const renderToken = ++trocaViewRenderToken;
 // Atualiza o estado visual antes de qualquer renderização/consulta.
 // Isso impede a toolbar de Posições de aparecer no Dashboard durante refreshs.
-try { document.body.setAttribute("data-mybettys-view", view); } catch (_) {}
+try { document.body.setAttribute("data-betty-view", view); } catch (_) {}
 // Os filtros pertencem à tela de posições. Não é necessário resetá-los ao
 // alternar entre as outras telas, nem renderizar uma tabela que ficará oculta.
 if (viewAnterior !== view && (viewAnterior === "posicoes" || view === "posicoes")) resetarFiltrosTabela();
@@ -1623,7 +1623,7 @@ let refreshGeneration = 0;
 // O timestamp do último check fica salvo no localStorage (não só em memória)
 // para que o intervalo de ~10 min seja respeitado mesmo depois de um F5
 // completo (o botão "Atualizar agora" recarrega a página de verdade).
-const POLY_ACTIVITY_AT_KEY = "mybettys:polyActivityAt";
+const POLY_ACTIVITY_AT_KEY = "betty:polyActivityAt";
 let polyActivityCache = { at: 0, conditionIds: [] };
 try {
 const savedAt = Number(localStorage.getItem(POLY_ACTIVITY_AT_KEY));
@@ -1632,7 +1632,7 @@ if (Number.isFinite(savedAt) && savedAt > 0) polyActivityCache.at = savedAt;
 const POLY_ACTIVITY_CACHE_MS = 10 * 60 * 1000;
 let polyClosedSnapshotCache = { at: 0, data: [] };
 let kalshiClosedSnapshotCache = { at: 0, data: [] };
-const POLY_CLOSED_ENRICH_CACHE_PREFIX = "mybettys:polyClosedEnriched:";
+const POLY_CLOSED_ENRICH_CACHE_PREFIX = "betty:polyClosedEnriched:";
 const POLY_INCOMPLETE_RETRY_MS = 10 * 60 * 1000;
 // Incrementa somente quando a regra central de data ganhar uma correção que
 // precise revalidar entradas antigas já enriquecidas. Não é uma migração
@@ -1924,13 +1924,13 @@ return titulo !== d.title || parsed || /^.+?\s+wins?\??$/i.test(String(meta.mark
 // uma única reconstrução do índice derivado, sem mudar o ledger canônico.
 const VERSAO_INDICE_DATA = "3";
 function chaveVersaoIndiceCategoria() {
-return "mybettys:categoryIndexVersion:" + (MYBETTYS_USER?.id || "local");
+return "betty:categoryIndexVersion:" + (BETTY_USER?.id || "local");
 }
 function chaveVersaoIndiceTitulo() {
-return "mybettys:titleIndexVersion:" + (MYBETTYS_USER?.id || "local");
+return "betty:titleIndexVersion:" + (BETTY_USER?.id || "local");
 }
 function chaveVersaoIndiceData() {
-return "mybettys:dateIndexVersion:" + (MYBETTYS_USER?.id || "local");
+return "betty:dateIndexVersion:" + (BETTY_USER?.id || "local");
 }
 function categoriaIndicePrecisaReindexar() {
 try { return localStorage.getItem(chaveVersaoIndiceCategoria()) !== VERSAO_INDICE_CATEGORIA; }
@@ -2146,7 +2146,7 @@ mostrandoAtualizando = true;
 const statusAtualizadoEl = document.getElementById("statusAtualizado");
 if (statusAtualizadoEl) statusAtualizadoEl.textContent = "Atualizando...";
 for (const casa of CASAS_STAKE) {
-const connected = Boolean(MYBETTYS_CONNECTIONS?.[casa]);
+const connected = Boolean(BETTY_CONNECTIONS?.[casa]);
 registrarSyncCasa(casa, { connected, state: connected ? "syncing" : "disconnected", lastError: null });
 }
 atualizarStatusOnline(false);
@@ -2165,8 +2165,8 @@ content.innerHTML = '<div class="loading">Carregando posições...</div>';
 if (btn) btn.classList.add("spinning");
 // Snapshot usado somente como fallback por plataforma. Nunca fazemos merge
 // incremental do mesmo conjunto, evitando acumulação/duplicação a cada ciclo.
-const podePoly = !!MYBETTYS_CONNECTIONS?.polymarket;
-const podeKalshi = !!MYBETTYS_CONNECTIONS?.kalshi;
+const podePoly = !!BETTY_CONNECTIONS?.polymarket;
+const podeKalshi = !!BETTY_CONNECTIONS?.kalshi;
 const prev = {
 polyOpen: podePoly ? abertos.filter(d => casaDaAposta(d) === "polymarket") : [],
 kalshiOpen: podeKalshi ? abertos.filter(d => (d._platform || "").toLowerCase() === "kalshi") : [],
@@ -2208,23 +2208,23 @@ const polyClosedPromise = cronometrar('Polymarket fechadas e fluxo', () => fetch
 .catch(error => ({ ok: false, error }));
 // Start independent requests now; publication still waits for the complete pipeline.
 if (podePoly) buscarFluxoPolymarket().catch(()=>{});
-const kalshiClosedPromise = MYBETTYS_CONNECTIONS?.kalshi
+const kalshiClosedPromise = BETTY_CONNECTIONS?.kalshi
 ? cronometrar('Kalshi fechadas', fetchKalshiFechados).then(v => ({ ok: true, value: v })).catch(error => ({ ok: false, error }))
 : Promise.resolve({ ok: true, value: [] });
 // Kalshi desconectada = não faz nenhuma chamada para /api/kalshi.
-const kalshiOpenPromise = MYBETTYS_CONNECTIONS?.kalshi
+const kalshiOpenPromise = BETTY_CONNECTIONS?.kalshi
 ? cronometrar('Kalshi abertas', fetchKalshiAbertos).then(v => ({ ok: true, value: v })).catch(error => ({ ok: false, error }))
 : Promise.resolve({ ok: true, value: [] });
-const kalshiBalancePromise = MYBETTYS_CONNECTIONS?.kalshi
+const kalshiBalancePromise = BETTY_CONNECTIONS?.kalshi
 ? cronometrar('Kalshi saldo', fetchKalshiSaldo).then(v => ({ ok: true, value: v })).catch(error => ({ ok: false, error }))
 : Promise.resolve({ ok: true, value: null });
-const polyBalancePromise = MYBETTYS_CONNECTIONS?.polymarket
+const polyBalancePromise = BETTY_CONNECTIONS?.polymarket
 ? cronometrar('Polymarket saldo', fetchPolymarketSaldo).then(v => ({ ok: true, value: v })).catch(error => ({ ok: false, error }))
 : Promise.resolve({ ok: true, value: null });
-const predictBalancePromise = MYBETTYS_CONNECTIONS?.predict
+const predictBalancePromise = BETTY_CONNECTIONS?.predict
 ? cronometrar('Predict.fun saldo', fetchPredictSaldo).then(value => ({ ok: true, value })).catch(() => ({ ok: false, value: null }))
 : Promise.resolve({ ok: true, value: null });
-const sxBetBalancePromise = MYBETTYS_CONNECTIONS?.sxbet
+const sxBetBalancePromise = BETTY_CONNECTIONS?.sxbet
 ? cronometrar('SX Bet saldo', fetchSxBetSaldo).then(data => data.balance).catch(() => null)
 : null;
 const [polyOpenResult, kalshiOpenResult, kalshiBalanceResult, polyBalanceResult, predictBalanceResult, sxBetBalance] = await Promise.all([
@@ -2235,19 +2235,19 @@ if (generation !== refreshGeneration) return;
 // Não substituímos um valor confirmado por cálculo baseado no histórico.
 if (polyBalanceResult.ok && Number.isFinite(polyBalanceResult.value)) {
 POLY_API_BALANCE = polyBalanceResult.value;
-} else if (!MYBETTYS_CONNECTIONS?.polymarket) {
+} else if (!BETTY_CONNECTIONS?.polymarket) {
 POLY_API_BALANCE = null;
 }
 // Saldo disponível real da Kalshi: vem do endpoint /portfolio/balance.
 // Se a chamada falhar, preservamos o último valor confirmado.
 if (kalshiBalanceResult.ok && Number.isFinite(kalshiBalanceResult.value)) {
 KALSHI_API_BALANCE = kalshiBalanceResult.value;
-} else if (!MYBETTYS_CONNECTIONS?.kalshi) {
+} else if (!BETTY_CONNECTIONS?.kalshi) {
 KALSHI_API_BALANCE = null;
 }
 if (predictBalanceResult.ok) PREDICT_API_BALANCE = predictBalanceResult.value;
 saldoPredictFalhou = !predictBalanceResult.ok;
-if (sxBetBalance !== null || !MYBETTYS_CONNECTIONS?.sxbet) SXBET_API_BALANCE = sxBetBalance;
+if (sxBetBalance !== null || !BETTY_CONNECTIONS?.sxbet) SXBET_API_BALANCE = sxBetBalance;
 atualizarSaldosFixos();
 if (generation !== refreshGeneration) return;
 const polyOpen = polyOpenResult.ok ? polyOpenResult.value : prev.polyOpen;
@@ -2345,7 +2345,7 @@ const data = dataInicioAposta(d);
 return data && data.getTime() >= limiteAoVivoFechadas;
 });
 if (historicoFechadoIndexado) {
-try { localStorage.removeItem('mybettys:lastConfirmedClosed:' + (MYBETTYS_USER?.id || '')); } catch (_) {}
+try { localStorage.removeItem('betty:lastConfirmedClosed:' + (BETTY_USER?.id || '')); } catch (_) {}
 }
 const abertosNovasCasas = [];
 for (const { casa, data, error } of resultadosNovasCasas) {
@@ -2679,7 +2679,7 @@ fechados: dedupePolymarket((fechados || []).concat(closedBy))
 };
 }
 async function fetchPosicoesAbertas() {
-if (!MYBETTYS_CONNECTIONS?.polymarket) return [];
+if (!BETTY_CONNECTIONS?.polymarket) return [];
 // Paginação completa para a wallet configurada; não limita artificialmente em 5.000 registros.
 // Limite de 500 por página (o mesmo já usado em buscarPosicoesPorMercadosPolymarket
 // para este mesmo endpoint /positions) — reduz o número de idas e vindas
@@ -2926,7 +2926,7 @@ d?.realizedPnl ?? "", d?.cashPnl ?? "", d?.timestamp ?? "", d?.endDate ?? ""
 ].join("|");
 }
 function cacheFechadasPolymarket() {
-const userId = MYBETTYS_USER?.id || "local";
+const userId = BETTY_USER?.id || "local";
 if (polyClosedEnrichmentCache?.userId === userId) return polyClosedEnrichmentCache;
 let entries = {};
 try {
@@ -3053,7 +3053,7 @@ return cached ? { ...cached, _order: i } : null;
 }).filter(Boolean);
 }
 async function fetchPosicoesFechadas(posicoesAbertasRaw) {
-if (!MYBETTYS_CONNECTIONS?.polymarket) return [];
+if (!BETTY_CONNECTIONS?.polymarket) return [];
 // A API permite até 100.000 de offset. Pagina até o fim para não perder histórico antigo.
 let todas = [];
 let offset = 0;
@@ -3100,7 +3100,7 @@ console.warn("PnL por fluxo indisponivel; mantendo valores da API:", e);
 return lista;
 }
 async function fetchKalshiAbertos() {
-if (!MYBETTYS_CONNECTIONS?.kalshi) return [];
+if (!BETTY_CONNECTIONS?.kalshi) return [];
 const res = await fetchComRetry(KALSHI_PROXY + "/positions");
 if (!res.ok) throw new Error("Kalshi positions HTTP " + res.status);
 const data = await res.json();
@@ -3114,7 +3114,7 @@ avgPrice: d.avgPrice || (d.totalBought ? (d.initialValue || 0) / d.totalBought :
 }));
 }
 async function fetchKalshiFechados() {
-if (!MYBETTYS_CONNECTIONS?.kalshi) return [];
+if (!BETTY_CONNECTIONS?.kalshi) return [];
 const res = await fetchComRetry(KALSHI_PROXY + "/settlements");
 if (!res.ok) throw new Error("Kalshi settlements HTTP " + res.status);
 const data = await res.json();
@@ -4059,10 +4059,10 @@ el.classList.toggle("negative", confirmado && valor < 0);
 }
 const predictCard = document.getElementById("saldoPredictCard");
 if (predictCard) {
-predictCard.hidden = !MYBETTYS_CONNECTIONS?.predict;
+predictCard.hidden = !BETTY_CONNECTIONS?.predict;
 }
 const sxBetCard = document.getElementById("saldoSxBetCard");
-if (sxBetCard) sxBetCard.hidden = !MYBETTYS_CONNECTIONS?.sxbet;
+if (sxBetCard) sxBetCard.hidden = !BETTY_CONNECTIONS?.sxbet;
 }
 const ICONS = {
 trendUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
@@ -4391,7 +4391,7 @@ const paginasHistoricoPosicoes = new Map();
 let escopoPaginasHistoricoPosicoes = '';
 let preparoPaginaFechadasTimer = null;
 function escopoConsultaPosicoes() {
-return JSON.stringify([MYBETTYS_USER?.id || 'local',refreshGeneration,versaoIndiceHistorico,chavePeriodoFechadasConfigurado()]);
+return JSON.stringify([BETTY_USER?.id || 'local',refreshGeneration,versaoIndiceHistorico,chavePeriodoFechadasConfigurado()]);
 }
 function agendarPreparoNavegacao() {
 const previous=agendarPreparoNavegacao.handle;
@@ -5500,13 +5500,13 @@ let filtroOddsEstat = "todas";
 let atalhoPeriodoEstat = "tudo";
 let dataInicioEstat = "";
 let dataFimEstat = "";
-const STATS_PERIOD_STORAGE_PREFIX = "mybettys:statsPeriod:";
+const STATS_PERIOD_STORAGE_PREFIX = "betty:statsPeriod:";
 let periodoEstatCarregadoPara = null;
 let calendarioPeriodoEstatMes = new Date();
 let calendarioPeriodoEstatAberto = false;
 let campoCalendarioPeriodoEstat = "start";
 
-function chavePeriodoEstat() { return STATS_PERIOD_STORAGE_PREFIX + (MYBETTYS_USER?.id || "local"); }
+function chavePeriodoEstat() { return STATS_PERIOD_STORAGE_PREFIX + (BETTY_USER?.id || "local"); }
 function carregarPeriodoEstatisticas() {
 const chave = chavePeriodoEstat();
 if (periodoEstatCarregadoPara === chave) return;
@@ -6376,7 +6376,7 @@ return estadoPendente;
 function renderPorSite(resumoDb = resumoEstatDbAtual(), estadoPendente = "Histórico indisponível") {
 const casas = filtroCasaEstat === "todas" ? CASAS_STAKE : [filtroCasaEstat];
 const resultados = new Map((resumoDb?.porSite || []).map(row => [row.chave, metricasResumoDb(row)]));
-const grupos = casas.filter(casa => MYBETTYS_CONNECTIONS?.[casa] &&
+const grupos = casas.filter(casa => BETTY_CONNECTIONS?.[casa] &&
 (!resumoDb || Number(resultados.get(casa)?.total) > 0)).map(casa => ({
 casa, label: NOMES_CASAS[casa], row: resultados.get(casa)
 })).sort((a, b) => (b.row?.total ?? 0) - (a.row?.total ?? 0));
@@ -7001,7 +7001,7 @@ casaSync[casa] = { ...casaSyncPadrao(casa), ...casaSync[casa], ...patch, casa };
 salvarSyncPersistido();
 }
 function casasConectadas() {
-return CASAS_STAKE.filter(casa => MYBETTYS_CONNECTIONS?.[casa]);
+return CASAS_STAKE.filter(casa => BETTY_CONNECTIONS?.[casa]);
 }
 function syncEstaStale() {
 const casas = casasConectadas();
@@ -7028,7 +7028,7 @@ const el = document.getElementById("syncPanel");
 if (!el) return;
 el.innerHTML = Object.entries(NOMES_CASAS).map(([id, nome]) => {
 const s = casaSync[id] || casaSyncPadrao(id);
-const connected = Boolean(MYBETTYS_CONNECTIONS?.[id]);
+const connected = Boolean(BETTY_CONNECTIONS?.[id]);
 const state = connected ? (s.state || "idle") : "disconnected";
 const counts = connected ? `${s.openCount || 0} abertas` + (s.closedCount ? ` · ${s.closedCount} fechadas recebidas` : "") : "Não conectada";
 return `<div class="sync-house">
@@ -7161,7 +7161,7 @@ document.getElementById('autoRefreshToggle')?.setAttribute('aria-pressed',String
 }
 function alternarAutoRefresh() {
 autoRefreshAtivo = !autoRefreshAtivo;
-try { localStorage.setItem("mybettys:autoRefresh", autoRefreshAtivo ? "1" : "0"); } catch (_) {}
+try { localStorage.setItem("betty:autoRefresh", autoRefreshAtivo ? "1" : "0"); } catch (_) {}
 if (autoRefreshAtivo) iniciarAutoRefresh();
 else if (autoRefreshTimer) {
 clearInterval(autoRefreshTimer);
@@ -7295,7 +7295,7 @@ function renderSyncCasas() {
   if (!el) return;
   const html = Object.entries(NOMES_CASAS).map(([id, nome]) => {
     const s = casaSync[id] || casaSyncPadrao(id);
-    const conectada = Boolean(MYBETTYS_CONNECTIONS?.[id]);
+    const conectada = Boolean(BETTY_CONNECTIONS?.[id]);
     const estado = conectada ? (s.state || "idle") : "disconnected";
     const ponto = { ok: "ok", syncing: "run", error: "err", stale: "warn", partial: "warn" }[estado] || "";
     const texto = !conectada ? "não conectada"
@@ -7395,7 +7395,7 @@ function pintarKpisVisao(d) {
   const texto = (id, valor) => { const alvo = document.getElementById(id); if (alvo) alvo.textContent = valor; };
   texto("visaoFechadas", `${d.nFechadas.toLocaleString("en-US")} apostas fechadas no total`);
   texto("visaoCotacao", d.abertosF.length ? `${comCotacao} de ${d.abertosF.length}` : "—");
-  texto("visaoCotacaoNota", MYBETTYS_CONNECTIONS?.sxbet ? "A SX Bet informa só a exposição, sem valor a mercado" : "Valor a mercado das posições abertas");
+  texto("visaoCotacaoNota", BETTY_CONNECTIONS?.sxbet ? "A SX Bet informa só a exposição, sem valor a mercado" : "Valor a mercado das posições abertas");
 }
 // Coluna "Risco": exposição por casa, maior posição e drawdown, uma linha cada.
 function pintarDestaquesVisao(d) {

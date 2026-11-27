@@ -258,7 +258,7 @@ async fn buscar_linhas(p: &Pedido, pares: &[(String, String)]) -> Result<Vec<Val
         let r = net::CLIENTE
             .get(&url)
             .header("accept", "application/json")
-            .header("user-agent", "MyBettys/1.0")
+            .header("user-agent", "Betty/1.0")
             .timeout(Duration::from_secs(25))
             .send()
             .await?;
@@ -593,7 +593,7 @@ pub async fn proxy(estado: &Estado, gamma: bool, resto: &str, query: Option<&str
     let r = net::CLIENTE
         .get(&alvo)
         .header("accept", "application/json")
-        .header("user-agent", "MyBettys/1.0")
+        .header("user-agent", "Betty/1.0")
         .timeout(Duration::from_secs(20))
         .send()
         .await;
@@ -701,7 +701,7 @@ async fn wallet_de_negociacao(endereco: &str) -> String {
     let r = net::CLIENTE
         .get(url)
         .header("accept", "application/json")
-        .header("user-agent", "MyBettys/1.0")
+        .header("user-agent", "Betty/1.0")
         .timeout(Duration::from_secs(8))
         .send()
         .await;

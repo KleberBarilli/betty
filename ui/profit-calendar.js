@@ -39,7 +39,7 @@ const profitCalendarState = {
   house: 'todas', unit: 'usd', selected: null, data: null, key: '', version: -1, request: 0, detailRequest: 0, detailCollapsed: true
 };
 function profitCalendarKey() {
-  return JSON.stringify([profitCalendarState.month,profitCalendarState.house,MYBETTYS_USER?.id||'local',versaoIndiceHistorico,chavePeriodoFechadasConfigurado()]);
+  return JSON.stringify([profitCalendarState.month,profitCalendarState.house,BETTY_USER?.id||'local',versaoIndiceHistorico,chavePeriodoFechadasConfigurado()]);
 }
 let profitCalendarPickerYear;
 function fecharSeletorMesProfit(focus = false) {

@@ -1973,11 +1973,11 @@ mod tests {
     }
 
     /// Compara `predictSelection`/`predictCategory` com o JS original
-    /// (casos gerados por `predict-oracle.mjs`; env `MYBETTYS_ORACULO_PREDICT`).
+    /// (casos gerados por `predict-oracle.mjs`; env `BETTY_ORACULO_PREDICT`).
     #[test]
     #[ignore]
     fn oraculo_predict() {
-        let arquivo = std::env::var("MYBETTYS_ORACULO_PREDICT").expect("defina MYBETTYS_ORACULO_PREDICT");
+        let arquivo = std::env::var("BETTY_ORACULO_PREDICT").expect("defina BETTY_ORACULO_PREDICT");
         let (mut total, mut erros) = (0, 0);
         for linha in std::fs::read_to_string(arquivo).unwrap().lines().filter(|l| !l.is_empty()) {
             let caso: Value = serde_json::from_str(linha).unwrap();

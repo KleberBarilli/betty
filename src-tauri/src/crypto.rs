@@ -59,7 +59,7 @@ impl MasterKey {
     pub fn encrypt(&self, texto: &str) -> Result<String> {
         let mut nonce = [0u8; NONCE_LEN];
         getrandom::fill(&mut nonce).map_err(|e| anyhow!("gerador aleatório indisponível: {e}"))?;
-        // O crate devolve `ciphertext | tag`; o formato do MyBettys é `nonce | tag | ciphertext`.
+        // O crate devolve `ciphertext | tag`; o formato do Betty é `nonce | tag | ciphertext`.
         let saida = self
             .cipher()
             .encrypt(Nonce::from_slice(&nonce), texto.as_bytes())

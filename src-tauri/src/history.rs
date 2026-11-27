@@ -1479,7 +1479,7 @@ mod tests {
     #[ignore]
     fn medir_etapas_exportacao() {
         use std::time::Instant;
-        let c = crate::db::abrir(std::path::Path::new(&std::env::var("MYBETTYS_COMPARAR_DB").unwrap())).unwrap();
+        let c = crate::db::abrir(std::path::Path::new(&std::env::var("BETTY_COMPARAR_DB").unwrap())).unwrap();
         let t = Instant::now();
         let textos: Vec<String> = {
             let mut s = c.prepare("SELECT data_json FROM closed_bets_ledger ORDER BY rowid").unwrap();

@@ -316,7 +316,7 @@ pub fn usuario_local(conn: &mut Connection) -> Result<UsuarioLocal> {
         None => {
             let u = UsuarioLocal {
                 id: uuid::Uuid::new_v4().to_string(),
-                email: "local@mybettys.local".into(),
+                email: "local@betty.local".into(),
                 name: "Usuário Local".into(),
             };
             // Não existe senha no app desktop: "!" nunca corresponde a um hash válido.
@@ -381,14 +381,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("antigo.db");
         {
-            // Formato da primeira versão do MyBettys (v52build).
+            // Formato da primeira versão do Betty (v52build).
             let c = Connection::open(&p).unwrap();
             c.execute_batch(
                 "CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, display_name TEXT NOT NULL, created_at TEXT NOT NULL);
                  CREATE TABLE connections (user_id TEXT PRIMARY KEY, polymarket_wallet TEXT, kalshi_api_key_enc TEXT, kalshi_private_key_enc TEXT, polymarket_private_key_enc TEXT, updated_at TEXT NOT NULL);
                  CREATE TABLE settings (user_id TEXT PRIMARY KEY, poly REAL NOT NULL DEFAULT 0, kalshi REAL NOT NULL DEFAULT 0, stake_unidade REAL NOT NULL DEFAULT 1, stake_regras TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL);
                  CREATE TABLE closed_bets_index (user_id TEXT NOT NULL, platform TEXT NOT NULL, bet_key TEXT NOT NULL, category TEXT NOT NULL, start_ymd TEXT NOT NULL DEFAULT '', table_ymd TEXT NOT NULL DEFAULT '', table_ts INTEGER NOT NULL DEFAULT 0, title_search TEXT NOT NULL DEFAULT '', title_display TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, PRIMARY KEY (user_id, platform, bet_key));
-                 INSERT INTO users VALUES ('u1','local@mybettys.local','x','Usuário Local','2026-08-26T00:00:00.000Z');
+                 INSERT INTO users VALUES ('u1','local@betty.local','x','Usuário Local','2026-08-26T00:00:00.000Z');
                  INSERT INTO connections(user_id,polymarket_wallet,polymarket_private_key_enc,updated_at) VALUES ('u1','0x1111111111111111111111111111111111111111','segredo-antigo','2026-08-26T00:00:00.000Z');",
             )
             .unwrap();

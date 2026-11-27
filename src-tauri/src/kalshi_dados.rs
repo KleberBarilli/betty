@@ -478,13 +478,13 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    /// Compara com o JS original. `MYBETTYS_ORACULO_TITULOS=<jsonl>` e
-    /// `MYBETTYS_ORACULO_DB=<banco>` (de onde vêm mercados e eventos).
+    /// Compara com o JS original. `BETTY_ORACULO_TITULOS=<jsonl>` e
+    /// `BETTY_ORACULO_DB=<banco>` (de onde vêm mercados e eventos).
     #[test]
     #[ignore]
     fn oraculo_titulos() {
         let var = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("defina {k}"));
-        let c = rusqlite::Connection::open_with_flags(var("MYBETTYS_ORACULO_DB"), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let c = rusqlite::Connection::open_with_flags(var("BETTY_ORACULO_DB"), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
         let meta = |kind: &str| -> HashMap<String, Value> {
             let mut s = c.prepare("SELECT cache_key, data_json FROM kalshi_metadata_cache WHERE kind=?").unwrap();
             s.query_map([kind], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
@@ -494,7 +494,7 @@ mod tests {
                 .collect()
         };
         let (mercados, eventos) = (meta("market"), meta("event"));
-        let texto = std::fs::read_to_string(var("MYBETTYS_ORACULO_TITULOS")).unwrap();
+        let texto = std::fs::read_to_string(var("BETTY_ORACULO_TITULOS")).unwrap();
         let s = |v: &Value| v.as_str().unwrap_or("").to_string();
         let (mut total, mut erros, mut por_fn) = (0usize, Vec::new(), HashMap::<String, usize>::new());
         for linha in texto.lines() {

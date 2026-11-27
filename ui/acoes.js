@@ -118,5 +118,5 @@
     }
   }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ATRIBUTOS });
 
-  window.MyBettysAcoes = { analisar };
+  window.BettyAcoes = { analisar };
 })();

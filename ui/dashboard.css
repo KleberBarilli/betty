@@ -290,7 +290,7 @@ flex-wrap: wrap;
 .sidebar-auto-toggle[aria-pressed="true"] .sidebar-auto-switch::after { transform:translateX(10px); background:var(--accent); }
 .sidebar-sync-card .btn-refresh { width:100%; justify-content:center; gap:6px; min-height:31px; padding:6px; border-radius:7px; font-size:.67rem; background:var(--card-2); }
 .sidebar-sync-card .btn-refresh .ic { width:13px; height:13px; }
-.sidebar-footer #mybettysUserBox { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 2px 0; color:var(--muted); font-size:.64rem; }
+.sidebar-footer #bettyUserBox { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 2px 0; color:var(--muted); font-size:.64rem; }
 .sidebar-user-name { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-weight:500; }
 .sidebar-user-logout { flex:none; border:0; background:transparent; padding:3px 0 3px 5px; color:var(--muted); cursor:pointer; font:inherit; }
 .sidebar-user-logout:hover { color:var(--text); }
@@ -302,7 +302,7 @@ flex-wrap: wrap;
 .sidebar-account-info .sidebar-user-name { display:block; color:var(--text); font-size:.69rem; }
 .sidebar-account-info small { color:var(--muted-2); font-size:.62rem; }
 .sidebar-user-logout svg { width:16px; height:16px; vertical-align:middle; }
-.sidebar-footer #mybettysUserBox { margin-top:12px; padding:12px 2px 0; border-top:1px solid var(--border); }
+.sidebar-footer #bettyUserBox { margin-top:12px; padding:12px 2px 0; border-top:1px solid var(--border); }
 .sidebar-sync-card .online-box { display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .sidebar-sync-card .online-box .line1 { flex:1; min-width:0; gap:5px; font-size:.62rem; white-space:nowrap; }
 .sidebar-sync-card .status-label { min-width:0; overflow:hidden; text-overflow:ellipsis; }
@@ -404,7 +404,7 @@ flex-shrink: 0;
 @media (min-width: 1280px) {
 .stats-row.cols-6 { grid-template-columns: repeat(6, 1fr); }
 }
-body:not([data-mybettys-view="dashboard"]) #dashboardInsights { display: none !important; }
+body:not([data-betty-view="dashboard"]) #dashboardInsights { display: none !important; }
 .stale-banner {
 display: none;
 align-items: flex-start;
@@ -549,8 +549,8 @@ body.view-estatisticas .metric-mini .val.positive,
 body.view-estatisticas .metric-mini .val .positive { color: var(--pos); }
 body.view-estatisticas .metric-mini .val.negative,
 body.view-estatisticas .metric-mini .val .negative { color: var(--danger); }
-body[data-mybettys-view]:not([data-mybettys-view="dashboard"]) .balances { display:none !important; }
-body[data-mybettys-view="dashboard"] .balances { display:flex !important; }
+body[data-betty-view]:not([data-betty-view="dashboard"]) .balances { display:none !important; }
+body[data-betty-view="dashboard"] .balances { display:flex !important; }
 .pnl-period-table { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
 .pnl-period-table th { text-align: left; color: var(--muted); font-size: 0.7rem; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .pnl-period-table td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); font-variant-numeric: tabular-nums; }
@@ -1559,11 +1559,11 @@ padding:8px !important;
 
 /* ==== betty-stats-toolbar-final-fix ==== */
 /* A toolbar de Posições NÃO existe no Dashboard, Estatísticas ou Configurações.
-O atributo data-mybettys-view é a fonte visual de verdade e evita que uma
+O atributo data-betty-view é a fonte visual de verdade e evita que uma
 atualização assíncrona ou regra de responsividade faça a barra reaparecer. */
-body[data-mybettys-view="dashboard"] #toolbarSection,
-body[data-mybettys-view="estatisticas"] #toolbarSection,
-body[data-mybettys-view="config"] #toolbarSection,
+body[data-betty-view="dashboard"] #toolbarSection,
+body[data-betty-view="estatisticas"] #toolbarSection,
+body[data-betty-view="config"] #toolbarSection,
 #toolbarSection.stats-hidden {
 display: none !important;
 visibility: hidden !important;
@@ -1575,7 +1575,7 @@ border: 0 !important;
 overflow: hidden !important;
 }
 /* Só Posições pode exibir a toolbar. */
-body[data-mybettys-view="posicoes"] #toolbarSection {
+body[data-betty-view="posicoes"] #toolbarSection {
 visibility: visible;
 }
 
@@ -1785,7 +1785,7 @@ max-width:250px !important;
 #toolbarSection.posicoes-mode .btn-download-csv{order:6;}
 }
 
-/* ==== mybettys-account-ui ==== */
+/* ==== betty-account-ui ==== */
 .account-modal{position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(7px);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px}.account-modal.show{display:flex}.account-box{width:min(520px,100%);background:var(--card,#10151d);border:1px solid var(--border,#293241);border-radius:18px;padding:22px;box-shadow:0 30px 90px #0009}.account-box h3{margin:0 0 5px;font-size:1.1rem}.account-box .muted{color:var(--muted);font-size:.78rem;line-height:1.5}.account-box label{display:block;color:var(--muted);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:15px 0 6px}.account-box input,.account-box textarea{width:100%;box-sizing:border-box;background:var(--bg,#080b10);border:1px solid var(--border,#293241);color:var(--text,#fff);border-radius:10px;padding:11px 12px;font:inherit;outline:none}.account-box textarea{min-height:130px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem}.account-box input:focus,.account-box textarea:focus{border-color:var(--accent,#5eead4)}.account-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.account-close{background:none;border:0;color:var(--muted);font-size:24px;float:right;cursor:pointer}.account-error{min-height:18px;color:#fb7185;font-size:.76rem;margin-top:8px}.connection-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.16);color:var(--muted);font-size:.74rem;line-height:1.45}
 
 /* ==== betty-responsive-layout-v1 ==== */
@@ -1865,7 +1865,7 @@ max-width:250px !important;
 
 /* Cada controle tem uma área explícita. O escopo do CSV fica no menu do
    download e não acrescenta uma coluna à barra de Casa/Data. */
-body[data-mybettys-view="posicoes"] #toolbarSection.posicoes-mode {
+body[data-betty-view="posicoes"] #toolbarSection.posicoes-mode {
   display: grid !important;
   grid-template-areas: "tabs search date house sport export";
   grid-template-columns: auto minmax(140px, 1fr) 150px 150px 150px 34px;
@@ -1891,9 +1891,9 @@ body[data-mybettys-view="posicoes"] #toolbarSection.posicoes-mode {
 #toolbarSection.posicoes-mode .casa-filter-wrap { grid-area: house; }
 #toolbarSection.posicoes-mode .sport-filter-wrap { grid-area: sport; }
 #toolbarSection.posicoes-mode .date-filter-wrap { grid-area: date; }
-body[data-mybettys-view="posicoes"] #toolbarSection .casa-filter-wrap,
-body[data-mybettys-view="posicoes"] #toolbarSection .sport-filter-wrap,
-body[data-mybettys-view="posicoes"] #toolbarSection .date-filter-wrap {
+body[data-betty-view="posicoes"] #toolbarSection .casa-filter-wrap,
+body[data-betty-view="posicoes"] #toolbarSection .sport-filter-wrap,
+body[data-betty-view="posicoes"] #toolbarSection .date-filter-wrap {
   width: 100% !important;
   min-width: 0 !important;
 }
@@ -1917,14 +1917,14 @@ body[data-mybettys-view="posicoes"] #toolbarSection .date-filter-wrap {
 .csv-export-confirm:disabled { opacity: .5; cursor: wait; }
 .csv-export-confirm:focus-visible, .csv-export-popup select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (min-width: 901px) and (max-width: 1200px) {
-  body[data-mybettys-view="posicoes"] #toolbarSection.posicoes-mode {
+  body[data-betty-view="posicoes"] #toolbarSection.posicoes-mode {
     grid-template-areas: "tabs tabs tabs tabs tabs" "search date house sport export";
     grid-template-columns: minmax(140px, 1fr) 140px 140px 140px 34px;
   }
   #toolbarSection.posicoes-mode .search-input { max-width: none !important; }
 }
 @media (max-width: 900px) {
-  body[data-mybettys-view="posicoes"] #toolbarSection.posicoes-mode {
+  body[data-betty-view="posicoes"] #toolbarSection.posicoes-mode {
     grid-template-areas: "tabs tabs tabs tabs" "search search search search" "date house sport export";
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 34px;
   }
@@ -1938,10 +1938,10 @@ body[data-mybettys-view="posicoes"] #toolbarSection .date-filter-wrap {
 @media (min-width: 901px) {
   /* O gráfico usa preserveAspectRatio="none"; a altura acompanha a janela,
      com piso igual ao layout anterior e teto para não virar um painel vazio. */
-  body[data-mybettys-view="dashboard"] { --chart-plot-h: clamp(240px, calc(100vh - 540px), 460px); }
-  body[data-mybettys-view="dashboard"] .chart-area,
-  body[data-mybettys-view="dashboard"] .chart-svg,
-  body[data-mybettys-view="dashboard"] .chart-empty { min-height: var(--chart-plot-h); height: var(--chart-plot-h); }
+  body[data-betty-view="dashboard"] { --chart-plot-h: clamp(240px, calc(100vh - 540px), 460px); }
+  body[data-betty-view="dashboard"] .chart-area,
+  body[data-betty-view="dashboard"] .chart-svg,
+  body[data-betty-view="dashboard"] .chart-empty { min-height: var(--chart-plot-h); height: var(--chart-plot-h); }
   /* Ultrawide: limita a largura útil e centraliza, preservando a sidebar. */
   .main { max-width: 2200px; margin-left: auto; margin-right: auto; }
 }

@@ -113,9 +113,11 @@ mod tests {
 
     #[test]
     fn assina_e_verifica_pss() {
-        // Chave de teste gerada só para este teste (2048 bits, PKCS#8).
-        let pem = include_str!("../testdata/rsa-teste.pem");
-        let chave = chave_rsa(pem).unwrap();
+        // A chave é gerada na hora (2048 bits, PKCS#8): nenhuma chave privada fica no repositório.
+        use rsa::pkcs8::EncodePrivateKey;
+        let gerada = rsa::RsaPrivateKey::new(&mut rand::thread_rng(), 2048).unwrap();
+        let pem = gerada.to_pkcs8_pem(rsa::pkcs8::LineEnding::LF).unwrap();
+        let chave = chave_rsa(&pem).unwrap();
         let assinatura = assinar_pss(&chave, b"1700000000000GET/trade-api/v2/portfolio/balance").unwrap();
         let bytes = base64::engine::general_purpose::STANDARD.decode(assinatura).unwrap();
         let publica = ring::signature::UnparsedPublicKey::new(&ring::signature::RSA_PSS_2048_8192_SHA256, chave.public().as_ref());

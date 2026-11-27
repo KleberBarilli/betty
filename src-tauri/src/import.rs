@@ -1,4 +1,4 @@
-//! Importação do banco do MyBettys Electron.
+//! Importação do banco da versão Electron (quando o app se chamava MyBettys).
 //!
 //! O banco antigo é aberto somente para leitura e copiado pela API de backup do
 //! SQLite, que gera um snapshot consistente mesmo com o Electron aberto. O
@@ -75,7 +75,7 @@ mod tests {
     fn copia_sem_alterar_o_original() {
         let dir = tempfile::tempdir().unwrap();
         let antigo = dir.path().join("electron.db");
-        let novo = dir.path().join("novo").join("mybettys.db");
+        let novo = dir.path().join("novo").join("betty.db");
         std::fs::create_dir_all(novo.parent().unwrap()).unwrap();
 
         assert_eq!(importar_se_necessario(&novo, &antigo).unwrap(), ResultadoImportacao::SemBancoAnterior);

@@ -16,13 +16,27 @@ const CONTA: &str = "master-key";
 pub enum OrigemChave {
     /// Já estava no cofre.
     Cofre,
+    /// Estava no cofre com o nome antigo do app e foi copiada para o novo.
+    TrazidaDoNomeAntigo,
     /// Veio do `local-config.json` do Electron e foi copiada para o cofre.
     ImportadaDoElectron,
     /// Primeira execução sem dados anteriores.
     NovaGerada,
 }
 
-pub fn carregar_ou_criar(servico: &str, config_electron: &Path) -> Result<(MasterKey, OrigemChave)> {
+/// Chave gravada no cofre sob outro nome de serviço (o de antes da troca de
+/// marca). A entrada antiga não é apagada.
+fn ler_cofre_legado(servico: Option<&str>) -> Result<Option<MasterKey>> {
+    let Some(servico) = servico else { return Ok(None) };
+    let entrada = keyring::Entry::new(servico, CONTA).context("cofre de credenciais indisponível")?;
+    match entrada.get_password() {
+        Ok(hex) => Ok(Some(MasterKey::from_hex(&zeroize::Zeroizing::new(hex))?)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e).context("não foi possível ler a chave antiga no cofre de credenciais"),
+    }
+}
+
+pub fn carregar_ou_criar(servico: &str, servico_legado: Option<&str>, config_electron: &Path) -> Result<(MasterKey, OrigemChave)> {
     let entrada = keyring::Entry::new(servico, CONTA).context("cofre de credenciais indisponível")?;
     match entrada.get_password() {
         Ok(hex) => {
@@ -33,9 +47,12 @@ pub fn carregar_ou_criar(servico: &str, config_electron: &Path) -> Result<(Maste
         Err(e) => return Err(e).context("não foi possível ler a chave no cofre de credenciais"),
     }
 
-    let (chave, origem) = match ler_chave_electron(config_electron)? {
-        Some(chave) => (chave, OrigemChave::ImportadaDoElectron),
-        None => (MasterKey::generate()?, OrigemChave::NovaGerada),
+    let (chave, origem) = match ler_cofre_legado(servico_legado)? {
+        Some(chave) => (chave, OrigemChave::TrazidaDoNomeAntigo),
+        None => match ler_chave_electron(config_electron)? {
+            Some(chave) => (chave, OrigemChave::ImportadaDoElectron),
+            None => (MasterKey::generate()?, OrigemChave::NovaGerada),
+        },
     };
     entrada
         .set_password(&chave.to_hex())
@@ -80,5 +97,32 @@ mod tests {
         std::fs::write(&p, format!(r#"{{"masterKeyHex":"{}"}}"#, "ab".repeat(32))).unwrap();
         let chave = ler_chave_electron(&p).unwrap().unwrap();
         assert_eq!(chave.to_hex().as_str(), "ab".repeat(32));
+    }
+}
+
+#[cfg(test)]
+mod testes_legado {
+    use super::*;
+
+    /// Usa o cofre de verdade, com nomes descartáveis que são apagados no fim.
+    #[test]
+    fn traz_a_chave_gravada_com_o_nome_antigo() {
+        let sufixo = uuid::Uuid::new_v4();
+        let (novo, antigo) = (format!("Betty-teste-{sufixo}"), format!("Betty-teste-antigo-{sufixo}"));
+        let entrada_antiga = keyring::Entry::new(&antigo, CONTA).unwrap();
+        entrada_antiga.set_password(&"cd".repeat(32)).unwrap();
+        let sem_electron = std::path::Path::new("nao-existe").join("local-config.json");
+
+        let resultado = carregar_ou_criar(&novo, Some(&antigo), &sem_electron);
+        let segunda = carregar_ou_criar(&novo, Some(&antigo), &sem_electron);
+        let ainda_no_antigo = entrada_antiga.get_password();
+        let _ = entrada_antiga.delete_credential();
+        let _ = keyring::Entry::new(&novo, CONTA).unwrap().delete_credential();
+
+        let (chave, origem) = resultado.unwrap();
+        assert_eq!(origem, OrigemChave::TrazidaDoNomeAntigo);
+        assert_eq!(chave.to_hex().as_str(), "cd".repeat(32));
+        assert_eq!(segunda.unwrap().1, OrigemChave::Cofre, "na segunda abertura já está no cofre novo");
+        assert_eq!(ainda_no_antigo.unwrap(), "cd".repeat(32), "a entrada antiga não é apagada");
     }
 }

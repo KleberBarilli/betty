@@ -1,4 +1,4 @@
-/* MyBettys — folha única do protótipo (sem framework, sem webfont).
+/* Betty — folha única do protótipo (sem framework, sem webfont).
    Três paletas escuras trocáveis por [data-pal] no elemento raiz. */
 :root,[data-pal="a"]{ /* Meia-noite */
   --bg:#080e1a; --bg2:#0b1321; --sf:#101929; --sf2:#172236; --hv:#1a2740; --bd:#22304a; --ln:#19253b;

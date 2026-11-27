@@ -644,11 +644,11 @@ mod tests {
     use super::*;
 
     /// Compara com o JS original pelo TEXTO JSON resultante.
-    /// `MYBETTYS_ORACULO_LEDGER=<jsonl> cargo test -- --ignored oraculo_ledger`.
+    /// `BETTY_ORACULO_LEDGER=<jsonl> cargo test -- --ignored oraculo_ledger`.
     #[test]
     #[ignore]
     fn oraculo_ledger() {
-        let texto = std::fs::read_to_string(std::env::var("MYBETTYS_ORACULO_LEDGER").unwrap()).unwrap();
+        let texto = std::fs::read_to_string(std::env::var("BETTY_ORACULO_LEDGER").unwrap()).unwrap();
         let (mut total, mut erros, mut por_fn) = (0usize, Vec::new(), HashMap::<String, usize>::new());
         for linha in texto.lines() {
             let caso: Value = serde_json::from_str(linha).unwrap();
