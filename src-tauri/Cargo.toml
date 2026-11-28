@@ -1,6 +1,6 @@
 [package]
 name = "betty"
-version = "0.2.0"
+version = "0.3.0"
 description = "Betty: acompanhamento de apostas na Polymarket, Kalshi, Predict.fun e SX Bet"
 authors = ["Kleber Barilli"]
 edition = "2024"
