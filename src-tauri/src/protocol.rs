@@ -87,6 +87,9 @@ pub fn abrir_no_navegador<R: Runtime>(app: &AppHandle<R>, url: &Url) {
 
 pub async fn handle<R: Runtime>(app: &AppHandle<R>, request: Request<Vec<u8>>) -> Response<Vec<u8>> {
     let path = request.uri().path().to_owned();
+    if path == "/api/atualizacao" || path == "/api/atualizacao/instalar" {
+        return atualizacao(app, request.method(), &path, request.uri().query()).await;
+    }
     if path == "/health" || path.starts_with("/api/") {
         let inicio = std::time::Instant::now();
         let estado = app.state::<api::Estado>();
@@ -112,6 +115,48 @@ pub async fn handle<R: Runtime>(app: &AppHandle<R>, request: Request<Vec<u8>>) -
         return montar(StatusCode::METHOD_NOT_ALLOWED, "text/plain; charset=utf-8", Vec::new(), true);
     }
     arquivo_estatico(app, &path)
+}
+
+/// Rotas da atualização: ficam aqui porque precisam da versão do app e de
+/// fechá-lo depois de abrir o instalador.
+async fn atualizacao<R: Runtime>(app: &AppHandle<R>, metodo: &Method, path: &str, query: Option<&str>) -> Response<Vec<u8>> {
+    let versao = app.package_info().version.to_string();
+    let json = |status: StatusCode, v: serde_json::Value| montar(status, "application/json; charset=utf-8", crate::js::para_vec(&v), true);
+    match (metodo.as_str(), path) {
+        ("GET", "/api/atualizacao") => {
+            let forcar = query.is_some_and(|q| q.split('&').any(|p| p == "forcar=1"));
+            json(StatusCode::OK, crate::atualizacao::consultar(&versao, forcar).await)
+        }
+        ("POST", "/api/atualizacao/instalar") => {
+            // Uma instalação por vez, mesmo com cliques repetidos.
+            static EM_ANDAMENTO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+            if EM_ANDAMENTO.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                return json(StatusCode::CONFLICT, serde_json::json!({ "error": "A atualização já está em andamento." }));
+            }
+            let resultado = match crate::atualizacao::baixar(&versao).await {
+                Ok(caminho) => crate::atualizacao::executar(&caminho),
+                Err(e) => Err(e),
+            };
+            match resultado {
+                Ok(()) => {
+                    // Fecha o Betty logo depois de a resposta chegar à página; o
+                    // instalador espera ele sair (e o fecha, se preciso).
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+                        app.exit(0);
+                    });
+                    json(StatusCode::OK, serde_json::json!({ "ok": true }))
+                }
+                Err(e) => {
+                    EM_ANDAMENTO.store(false, std::sync::atomic::Ordering::SeqCst);
+                    eprintln!("[atualização] falhou: {e:#}");
+                    json(StatusCode::BAD_GATEWAY, serde_json::json!({ "error": format!("Não foi possível atualizar: {e}.") }))
+                }
+            }
+        }
+        _ => montar(StatusCode::METHOD_NOT_ALLOWED, "text/plain; charset=utf-8", Vec::new(), true),
+    }
 }
 
 fn arquivo_estatico<R: Runtime>(app: &AppHandle<R>, path: &str) -> Response<Vec<u8>> {

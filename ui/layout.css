@@ -667,3 +667,62 @@ button.visao-linha:focus-visible { outline: 2px solid var(--accent); outline-off
 .selo-dados-salvos.aviso { background: var(--warn-soft); color: var(--warn); }
 .selo-dados-salvos.aviso .selo-ponto { animation: none; }
 @media (prefers-reduced-motion: reduce) { .selo-dados-salvos .selo-ponto { animation: none; } }
+
+/* ---------- Versão nova disponível ---------- */
+/* Primeiro item do topo à direita, em todas as telas, na cor de destaque. */
+.btn-atualizacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 8px 22px -10px var(--accent);
+}
+.btn-atualizacao[hidden] { display: none; }
+.btn-atualizacao:hover { background: color-mix(in srgb, var(--accent) 86%, #fff); }
+.btn-atualizacao:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.btn-atualizacao .ic { width: 16px; height: 16px; }
+.btn-atualizacao strong { font-weight: 800; }
+.btn-atualizacao-ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: sync-breathe 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .btn-atualizacao-ponto { animation: none; } }
+@media (min-width: 901px) { .topbar-right > .btn-atualizacao { order: 0; } }
+
+.atualizacao-notas {
+  max-height: 220px;
+  overflow: auto;
+  margin: 14px 0 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+.atualizacao-notas[hidden] { display: none; }
+#atualizacaoModal .btn-save { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+#atualizacaoModal .btn-save:disabled { opacity: 0.6; cursor: progress; }
+
+.sidebar-versao {
+  padding: 10px 4px 0;
+  color: var(--muted-2, var(--muted));
+  font-size: 0.68rem;
+  text-align: center;
+}
+.sidebar-versao:empty { display: none; }

@@ -6,6 +6,7 @@
 //! máquina consegue consultar as rotas `/api/*`.
 
 mod api;
+mod atualizacao;
 mod audit;
 mod breakdown;
 #[allow(dead_code)] // ainda não usada pelas rotas: primeira peça da sincronização no Rust
