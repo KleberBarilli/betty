@@ -259,6 +259,137 @@ pub fn truthy(valor: Option<&Value>) -> bool {
     }
 }
 
+/// `String(valor)` completo: listas viram `"a,b"` (com `null` vazio), como no
+/// `Array.prototype.join`.
+pub fn texto(valor: Option<&Value>) -> String {
+    match valor {
+        Some(Value::Array(itens)) => itens.iter().map(|i| if i.is_null() { String::new() } else { texto(Some(i)) }).collect::<Vec<_>>().join(","),
+        outro => string(outro),
+    }
+}
+
+/// `String(v || "")`.
+pub fn texto_ou_vazio(valor: Option<&Value>) -> String {
+    if truthy(valor) { texto(valor) } else { String::new() }
+}
+
+/// Caracteres do `\s` e do `trim()` do JavaScript: incluem U+FEFF e não
+/// incluem U+0085 (o contrário do `char::is_whitespace`).
+pub fn espaco_js(c: char) -> bool {
+    matches!(
+        c,
+        '\t' | '\n' | '\u{0B}' | '\u{0C}' | '\r' | ' ' | '\u{A0}' | '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{2028}' | '\u{2029}' | '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}'
+    )
+}
+
+/// `String.prototype.trim()`.
+pub fn trim_js(s: &str) -> &str {
+    s.trim_matches(espaco_js)
+}
+
+/// `s.replace(/\s+/g, " ").trim()`.
+pub fn limpar(s: &str) -> String {
+    s.split(espaco_js).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ")
+}
+
+/// Unidades UTF-16 de um texto (o `length` do JavaScript).
+pub fn tamanho_utf16(s: &str) -> usize {
+    s.chars().map(char::len_utf16).sum()
+}
+
+/// `s.slice(n)` com `n` em unidades UTF-16 (um par substituto partido ao
+/// meio fica inteiro do lado de cá).
+pub fn resto_utf16(s: &str, n: usize) -> &str {
+    &s[fatia_utf16(s, n).len()..]
+}
+
+/// Corpo da classe do `\s` do JavaScript.
+const CLASSE_ESPACO: &str = r"\t\n\x0B\x0C\r \x{A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}";
+
+/// Regex do JavaScript (sem a flag `u`) com a semântica dele: `\s`, `\S`, `.`,
+/// `\d`, `\w` e `\b` como no JS, e `[`, `&`, `~` e `--` literais dentro de
+/// classes (no crate `regex` são operadores). O `(?i)` continua o do Rust: ele
+/// também junta `ſ` a `s` e o sinal de kelvin a `k`, o que o JS sem `u` não faz.
+pub fn re_exata(padrao: &str) -> regex::Regex {
+    regex::Regex::new(&traduzir_regex(padrao)).unwrap_or_else(|e| panic!("regex inválida {padrao}: {e}"))
+}
+
+fn traduzir_regex(padrao: &str) -> String {
+    let mut saida = String::with_capacity(padrao.len() * 2);
+    let mut letras = padrao.chars().peekable();
+    let mut em_classe = false;
+    while let Some(c) = letras.next() {
+        match c {
+            '\\' => {
+                let Some(e) = letras.next() else {
+                    saida.push('\\');
+                    break;
+                };
+                let classe = match e {
+                    's' => Some((false, CLASSE_ESPACO)),
+                    'S' => Some((true, CLASSE_ESPACO)),
+                    'd' => Some((false, "0-9")),
+                    'D' => Some((true, "0-9")),
+                    'w' => Some((false, "A-Za-z0-9_")),
+                    'W' => Some((true, "A-Za-z0-9_")),
+                    _ => None,
+                };
+                match (classe, e) {
+                    (Some((false, corpo)), _) if em_classe => {
+                        saida.push_str(corpo);
+                        // `[\s-x]`: no JS o hífen depois de uma classe é literal.
+                        if letras.peek() == Some(&'-') {
+                            letras.next();
+                            saida.push_str(r"\-");
+                        }
+                    }
+                    (Some((negada, corpo)), _) => {
+                        saida.push_str(if negada { "[^" } else { "[" });
+                        saida.push_str(corpo);
+                        saida.push(']');
+                    }
+                    (None, 'b') if em_classe => saida.push_str(r"\x08"),
+                    (None, 'b') => saida.push_str(r"(?-u:\b)"),
+                    (None, '/') => saida.push('/'),
+                    (None, outro) => {
+                        saida.push('\\');
+                        saida.push(outro);
+                    }
+                }
+            }
+            '[' if em_classe => saida.push_str(r"\["),
+            '[' => {
+                em_classe = true;
+                saida.push('[');
+                if letras.peek() == Some(&'^') {
+                    letras.next();
+                    saida.push('^');
+                }
+            }
+            ']' if em_classe => {
+                em_classe = false;
+                saida.push(']');
+            }
+            '&' | '~' if em_classe => {
+                saida.push('\\');
+                saida.push(c);
+            }
+            '-' if em_classe && letras.peek() == Some(&'-') => saida.push_str(r"\-"),
+            '.' if !em_classe => saida.push_str(r"[^\n\r\x{2028}\x{2029}]"),
+            outro => saida.push(outro),
+        }
+    }
+    saida
+}
+
+/// Declara uma regex estática do JavaScript (`re_exata`), compilada no primeiro uso.
+#[macro_export]
+macro_rules! regex_exata {
+    ($nome:ident, $padrao:expr) => {
+        static $nome: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| $crate::js::re_exata($padrao));
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

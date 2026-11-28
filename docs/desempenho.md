@@ -237,6 +237,8 @@ Só compacta quando duas condições valem juntas:
 | `oraculo_compactacao.mjs` | Modelo de oráculo: compara o que a interface deriva de dois bancos. |
 | `oraculo_recorte.mjs` + `preparar_meta.py` | Modelo de oráculo para respostas de rota (evento inteiro x recortado). |
 | `oraculo_categorias.mjs` | Casos e respostas do `classificarAposta()` real para `categorias::tests::oraculo_categorias`, a partir de um despejo com `GET /api/history/closed`. |
+| `contexto_ui.mjs` | Base comum dos oráculos novos: carrega `ui/*.js` num `node:vm`, lê as apostas do despejo e grava `{id, entrada, saida \| erro}` por linha. |
+| `oraculo_titulos.mjs` | Casos e respostas do `tituloExibicao()` real para `exibicao::tests::oraculo_titulos_exibicao`. |
 | `rotas_leitura.py` + `comparar_rotas.py` | Lista de 64 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
 | `medir_app.mjs` | Pelo CDP, sem capturas: linha do tempo da abertura (tela, dados salvos, confirmação), compilação e execução de cada script numa recarga, e um marcador para saber se a página recarregou. |
 | `medir_memoria.ps1` | Memória privada do `betty.exe` (e o pico) e de cada processo do WebView2 dele, por papel (página, GPU, rede...). |
@@ -287,8 +289,13 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
     - Oráculo `categorias::tests::oraculo_categorias`, com os casos de `oraculo_categorias.mjs`: 27.709 casos iguais ao JS. São as 4.232 apostas do ledger como a interface as recebe, seis variantes de cada (sem `_sportMeta`, título de outra, outra casa, sem campos de esporte, slugs de outra, metadado de outra) e 36 casos de borda, 4 deles com exceção no JS, que o Rust devolve como `Err`.
     - Controle negativo: 555 respostas estragadas de propósito, 555 acusadas.
     - Cuidados que o porte já resolve e que valem para os próximos: `\s` e `trim()` do JS (incluem U+FEFF, não U+0085), `.` do JS (não casa `\r`, U+2028 e U+2029), `String([a, b])` = `"a,b"`, e o espalhamento `...(x || [])`, que percorre um texto letra a letra e lança exceção num número ou objeto.
+  - `exibicao.rs`: `tituloExibicao()`, `normalizarNomeMercadoPolymarket()` (com todos os auxiliares internos: `cleanTeam`, `stripMarketSuffix`, `matchupFrom`, `findSpecificTeam`, `findBaseballTeam`...) e `normalizarNomeMercadoKalshi()`. Ainda não é chamado pelas rotas.
+    - `titles.rs` ganhou as formas de linha inteira que o `tituloExibicao()` usa (`drawTitle`, `combatTitle`, `extendedTitle(d, matchupHint)`, `kalshiSpecialTitle(d)` com `_titleDisplay` e `matchup`, `inningWinnerTitle(d)` e o ramo de futebol americano do `kalshiDetail`), e o `clean()` e as regexes dele passaram a ter os espaços e o `.` do JS (`js::re_exata`, `js::limpar`, `js::texto`). O oráculo das categorias continua igual (27.752 casos com as 4.239 apostas de 2026-11-27).
+    - Oráculo `exibicao::tests::oraculo_titulos_exibicao`, com os casos de `oraculo_titulos.mjs`: 62.846 casos iguais ao JS, 51.192 deles com título diferente do bruto. São as 4.239 apostas do ledger, variantes de cada (sem metadado, título, resultado, ids, `_titleDisplay` e metadado de outra aposta, outra casa, espaços do JS), perguntas e tipos de mercado de modelo que passam pelos ramos de spread, totais, tênis, handicap, empate, BTTS, vencedor e props da Polymarket e de `kalshiDetail`/`kalshiSpecialTitle` da Kalshi, e 62 casos de borda, 4 deles com exceção no JS (`Err` no Rust).
+    - Controle negativo: 557 respostas estragadas de propósito, 557 acusadas.
+    - O `_tituloExibicaoCache` do JS fica de fora: o oráculo limpa o cache antes de cada caso. Com o mesmo título, resultado, plataforma e id e sem metadado, o JS devolveria o título calculado para outra linha.
+    - Cuidados novos: `indexOf`/`slice`/`length` em unidades UTF-16 (`js::tamanho_utf16`, `js::resto_utf16`), `teams.find(...)` seguido de `if (hit)` ignora um time vazio, o `scope` da Kalshi lido como `join` (`null` vazio), `q + ' ' + scope` (`"null"`) e `clean(scope)`, e o `readline` do Node quebra linha em U+2028: leia os JSONL dos oráculos separando só por `\n`.
 - **Só existe no JS (precisa portar com oráculo):**
-  - `normalizarNomeMercadoPolymarket()` e `tituloExibicao()`;
   - `resolverDataInicio()` com `metaDatasGamma()` e `extrairMetaEsporteEvento()`;
   - `corrigirPnlPorFluxo()`, `mesclarPerdasNasFechadas()`, as reconciliações e `indiceHistoricoFechado()`.
 - **Proposta:**

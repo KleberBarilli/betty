@@ -13,6 +13,8 @@ mod categorias;
 mod crypto;
 mod db;
 mod download;
+#[allow(dead_code)] // ainda não usada pelas rotas: sincronização no Rust
+mod exibicao;
 mod history;
 mod import;
 mod js;

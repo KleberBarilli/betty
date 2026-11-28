@@ -7,15 +7,15 @@ use serde_json::Value;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::js;
-use crate::regex_js;
+use crate::regex_exata;
 
 /// `clean()`: `String(v || '')` com espaços normalizados.
 pub fn clean(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
+    js::limpar(s)
 }
 
 pub fn clean_v(v: Option<&Value>) -> String {
-    if js::truthy(v) { clean(&js::string(v)) } else { String::new() }
+    if js::truthy(v) { clean(&js::texto(v)) } else { String::new() }
 }
 
 /// `a || b` sobre campos de um objeto.
@@ -62,13 +62,13 @@ fn junta_nao_vazios(partes: &[&str]) -> String {
 
 const ORDINAIS: [&str; 9] = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth"];
 
-regex_js!(P_CINCO_INNINGS, r"(?i)\b(?:first|1st)\s*(?:5|five)\s+innings?\b");
-regex_js!(P_FAIXA_INNINGS, r"(?i)\b(?:first|1st)\s+(\d+)\s+innings\b");
-regex_js!(P_INNING, r"(?i)\b(\d+)(?:st|nd|rd|th|º|°)\s+inning\b");
-regex_js!(P_INNING_NOME, r"(?i)\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+inning\b");
-regex_js!(P_QUARTO, r"(?i)\b([1-4])Q\b|\b([1-4])(?:st|nd|rd|th)\s+quarter\b|(?:^|_)q([1-4])(?:_|$)|\b([1-4])[º°]\s+quarto\b");
-regex_js!(P_TEMPO1, r"(?i)\b(?:first|1st)\s+half\b|\b1H\b|(?:first|1st)_half");
-regex_js!(P_TEMPO2, r"(?i)\b(?:second|2nd)\s+half\b|\b2H\b|(?:second|2nd)_half");
+regex_exata!(P_CINCO_INNINGS, r"(?i)\b(?:first|1st)\s*(?:5|five)\s+innings?\b");
+regex_exata!(P_FAIXA_INNINGS, r"(?i)\b(?:first|1st)\s+(\d+)\s+innings\b");
+regex_exata!(P_INNING, r"(?i)\b(\d+)(?:st|nd|rd|th|º|°)\s+inning\b");
+regex_exata!(P_INNING_NOME, r"(?i)\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+inning\b");
+regex_exata!(P_QUARTO, r"(?i)\b([1-4])Q\b|\b([1-4])(?:st|nd|rd|th)\s+quarter\b|(?:^|_)q([1-4])(?:_|$)|\b([1-4])[º°]\s+quarto\b");
+regex_exata!(P_TEMPO1, r"(?i)\b(?:first|1st)\s+half\b|\b1H\b|(?:first|1st)_half");
+regex_exata!(P_TEMPO2, r"(?i)\b(?:second|2nd)\s+half\b|\b2H\b|(?:second|2nd)_half");
 
 /// `period()`: período do jogo citado no texto.
 pub fn period(texto: &str) -> String {
@@ -99,7 +99,7 @@ pub fn period(texto: &str) -> String {
     String::new()
 }
 
-regex_js!(QUARTO_PT, r"^([1-4])º quarto$");
+regex_exata!(QUARTO_PT, r"^([1-4])º quarto$");
 
 /// `period(x).replace(/^([1-4])º quarto$/, ordinal Quarter)`.
 fn period_quarter(texto: &str) -> String {
@@ -110,14 +110,14 @@ fn period_quarter(texto: &str) -> String {
     }
 }
 
-regex_js!(U_ESCANTEIOS, r"(?i)\b(?:corners?|corner kicks?|escanteios)\b");
-regex_js!(U_REBOTES, r"(?i)\b(?:rebounds?|rebotes)\b");
-regex_js!(U_ROUNDS, r"(?i)\brounds?\b");
-regex_js!(U_GOLS, r"(?i)\b(?:goals?|gols)\b");
-regex_js!(U_RUNS, r"(?i)\b(?:runs?|baseball|mlb)\b");
-regex_js!(U_PONTOS, r"(?i)\b(?:points?|pontos|basketball|basquete|american football|nfl)\b");
-regex_js!(U_SLUG_PONTOS, r"(?i)^(?:nba|wnba|ncaab|cbb|bkbsl|fiba|euroleague|cfb|ncaaf|nfl|cfl|ufl|xfl)-");
-regex_js!(U_SLUG_RUNS, r"(?i)^(?:mlb|npb|kbo|cpbl|milb)-");
+regex_exata!(U_ESCANTEIOS, r"(?i)\b(?:corners?|corner kicks?|escanteios)\b");
+regex_exata!(U_REBOTES, r"(?i)\b(?:rebounds?|rebotes)\b");
+regex_exata!(U_ROUNDS, r"(?i)\brounds?\b");
+regex_exata!(U_GOLS, r"(?i)\b(?:goals?|gols)\b");
+regex_exata!(U_RUNS, r"(?i)\b(?:runs?|baseball|mlb)\b");
+regex_exata!(U_PONTOS, r"(?i)\b(?:points?|pontos|basketball|basquete|american football|nfl)\b");
+regex_exata!(U_SLUG_PONTOS, r"(?i)^(?:nba|wnba|ncaab|cbb|bkbsl|fiba|euroleague|cfb|ncaaf|nfl|cfl|ufl|xfl)-");
+regex_exata!(U_SLUG_RUNS, r"(?i)^(?:mlb|npb|kbo|cpbl|milb)-");
 
 /// `unit()`: unidade de contagem citada no texto (ou deduzida do slug).
 pub fn unit(texto: &str, slug: &str) -> &'static str {
@@ -141,15 +141,15 @@ pub fn unit(texto: &str, slug: &str) -> &'static str {
     }
 }
 
-regex_js!(R_AMERICANO, r"(?i)\b(?:american|college|pro|professional)\s+football\s+game\b");
-regex_js!(R_BASQUETE, r"(?i)\bbasketball\s+(?:game|match)\b");
-regex_js!(R_BEISEBOL, r"(?i)\bbaseball\s+(?:game|match)\b");
-regex_js!(R_HOQUEI, r"(?i)\b(?:ice\s+)?hockey\s+(?:game|match)\b");
-regex_js!(R_TENIS, r"(?i)\btennis\s+(?:game|match)\b");
-regex_js!(R_FUTEBOL, r"(?i)\bsoccer\s+(?:game|match)\b");
-regex_js!(R_RUGBY, r"(?i)\brugby\s+(?:game|match)\b");
-regex_js!(R_CRIQUETE, r"(?i)\bcricket\s+(?:game|match)\b");
-regex_js!(R_VOLEI, r"(?i)\bvolleyball\s+(?:game|match)\b");
+regex_exata!(R_AMERICANO, r"(?i)\b(?:american|college|pro|professional)\s+football\s+game\b");
+regex_exata!(R_BASQUETE, r"(?i)\bbasketball\s+(?:game|match)\b");
+regex_exata!(R_BEISEBOL, r"(?i)\bbaseball\s+(?:game|match)\b");
+regex_exata!(R_HOQUEI, r"(?i)\b(?:ice\s+)?hockey\s+(?:game|match)\b");
+regex_exata!(R_TENIS, r"(?i)\btennis\s+(?:game|match)\b");
+regex_exata!(R_FUTEBOL, r"(?i)\bsoccer\s+(?:game|match)\b");
+regex_exata!(R_RUGBY, r"(?i)\brugby\s+(?:game|match)\b");
+regex_exata!(R_CRIQUETE, r"(?i)\bcricket\s+(?:game|match)\b");
+regex_exata!(R_VOLEI, r"(?i)\bvolleyball\s+(?:game|match)\b");
 
 /// `sportFromKalshiRules()`: só uma modalidade explícita de game/match conta.
 pub fn sport_from_kalshi_rules(mercado: Option<&Value>) -> Option<&'static str> {
@@ -186,12 +186,12 @@ pub fn football_winner(time: &str, escopo: &str, lado: Option<&str>) -> String {
     junta_nao_vazios(&[&p, &time, "ML", if lado == Some("no") { "No" } else { "" }])
 }
 
-regex_js!(INNING_WIN_TICKER, r"^KX(?:MLB|NPB|KBO|CPBL|MILB|WBC)INNINGWIN-[^-]+-([1-9]\d*)-([A-Z0-9]+)$");
-regex_js!(VS_SPLIT, r"(?i)\s+vs\.?\s+");
-regex_js!(WINS_FINAL, r"(?i)\s+wins?\??$");
-regex_js!(INNING_PREFIXO, r"(?i)^\d+(?:st|nd|rd|th) Inning\s+");
-regex_js!(ML_FINAL, r"(?i)\s+ML(?:\s+No)?$");
-regex_js!(NO_FINAL, r"(?i)\s+No$");
+regex_exata!(INNING_WIN_TICKER, r"^KX(?:MLB|NPB|KBO|CPBL|MILB|WBC)INNINGWIN-[^-]+-([1-9]\d*)-([A-Z0-9]+)$");
+regex_exata!(VS_SPLIT, r"(?i)\s+vs\.?\s+");
+regex_exata!(WINS_FINAL, r"(?i)\s+wins?\??$");
+regex_exata!(INNING_PREFIXO, r"(?i)^\d+(?:st|nd|rd|th) Inning\s+");
+regex_exata!(ML_FINAL, r"(?i)\s+ML(?:\s+No)?$");
+regex_exata!(NO_FINAL, r"(?i)\s+No$");
 
 fn so_alfanumerico_minusculo(s: &str) -> String {
     clean(s).to_lowercase().chars().filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit()).collect()
@@ -233,13 +233,13 @@ pub fn inning_winner_title(ticker: &str, lado: &str, titulo: &str, mercado: Opti
     format!("{confronto} - {} Inning {} ML{}", ordinal_texto(&t[1]), escolhidos[0], if lado == "no" { " No" } else { "" })
 }
 
-regex_js!(DS_INCLUINDO, r"(?i)\b(?:including|excluding)\s+(?:overtime|extra time)\b");
-regex_js!(DS_ORDINAL, r"(?i)\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+(quarter|period|set|map)\b");
-regex_js!(DS_NUMERADO, r"(?i)\b(\d+)(?:st|nd|rd|th)\s+(Period|Set|Map)\b|\b(Set|Map)\s+(\d+)\b");
-regex_js!(DS_EXTRA_INNINGS, r"(?i)\bextra innings\b");
-regex_js!(DS_PRORROGACAO, r"(?i)^(?:overtime|extra time)(?: winner)?$");
-regex_js!(DS_EXTRA, r"(?i)^extra");
-regex_js!(DS_JOGO, r"(?i)^(?:the\s+)?(?:game|match|full game|regulation(?: time)?)(?: winner)?\??$");
+regex_exata!(DS_INCLUINDO, r"(?i)\b(?:including|excluding)\s+(?:overtime|extra time)\b");
+regex_exata!(DS_ORDINAL, r"(?i)\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+(quarter|period|set|map)\b");
+regex_exata!(DS_NUMERADO, r"(?i)\b(\d+)(?:st|nd|rd|th)\s+(Period|Set|Map)\b|\b(Set|Map)\s+(\d+)\b");
+regex_exata!(DS_EXTRA_INNINGS, r"(?i)\bextra innings\b");
+regex_exata!(DS_PRORROGACAO, r"(?i)^(?:overtime|extra time)(?: winner)?$");
+regex_exata!(DS_EXTRA, r"(?i)^extra");
+regex_exata!(DS_JOGO, r"(?i)^(?:the\s+)?(?:game|match|full game|regulation(?: time)?)(?: winner)?\??$");
 
 /// `drawScope()`: `Some("")` = jogo inteiro; `None` = escopo não reconhecido.
 pub fn draw_scope(valor: &str) -> Option<String> {
@@ -273,15 +273,15 @@ pub fn draw_scope(valor: &str) -> Option<String> {
     None
 }
 
-regex_js!(LADO_EMPATE, r"(?i)^(Yes|No|Tie|Draw)$");
-regex_js!(NENHUM_VENCE, r"(?i)^(?:Will\s+)?neither team wins?(?:\s+(?:the\s+)?(.+?))?\??$");
-regex_js!(EMPATAM, r"(?i)^(?:Will\s+)?(?:the\s+)?(?:teams|both teams|game|match)\s+(?:tie(?:s)?(?:\s+scoring)?|draw|(?:end|finish)\s+in\s+(?:a\s+)?(?:tie|draw))(?:\s+(?:in|at|after)\s+(?:the\s+)?(.+?))?\??$");
-regex_js!(EMPATE_SIMPLES, r"(?i)^(?:Tie|Draw)\??$");
-regex_js!(SELECAO_EMPATE, r"(?i)^(?:Tie|Draw)$");
-regex_js!(VENCEDOR_RESULTADO, r"(?i)\b(?:winner|result)\b");
-regex_js!(APOS_INNING, r"(?i)\bafter\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+inning\b");
-regex_js!(E_NO, r"(?i)^No$");
-regex_js!(E_YES, r"(?i)^Yes$");
+regex_exata!(LADO_EMPATE, r"(?i)^(Yes|No|Tie|Draw)$");
+regex_exata!(NENHUM_VENCE, r"(?i)^(?:Will\s+)?neither team wins?(?:\s+(?:the\s+)?(.+?))?\??$");
+regex_exata!(EMPATAM, r"(?i)^(?:Will\s+)?(?:the\s+)?(?:teams|both teams|game|match)\s+(?:tie(?:s)?(?:\s+scoring)?|draw|(?:end|finish)\s+in\s+(?:a\s+)?(?:tie|draw))(?:\s+(?:in|at|after)\s+(?:the\s+)?(.+?))?\??$");
+regex_exata!(EMPATE_SIMPLES, r"(?i)^(?:Tie|Draw)\??$");
+regex_exata!(SELECAO_EMPATE, r"(?i)^(?:Tie|Draw)$");
+regex_exata!(VENCEDOR_RESULTADO, r"(?i)\b(?:winner|result)\b");
+regex_exata!(APOS_INNING, r"(?i)\bafter\s+(?:the\s+)?\d+(?:st|nd|rd|th)\s+inning\b");
+regex_exata!(E_NO, r"(?i)^No$");
+regex_exata!(E_YES, r"(?i)^Yes$");
 
 /// Último trecho depois de `:` (`q.split(':').at(-1)`).
 fn depois_ultimo_dois_pontos(q: &str) -> String {
@@ -317,19 +317,19 @@ pub fn draw_detail(pergunta: &str, resultado: &str, escopo: &str) -> String {
     format!("{}Empate{}", if p.is_empty() { String::new() } else { format!("{p} ") }, if E_NO.is_match(&lado) { " No" } else { "" })
 }
 
-regex_js!(SIM_NAO, r"(?i)^(yes|no)$");
-regex_js!(TIME_INVALIDO, r"(?i)^(?:Yes|No|Over|Under|Draw|Tie|Neither(?: team)?|None|No team)$");
-regex_js!(VS_DENTRO, r"(?i)\s+vs\.?\s+");
-regex_js!(NENHUM_RACE, r"(?i)^(?:Will\s+)?neither team\s+(?:reach|score)\s+(\d+)\s+points?(?:\s+first)?\??$");
-regex_js!(RACE, r"(?i)^(?:Will\s+)?(.+?)\s+(?:reach|score)\s+(\d+)\s+points?\s+first\??$");
-regex_js!(RACE_GENERICO, r"(?i)^(?:Race to|First to)\s+(\d+)\s+(?:points?|pontos)\??$");
-regex_js!(NENHUMA_SELECAO, r"(?i)^(?:Neither(?: team)?|None|No team)$");
-regex_js!(PRIMEIRO_TD, r"(?i)^(?:Will\s+)?(.+?)\s+scores?\s+(?:the\s+)?(?:first|1st)\s+(?:TD|touchdown)(?:\s+in\s+(?:the\s+)?(.+?))?\??$");
-regex_js!(TD_GENERICO, r"(?i)^(?:First Team to Score (?:a )?(?:TD|Touchdown)|First Touchdown Scorer)\??$");
-regex_js!(PRIMEIRAS_ENTRADAS, r"(?i)^(?:Will\s+)?(.+?)\s+(?:wins?\s+(?:the\s+)?)?(?:first|1st)\s+(\d+|five)\s+innings?(?:\s+winner)?\??$");
-regex_js!(CINCO, r"(?i)five");
-regex_js!(VENCE_SIMPLES, r"(?i)^(.+?)\s+wins?\??$");
-regex_js!(PRIMEIRAS_N, r"^1st \d+ Innings$");
+regex_exata!(SIM_NAO, r"(?i)^(yes|no)$");
+regex_exata!(TIME_INVALIDO, r"(?i)^(?:Yes|No|Over|Under|Draw|Tie|Neither(?: team)?|None|No team)$");
+regex_exata!(VS_DENTRO, r"(?i)\s+vs\.?\s+");
+regex_exata!(NENHUM_RACE, r"(?i)^(?:Will\s+)?neither team\s+(?:reach|score)\s+(\d+)\s+points?(?:\s+first)?\??$");
+regex_exata!(RACE, r"(?i)^(?:Will\s+)?(.+?)\s+(?:reach|score)\s+(\d+)\s+points?\s+first\??$");
+regex_exata!(RACE_GENERICO, r"(?i)^(?:Race to|First to)\s+(\d+)\s+(?:points?|pontos)\??$");
+regex_exata!(NENHUMA_SELECAO, r"(?i)^(?:Neither(?: team)?|None|No team)$");
+regex_exata!(PRIMEIRO_TD, r"(?i)^(?:Will\s+)?(.+?)\s+scores?\s+(?:the\s+)?(?:first|1st)\s+(?:TD|touchdown)(?:\s+in\s+(?:the\s+)?(.+?))?\??$");
+regex_exata!(TD_GENERICO, r"(?i)^(?:First Team to Score (?:a )?(?:TD|Touchdown)|First Touchdown Scorer)\??$");
+regex_exata!(PRIMEIRAS_ENTRADAS, r"(?i)^(?:Will\s+)?(.+?)\s+(?:wins?\s+(?:the\s+)?)?(?:first|1st)\s+(\d+|five)\s+innings?(?:\s+winner)?\??$");
+regex_exata!(CINCO, r"(?i)five");
+regex_exata!(VENCE_SIMPLES, r"(?i)^(.+?)\s+wins?\??$");
+regex_exata!(PRIMEIRAS_N, r"^1st \d+ Innings$");
 
 fn time_valido(time: &str) -> bool {
     !time.is_empty() && !TIME_INVALIDO.is_match(time) && !VS_DENTRO.is_match(time)
@@ -346,13 +346,42 @@ fn n_texto(n: f64) -> String {
 
 /// `selectionDetail()`: Race, First TD, primeiras N entradas e empate.
 pub fn selection_detail(pergunta: &str, resultado: &str, escopo: &str) -> String {
+    selection_detail_escopo(pergunta, resultado, &Escopo::de_texto(escopo))
+}
+
+/// O `scope` de `kalshiDetail()`/`selectionDetail()` como cada trecho do JS o
+/// lê: `[a, scope].join(' ')` (`null` vira vazio), `q + ' ' + scope` e
+/// `String(x || scope)` (`null` vira "null") e `clean(scope)` (falso vira vazio).
+/// `undefined` vira `''` pelo valor padrão do parâmetro.
+pub struct Escopo {
+    juncao: String,
+    concatenado: String,
+    limpo: String,
+}
+
+impl Escopo {
+    pub fn de_texto(s: &str) -> Self {
+        Escopo { juncao: s.to_string(), concatenado: s.to_string(), limpo: clean(s) }
+    }
+
+    pub fn de_valor(v: Option<&Value>) -> Self {
+        match v {
+            None => Escopo::de_texto(""),
+            Some(Value::Null) => Escopo { juncao: String::new(), concatenado: "null".into(), limpo: String::new() },
+            Some(v) => Escopo { juncao: js::texto(Some(v)), concatenado: js::texto(Some(v)), limpo: clean_v(Some(v)) },
+        }
+    }
+}
+
+fn selection_detail_escopo(pergunta: &str, resultado: &str, escopo: &Escopo) -> String {
     let q = clean(pergunta);
     let cauda = depois_ultimo_dois_pontos(&q);
     let selecionado = clean(resultado);
     let sim_nao = SIM_NAO.is_match(&selecionado);
     let negativo = if E_NO.is_match(&selecionado) { " No" } else { "" };
-    let p = period_quarter(&format!("{q} {escopo}"));
+    let p = period_quarter(&format!("{q} {}", escopo.concatenado));
     let prefixo = if p.is_empty() { String::new() } else { format!("{p} ") };
+    let escopo = escopo.limpo.as_str();
     let empate = draw_detail(&q, &selecionado, escopo);
     if !empate.is_empty() {
         return empate;
@@ -414,17 +443,17 @@ pub fn selection_detail(pergunta: &str, resultado: &str, escopo: &str) -> String
 const ESCOPO: &str = r"(?:Full Game|Reg(?:ulation)? Time|(?:first|1st|second|2nd) Half|[1-4](?:st|nd|rd|th) Quarter|[1-4]Q|[12]H|(?:first|1st) (?:\d+|five) Innings?|\d+(?:st|nd|rd|th) (?:Inning|Period|Set|Map)|Overtime|Extra Time)";
 const UNIDADES: &str = r"points?|goals?|runs?|corners?|corner kicks?|games?|sets?|rounds?|rebounds?|assists?|strikeouts?|steals?|blocks?|shots on target|three.pointers?";
 
-static CT_PREFIXO: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| js::re(&format!("(?i)^{ESCOPO}$")));
+static CT_PREFIXO: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| js::re_exata(&format!("(?i)^{ESCOPO}$")));
 static CT_TOTAL: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-    js::re(&format!(
+    js::re_exata(&format!(
         r"(?i)^(?:(.+?)\s+(?:scores?\s+)?)?(over|under)\s+(\d+(?:[.,]\d+)?)\s+(?:({ESCOPO})\s+)?(?:total\s+)?({UNIDADES})(?:\s+(?:be\s+)?(?:scored|recorded))?(?:\s+in\s+(?:the\s+)?({ESCOPO}))?\??$"
     ))
 });
-regex_js!(CT_WILL, r"(?i)^Will\s+(?:there be\s+)?");
-regex_js!(CT_TIME_INVALIDO, r"(?i)\b(?:if|and|or|not|no|neither|either|both|any|each|all|at least|first|race|win|reach|than|exactly|margin|consecutive|combined|total)\b|\bvs\.?\b|[?:]");
-regex_js!(CT_ROUNDS, r"^rounds?$");
-regex_js!(CT_OVER, r"(?i)^over$");
-regex_js!(CT_TRES_PONTOS, r"^three.pointers?$");
+regex_exata!(CT_WILL, r"(?i)^Will\s+(?:there be\s+)?");
+regex_exata!(CT_TIME_INVALIDO, r"(?i)\b(?:if|and|or|not|no|neither|either|both|any|each|all|at least|first|race|win|reach|than|exactly|margin|consecutive|combined|total)\b|\bvs\.?\b|[?:]");
+regex_exata!(CT_ROUNDS, r"^rounds?$");
+regex_exata!(CT_OVER, r"(?i)^over$");
+regex_exata!(CT_TRES_PONTOS, r"^three.pointers?$");
 
 fn nome_escopo(s: &str) -> String {
     let p = period(s);
@@ -446,7 +475,7 @@ pub fn compact_kalshi_total(titulo: &str, lado: &str, escopo: &str) -> String {
     if !prefixo.is_empty() && !CT_PREFIXO.is_match(prefixo) {
         return String::new();
     }
-    let pergunta_bruta = dois_pontos.map_or(texto.as_str(), |i| texto[i + 1..].trim());
+    let pergunta_bruta = dois_pontos.map_or(texto.as_str(), |i| js::trim_js(&texto[i + 1..]));
     let pergunta = CT_WILL.replace(pergunta_bruta, "").into_owned();
     let Some(total) = CT_TOTAL.captures(&pergunta) else { return String::new() };
     let time = clean(grupo(&total, 1));
@@ -500,24 +529,24 @@ pub fn compact_kalshi_total(titulo: &str, lado: &str, escopo: &str) -> String {
     junta_nao_vazios(&[&time, &p, &ou, &linha, rotulo, if sn == "no" && !inverso { "No" } else { "" }])
 }
 
-regex_js!(KD_AVANCA, r"(?i)^(.+?)\s+(?:to advance|advances?)\??$");
-regex_js!(KD_CONFRONTO_VENCEDOR, r"(?i)^(.+?)\s+vs\.?\s+(.+?)\s+Winner\??$");
-regex_js!(KD_ESPORTE, r"(?i)\b(?:soccer|football|basketball|baseball|hockey|tennis|game|match)\b");
-regex_js!(KD_RFI, r"(?i)^(?:First Inning Run\??|(?:Will\s+)?(?:either|any)\s+team\s+score\s+(?:a|at least one)\s+run\s+in\s+the\s+(?:first|1st)\s+inning\??)$");
-regex_js!(KD_NRFI, r"(?i)^(?:No (?:run|runs) in (?:the )?(?:first|1st) inning\??|(?:Will\s+)?neither team score (?:a )?run in the (?:first|1st) inning\??)$");
-regex_js!(KD_EXTRA, r"(?i)^(?:Will (?:the )?game go to |)(?:extra innings|Extra Innings)\??$");
-regex_js!(KD_VENCE_ENTRADA, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?(?:\s+the)?\s+(\d+(?:st|nd|rd|th)\s+inning|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+inning)\??$");
-regex_js!(KD_VENCE_PERIODO, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?(?:\s+the)?\s+(?:[1-4](?:st|nd|rd|th)\s+quarter|(?:first|second|1st|2nd)\s+half)\??$");
-regex_js!(KD_TOTAL, r"(?i)\b(over|under)\s+(\d+(?:[.,]\d+)?)\s+(?:(?:[1-4]Q|[12]H)\s+)?(goals?|runs?|points?)\b");
-regex_js!(KD_INN, r"(?i)Inn");
-regex_js!(KD_RUNS, r"(?i)^runs?$");
-regex_js!(KD_INTERROGACAO_FINAL, r"\?$");
-regex_js!(KD_ANTES_LIMPA, r"(?i)^(?:Will(?:\s+|$)|Reg(?:ulation)?\s*Time\s*:\s*)");
-regex_js!(KD_SCORE_FINAL, r"(?i)\s+(?:score|scores)\s*$");
-regex_js!(KD_DOIS_PONTOS_FINAL, r":\s*$");
-regex_js!(KD_ORDINAL_INICIO, r"(?i)^(?:first|1st|second|2nd|third|3rd|\d+)");
-regex_js!(KD_SO_ESCOPO, r"(?i)^(?:Full Game|First 5 innings|1st Half|2nd Half)\s*:?$");
-regex_js!(KD_THERE_BE, r"(?i)^(?:will there be|there be)$");
+regex_exata!(KD_AVANCA, r"(?i)^(.+?)\s+(?:to advance|advances?)\??$");
+regex_exata!(KD_CONFRONTO_VENCEDOR, r"(?i)^(.+?)\s+vs\.?\s+(.+?)\s+Winner\??$");
+regex_exata!(KD_ESPORTE, r"(?i)\b(?:soccer|football|basketball|baseball|hockey|tennis|game|match)\b");
+regex_exata!(KD_RFI, r"(?i)^(?:First Inning Run\??|(?:Will\s+)?(?:either|any)\s+team\s+score\s+(?:a|at least one)\s+run\s+in\s+the\s+(?:first|1st)\s+inning\??)$");
+regex_exata!(KD_NRFI, r"(?i)^(?:No (?:run|runs) in (?:the )?(?:first|1st) inning\??|(?:Will\s+)?neither team score (?:a )?run in the (?:first|1st) inning\??)$");
+regex_exata!(KD_EXTRA, r"(?i)^(?:Will (?:the )?game go to |)(?:extra innings|Extra Innings)\??$");
+regex_exata!(KD_VENCE_ENTRADA, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?(?:\s+the)?\s+(\d+(?:st|nd|rd|th)\s+inning|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+inning)\??$");
+regex_exata!(KD_VENCE_PERIODO, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?(?:\s+the)?\s+(?:[1-4](?:st|nd|rd|th)\s+quarter|(?:first|second|1st|2nd)\s+half)\??$");
+regex_exata!(KD_TOTAL, r"(?i)\b(over|under)\s+(\d+(?:[.,]\d+)?)\s+(?:(?:[1-4]Q|[12]H)\s+)?(goals?|runs?|points?)\b");
+regex_exata!(KD_INN, r"(?i)Inn");
+regex_exata!(KD_RUNS, r"(?i)^runs?$");
+regex_exata!(KD_INTERROGACAO_FINAL, r"\?$");
+regex_exata!(KD_ANTES_LIMPA, r"(?i)^(?:Will(?:\s+|$)|Reg(?:ulation)?\s*Time\s*:\s*)");
+regex_exata!(KD_SCORE_FINAL, r"(?i)\s+(?:score|scores)\s*$");
+regex_exata!(KD_DOIS_PONTOS_FINAL, r":\s*$");
+regex_exata!(KD_ORDINAL_INICIO, r"(?i)^(?:first|1st|second|2nd|third|3rd|\d+)");
+regex_exata!(KD_SO_ESCOPO, r"(?i)^(?:Full Game|First 5 innings|1st Half|2nd Half)\s*:?$");
+regex_exata!(KD_THERE_BE, r"(?i)^(?:will there be|there be)$");
 
 fn sem_acentos_alfanumerico(s: &str) -> String {
     clean(s)
@@ -530,30 +559,36 @@ fn sem_acentos_alfanumerico(s: &str) -> String {
         .collect()
 }
 
-/// `kalshiDetail(m, side, scope)` (sem o ramo de futebol americano, que o
-/// servidor não usa).
+/// `kalshiDetail(m, side, scope)` com `americanFootball = false`.
 pub fn kalshi_detail(m: &Value, lado: Option<&str>, escopo: &str) -> String {
+    kalshi_detail_js(m, lado.unwrap_or(""), &Escopo::de_texto(escopo), false)
+}
+
+regex_exata!(KD_VENCE_AMERICANO, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?(?:\s+the)?(?:\s+([1-4](?:st|nd|rd|th)\s+quarter|(?:first|second|1st|2nd)\s+half))?\??$");
+
+/// `kalshiDetail(m, side, scope, americanFootball)`.
+pub fn kalshi_detail_js(m: &Value, lado_txt: &str, escopo: &Escopo, americano: bool) -> String {
     if !js::truthy(Some(m)) {
         return String::new();
     }
+    let lado = Some(lado_txt);
     let titulo = clean_v(ou(m.get("title"), m.get("subtitle")));
     let pergunta = match titulo.rfind(':') {
-        Some(i) => titulo[i + 1..].trim().to_string(),
+        Some(i) => js::trim_js(&titulo[i + 1..]).to_string(),
         None => titulo.clone(),
     };
     let subtitulo = clean_v(if lado == Some("no") { m.get("no_sub_title") } else { m.get("yes_sub_title") });
-    let p = period(&[titulo.as_str(), escopo, subtitulo.as_str()].join(" "));
+    let p = period(&[titulo.as_str(), escopo.juncao.as_str(), subtitulo.as_str()].join(" "));
     let sn = match lado {
         Some("yes") => "Yes",
         Some("no") => "No",
         _ => "",
     };
-    let lado_txt = lado.unwrap_or("");
-    let especial = selection_detail(&titulo, lado_txt, escopo);
+    let especial = selection_detail_escopo(&titulo, lado_txt, escopo);
     if !especial.is_empty() {
         return especial;
     }
-    let compacto = compact_kalshi_total(&titulo, lado_txt, escopo);
+    let compacto = compact_kalshi_total(&titulo, lado_txt, &escopo.limpo);
     if !compacto.is_empty() {
         return compacto;
     }
@@ -563,7 +598,7 @@ pub fn kalshi_detail(m: &Value, lado: Option<&str>, escopo: &str) -> String {
         }
         if let Some(c) = KD_CONFRONTO_VENCEDOR.captures(&pergunta) {
             let regras = m.get("rules_primary");
-            let base = if js::truthy(regras) { js::string(regras) } else { escopo.to_string() };
+            let base = if js::truthy(regras) { js::texto(regras) } else { escopo.concatenado.clone() };
             if KD_ESPORTE.is_match(&base) {
                 let escolhido = clean_v(m.get("yes_sub_title"));
                 let norm_escolhido = sem_acentos_alfanumerico(&escolhido);
@@ -574,6 +609,12 @@ pub fn kalshi_detail(m: &Value, lado: Option<&str>, escopo: &str) -> String {
                 if candidatos == 1 {
                     return football_winner(&escolhido, &p, lado);
                 }
+            }
+        }
+        if americano {
+            if let Some(c) = KD_VENCE_AMERICANO.captures(&pergunta) {
+                let escopo_vitoria = c.get(2).map(|g| g.as_str()).filter(|s| !s.is_empty()).unwrap_or(&escopo.limpo);
+                return football_winner(&c[1], escopo_vitoria, lado);
             }
         }
         // RFI é uma pergunta binária de corrida/sem corrida, não um total qualquer.
@@ -617,7 +658,7 @@ pub fn kalshi_detail(m: &Value, lado: Option<&str>, escopo: &str) -> String {
         let b = KD_ANTES_LIMPA.replace(&a, "");
         KD_SCORE_FINAL.replace(&b, "").into_owned()
     };
-    let so_periodo = KD_DOIS_PONTOS_FINAL.replace(&antes, "").trim().to_string();
+    let so_periodo = js::trim_js(&KD_DOIS_PONTOS_FINAL.replace(&antes, "")).to_string();
     let time = if !antes.is_empty()
         && !(!p.is_empty() && period(&so_periodo) == p && KD_ORDINAL_INICIO.is_match(&so_periodo))
         && !KD_SO_ESCOPO.is_match(&antes)
@@ -632,23 +673,23 @@ pub fn kalshi_detail(m: &Value, lado: Option<&str>, escopo: &str) -> String {
     junta_nao_vazios(&[&time, &p, &ou_txt, &linha, unit(&total[3], ""), if lado == Some("no") { "No" } else { "" }])
 }
 
-regex_js!(ET_TIPO_SEP, r"[\s-]+");
-regex_js!(ET_VS_PONTO, r"(?i)\s+vs\.\s+");
-regex_js!(ET_TIMES, r"(?i)^(.+?)\s+vs\s+(.+)$");
-regex_js!(ET_TIPO_DRAW, r"^(?:moneyline|(?:first_half|second_half|q[1-4]|(?:first|second|third|fourth)_quarter)_moneyline|soccer_halftime_result|rugby_halftime_result|rugby_second_half_result|baseball_team_first_five_winner|hockey_team_period[1-3]_winner)$");
-regex_js!(ET_QUARTO_TIPO, r"q([1-4])|^(first|second|third|fourth)_quarter");
-regex_js!(ET_PERIODO_TIPO, r"period([1-3])");
-regex_js!(ET_HOQUEI, r"^hockey_team_period([1-3])_winner$");
-regex_js!(ET_INNING, r"^baseball_team_inning([1-9]\d*)_winner$");
-regex_js!(ET_NOMEADO, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?\b");
-regex_js!(ET_OVER_UNDER_DRAW, r"(?i)^(Over|Under|Draw)$");
-regex_js!(ET_MAPA, r"(?i)\bMap\s+(\d+)\b|\b(\d+)(?:st|nd|rd|th)\s+Map\b");
-regex_js!(ET_SET, r"(?i)\bSet\s+(\d+)\b|\b(\d+)(?:st|nd|rd|th)\s+Set\b");
-regex_js!(ET_LINHA_OU, r"(?i)\b(?:O/U|Over/Under|Over|Under)\s+(\d+(?:[.,]\d+)?)");
-regex_js!(ET_LADO_OU, r"(?i)^(Over|Under)$");
-regex_js!(ET_OU_PERGUNTA, r"(?i)\bO/U|Over/Under");
-regex_js!(ET_METODO, r"(?i)^(?:Will\s+)?(.+?)\s+win\s+by\s+(knockout|KO/TKO|TKO|KO|submission|decision)\??$");
-regex_js!(ET_PODIO, r"(?i)^(?:Will\s+)?(.+?)\s+finish\s+on\s+the\s+podium\??$");
+regex_exata!(ET_TIPO_SEP, r"[\s-]+");
+regex_exata!(ET_VS_PONTO, r"(?i)\s+vs\.\s+");
+regex_exata!(ET_TIMES, r"(?i)^(.+?)\s+vs\s+(.+)$");
+regex_exata!(ET_TIPO_DRAW, r"^(?:moneyline|(?:first_half|second_half|q[1-4]|(?:first|second|third|fourth)_quarter)_moneyline|soccer_halftime_result|rugby_halftime_result|rugby_second_half_result|baseball_team_first_five_winner|hockey_team_period[1-3]_winner)$");
+regex_exata!(ET_QUARTO_TIPO, r"q([1-4])|^(first|second|third|fourth)_quarter");
+regex_exata!(ET_PERIODO_TIPO, r"period([1-3])");
+regex_exata!(ET_HOQUEI, r"^hockey_team_period([1-3])_winner$");
+regex_exata!(ET_INNING, r"^baseball_team_inning([1-9]\d*)_winner$");
+regex_exata!(ET_NOMEADO, r"(?i)^(?:Will\s+)?(.+?)\s+win(?:s)?\b");
+regex_exata!(ET_OVER_UNDER_DRAW, r"(?i)^(Over|Under|Draw)$");
+regex_exata!(ET_MAPA, r"(?i)\bMap\s+(\d+)\b|\b(\d+)(?:st|nd|rd|th)\s+Map\b");
+regex_exata!(ET_SET, r"(?i)\bSet\s+(\d+)\b|\b(\d+)(?:st|nd|rd|th)\s+Set\b");
+regex_exata!(ET_LINHA_OU, r"(?i)\b(?:O/U|Over/Under|Over|Under)\s+(\d+(?:[.,]\d+)?)");
+regex_exata!(ET_LADO_OU, r"(?i)^(Over|Under)$");
+regex_exata!(ET_OU_PERGUNTA, r"(?i)\bO/U|Over/Under");
+regex_exata!(ET_METODO, r"(?i)^(?:Will\s+)?(.+?)\s+win\s+by\s+(knockout|KO/TKO|TKO|KO|submission|decision)\??$");
+regex_exata!(ET_PODIO, r"(?i)^(?:Will\s+)?(.+?)\s+finish\s+on\s+the\s+podium\??$");
 
 /// `extendedTitle()` para os mercados sintéticos que `kalshiSpecialTitle()`
 /// monta: um único mercado `{slug, question, sportsMarketType}`.
@@ -667,8 +708,8 @@ fn extended_title_sintetico(pergunta: &str, tipo: &str, resultado: &str, titulo:
     let primeiro = clean(&escolhido).split(" - ").next().unwrap_or("").to_string();
     let mut base = ET_VS_PONTO.replace(&primeiro, " vs ").into_owned();
     if let Some(t) = ET_TIMES.captures(&base) {
-        let a = t[1].rsplit(':').next().unwrap_or("").trim().to_string();
-        let b = t[2].split(':').next().unwrap_or("").trim().to_string();
+        let a = js::trim_js(t[1].rsplit(':').next().unwrap_or("")).to_string();
+        let b = js::trim_js(t[2].split(':').next().unwrap_or("")).to_string();
         base = format!("{a} vs {b}");
     }
     let prefixo = if base.is_empty() { String::new() } else { format!("{base} - ") };
@@ -687,19 +728,19 @@ pub fn extended_title_exato(pergunta: &str, tipo: &str, resultado: &str, linha: 
     extended_core(&q, &tipo, &resultado, linha, "")
 }
 
-regex_js!(ET_TIPO_RACE, r"_race_to_points$|_first_td(?:_team)?$|_first_touchdown(?:_scorer)?$");
-regex_js!(ET_RACE_LINHA, r"\bRace to (\d+) pontos");
-regex_js!(ET_TENIS_GAMES, r"^tennis_(?:(?:first|second|third|fourth|fifth)_)?set_games_totals$");
-regex_js!(ET_TENIS_SET_NOME, r"^tennis_(first|second|third|fourth|fifth)_set");
-regex_js!(ET_LINHA_DIRECAO, r"(?i)\b(O/U|Over/Under|Over|Under)\s+(\d+(?:[.,]\d+)?)");
-regex_js!(ET_AMBAS, r"^both_teams_to_score(?:_(?:first|second)_half)?$");
-regex_js!(ET_TORNEIO, r"(?i)\bwin\s+the\s+tournament\??$");
-regex_js!(ET_GOLFISTA, r"(?i)^(?:Will\s+)?(.+?)\s+win\s+the\s+tournament\??$");
-regex_js!(
+regex_exata!(ET_TIPO_RACE, r"_race_to_points$|_first_td(?:_team)?$|_first_touchdown(?:_scorer)?$");
+regex_exata!(ET_RACE_LINHA, r"\bRace to (\d+) pontos");
+regex_exata!(ET_TENIS_GAMES, r"^tennis_(?:(?:first|second|third|fourth|fifth)_)?set_games_totals$");
+regex_exata!(ET_TENIS_SET_NOME, r"^tennis_(first|second|third|fourth|fifth)_set");
+regex_exata!(ET_LINHA_DIRECAO, r"(?i)\b(O/U|Over/Under|Over|Under)\s+(\d+(?:[.,]\d+)?)");
+regex_exata!(ET_AMBAS, r"^both_teams_to_score(?:_(?:first|second)_half)?$");
+regex_exata!(ET_TORNEIO, r"(?i)\bwin\s+the\s+tournament\??$");
+regex_exata!(ET_GOLFISTA, r"(?i)^(?:Will\s+)?(.+?)\s+win\s+the\s+tournament\??$");
+regex_exata!(
     ET_LEGADO,
     r"^(?:moneyline|spreads?|totals?|team_totals(?:_home|_away)?|team_totals_(?:home|away)|game_team_totals|h2_team_totals|total_corners|total_goals|both_teams_to_score|rebounds|map_handicap|tennis_(?:set_handicap|game_handicap|set_totals|match_totals|first_set_totals)|baseball_(?:team_first_five_(?:spread|total|winner)|game_extra_innings)|nrfi|soccer_(?:team_to_advance|halftime_result|team_totals|home_team_totals|away_team_totals|team_total_corners|first_half_team_totals|second_half_team_totals|first_half_total_corners|second_half_total_corners)|(?:first_half|second_half|q[1-4])_(?:moneyline|spreads|totals|team_totals)|football_team_(?:first|second)_half_winner|football_team_(?:first|second|third|fourth)_quarter_winner|p[1-3]_totals)$"
 );
-regex_js!(ET_LEGADO_QUARTO, r"^(?:to_advance|(?:first|second|third|fourth)_quarter_(?:moneyline|totals|spreads))$");
+regex_exata!(ET_LEGADO_QUARTO, r"^(?:to_advance|(?:first|second|third|fourth)_quarter_(?:moneyline|totals|spreads))$");
 
 /// `m.line != null && Number(m.line) !== n`.
 fn linha_diverge(linha: Option<&Value>, n: f64) -> bool {
@@ -894,18 +935,18 @@ pub fn sport_unit(esporte: &str) -> &'static str {
     }
 }
 
-regex_js!(KS_OFICIAL, r"(?i)\b(?:in|of)\s+(?:the\s+)?(.+?\s+vs\.?\s+.+?)\s+(?:Pro Football|college football|professional baseball|Pro Basketball|college basketball)\s+game\b");
-regex_js!(KS_INTERROGACAO_DOIS_PONTOS, r"[?:]");
-regex_js!(KS_PERIODO_NUM, r"(?i)\b([1-3])(?:st|nd|rd)\s+period\b");
-regex_js!(KS_VENCE, r"(?i)\bwins?\b");
-regex_js!(KS_SET, r"(?i)\bwins?\b.*\b(?:Set\s+\d+|\d+(?:st|nd|rd|th)\s+Set)\b");
-regex_js!(KS_MAPA, r"(?i)\bwins?\b.*\b(?:Map\s+\d+|\d+(?:st|nd|rd|th)\s+Map)\b");
-regex_js!(KS_METODO, r"(?i)\bwin by (?:knockout|KO/TKO|TKO|KO|submission|decision)\??$");
-regex_js!(KS_PODIO, r"(?i)\bfinish on the podium\??$");
-regex_js!(KS_LINHA, r"(?i)\b(?:O/U|Over/Under|Over|Under)\s+\d");
-regex_js!(KS_CHUTES, r"(?i)\bshots on target\b");
-regex_js!(KS_STRIKEOUTS, r"(?i)\bstrikeouts\b");
-regex_js!(KS_ASSISTS, r"(?i)\bassists\b");
+regex_exata!(KS_OFICIAL, r"(?i)\b(?:in|of)\s+(?:the\s+)?(.+?\s+vs\.?\s+.+?)\s+(?:Pro Football|college football|professional baseball|Pro Basketball|college basketball)\s+game\b");
+regex_exata!(KS_INTERROGACAO_DOIS_PONTOS, r"[?:]");
+regex_exata!(KS_PERIODO_NUM, r"(?i)\b([1-3])(?:st|nd|rd)\s+period\b");
+regex_exata!(KS_VENCE, r"(?i)\bwins?\b");
+regex_exata!(KS_SET, r"(?i)\bwins?\b.*\b(?:Set\s+\d+|\d+(?:st|nd|rd|th)\s+Set)\b");
+regex_exata!(KS_MAPA, r"(?i)\bwins?\b.*\b(?:Map\s+\d+|\d+(?:st|nd|rd|th)\s+Map)\b");
+regex_exata!(KS_METODO, r"(?i)\bwin by (?:knockout|KO/TKO|TKO|KO|submission|decision)\??$");
+regex_exata!(KS_PODIO, r"(?i)\bfinish on the podium\??$");
+regex_exata!(KS_LINHA, r"(?i)\b(?:O/U|Over/Under|Over|Under)\s+\d");
+regex_exata!(KS_CHUTES, r"(?i)\bshots on target\b");
+regex_exata!(KS_STRIKEOUTS, r"(?i)\bstrikeouts\b");
+regex_exata!(KS_ASSISTS, r"(?i)\bassists\b");
 
 /// Entrada de `kalshiSpecialTitle()` montada por `kalshiTitle()`.
 pub struct TituloEspecial<'a> {
@@ -942,29 +983,7 @@ pub fn kalshi_special_title(d: &TituloEspecial<'_>) -> String {
             return format!("{} - {detalhe}", ET_VS_PONTO.replace(c, " vs "));
         }
     }
-    let tipo = if let Some(c) = KS_PERIODO_NUM.captures(&fonte).filter(|_| KS_VENCE.is_match(&q)) {
-        format!("hockey_team_period{}_winner", &c[1])
-    } else if KS_SET.is_match(&q) {
-        "tennis_set_winner".into()
-    } else if KS_MAPA.is_match(&q) {
-        "child_moneyline".into()
-    } else if KS_METODO.is_match(&q) {
-        "combat_method_of_victory".into()
-    } else if KS_PODIO.is_match(&q) {
-        "f1_race_podium".into()
-    } else if q.contains(':') && KS_LINHA.is_match(&q) {
-        if KS_CHUTES.is_match(&q) {
-            "soccer_player_shots_on_target".into()
-        } else if KS_STRIKEOUTS.is_match(&q) {
-            "baseball_player_strikeouts".into()
-        } else if KS_ASSISTS.is_match(&q) {
-            "assists".into()
-        } else {
-            String::new()
-        }
-    } else {
-        String::new()
-    };
+    let tipo = tipo_especial_kalshi(&q, &fonte);
     if tipo.is_empty() {
         return String::new();
     }
@@ -973,8 +992,8 @@ pub fn kalshi_special_title(d: &TituloEspecial<'_>) -> String {
     extended_title_sintetico(&q, &tipo, lado, d.titulo, &confronto)
 }
 
-regex_js!(MP_PREFIXO, r"(?i)^(?:the\s+)?(?:first|second|third|fourth|fifth|last|final|\d+(?:st|nd|rd|th))\s+(?:\d+\s+)?(?:half|halves|quarters?|periods?|innings?|sets?|rounds?)\b\s*((?:\([^()]+\)\s*)*)(?:of|in|for)\s+(?:the\s+)?");
-regex_js!(MP_CONFRONTO, r"(?i)\S\s+(?:vs\.?|versus|@)\s+\S");
+regex_exata!(MP_PREFIXO, r"(?i)^(?:the\s+)?(?:first|second|third|fourth|fifth|last|final|\d+(?:st|nd|rd|th))\s+(?:\d+\s+)?(?:half|halves|quarters?|periods?|innings?|sets?|rounds?)\b\s*((?:\([^()]+\)\s*)*)(?:of|in|for)\s+(?:the\s+)?");
+regex_exata!(MP_CONFRONTO, r"(?i)\S\s+(?:vs\.?|versus|@)\s+\S");
 
 /// `kalshiMatchupParts()`: separa "1st quarter of the" do confronto.
 pub fn kalshi_matchup_parts(titulo: &str) -> (String, String) {
@@ -984,7 +1003,7 @@ pub fn kalshi_matchup_parts(titulo: &str) -> (String, String) {
             let fim = c.get(0).map_or(0, |m| m.end());
             let candidato = &texto[fim..];
             if MP_CONFRONTO.is_match(candidato.split(" - ").next().unwrap_or("")) {
-                (candidato.to_string(), grupo(&c, 1).trim().to_string())
+                (candidato.to_string(), js::trim_js(grupo(&c, 1)).to_string())
             } else {
                 (texto.clone(), String::new())
             }
@@ -997,8 +1016,8 @@ pub fn clean_kalshi_matchup(titulo: &str) -> String {
     kalshi_matchup_parts(titulo).0
 }
 
-regex_js!(BQ_NO, r"(?i)\s+No$");
-regex_js!(BQ_NO_CAPTURA, r"(?i)\s+(No)$");
+regex_exata!(BQ_NO, r"(?i)\s+No$");
+regex_exata!(BQ_NO_CAPTURA, r"(?i)\s+(No)$");
 
 /// `kalshiBetQualifier()`: leva qualificadores como "(excluding overtime)" para a aposta.
 pub fn kalshi_bet_qualifier(aposta: &str, fontes: &[&str]) -> String {
@@ -1019,16 +1038,16 @@ pub fn kalshi_bet_qualifier(aposta: &str, fontes: &[&str]) -> String {
     aposta
 }
 
-regex_js!(MM_VS, r"(?i)\s+(?:vs\.?|versus|@)\s+");
-regex_js!(MM_VS_SIMPLES, r"(?i)\s+vs\.?\s+");
-regex_js!(MM_PERGUNTAS, r"(?i)\b(?:reach|score)\s+\d+\s+points?\s+first\??$|\bscores?\s+(?:the\s+)?first\s+(?:TD|touchdown)\??$|\b(?:first|1st)\s+\d+\s+innings?\s+winner\??$|\bneither team\s+(?:wins?|reach)\b");
-regex_js!(MM_TOTAL, r"(?i)^(?:Over|Under)\s+\d+(?:[.,]\d+)?\s+(?:gols|goals?|runs?|pontos|points?)(?:\s+No)?$");
-regex_js!(MM_VENCE, r"(?i)^.+?\s+wins\??$");
+regex_exata!(MM_VS, r"(?i)\s+(?:vs\.?|versus|@)\s+");
+regex_exata!(MM_VS_SIMPLES, r"(?i)\s+vs\.?\s+");
+regex_exata!(MM_PERGUNTAS, r"(?i)\b(?:reach|score)\s+\d+\s+points?\s+first\??$|\bscores?\s+(?:the\s+)?first\s+(?:TD|touchdown)\??$|\b(?:first|1st)\s+\d+\s+innings?\s+winner\??$|\bneither team\s+(?:wins?|reach)\b");
+regex_exata!(MM_TOTAL, r"(?i)^(?:Over|Under)\s+\d+(?:[.,]\d+)?\s+(?:gols|goals?|runs?|pontos|points?)(?:\s+No)?$");
+regex_exata!(MM_VENCE, r"(?i)^.+?\s+wins\??$");
 
 /// `kalshiTitleMissingMatchup()`.
 pub fn kalshi_title_missing_matchup(linha: &Value, titulo: Option<&str>) -> bool {
     let plataforma = linha.get("_platform");
-    if !(js::truthy(plataforma) && js::string(plataforma).to_lowercase() == "kalshi") {
+    if !(js::truthy(plataforma) && js::texto(plataforma).to_lowercase() == "kalshi") {
         return false;
     }
     let texto = match titulo {
@@ -1107,6 +1126,242 @@ pub fn exact_market<'a>(d: &Value, meta: Option<&'a Value>) -> Result<Option<&'a
         }
     }
     Ok(None)
+}
+
+/// `String(d?._platform || padrao).toLowerCase()`.
+pub fn plataforma(d: &Value, padrao: &str) -> String {
+    let p = d.get("_platform");
+    if js::truthy(p) { js::texto(p).to_lowercase() } else { padrao.to_string() }
+}
+
+/// Itens de `...(x || [])`: lista, texto (letra a letra) ou exceção.
+pub fn espalhar(x: Option<&Value>) -> Result<Vec<Value>, ()> {
+    match x {
+        Some(Value::Array(a)) => Ok(a.clone()),
+        Some(Value::String(s)) => Ok(s.chars().map(|c| Value::String(c.to_string())).collect()),
+        Some(v) if js::truthy(Some(v)) => Err(()),
+        _ => Ok(Vec::new()),
+    }
+}
+
+regex_exata!(DT_EMPATE, r"(?i)^(?:Will\s+)?(.+?)\s+vs\.?\s+(.+?)\s+(?:end|finish)\s+in\s+a\s+draw(?:\s+(?:in|at)\s+(?:the\s+)?(.+?))?\??$");
+
+/// `drawTitle(d)`. `Err` quando o JS lançaria exceção.
+pub fn draw_title(d: &Value) -> Result<String, ()> {
+    if plataforma(d, "polymarket") != "polymarket" {
+        return Ok(String::new());
+    }
+    let proprio = exact_market(d, d.get("_sportMeta"))?;
+    let pergunta = clean_v(ou(proprio.and_then(|m| m.get("question")), d.get("title")));
+    let lado = clean_v(d.get("outcome"));
+    if !SIM_NAO.is_match(&lado) {
+        return Ok(String::new());
+    }
+    let Some(c) = DT_EMPATE.captures(&pergunta) else { return Ok(String::new()) };
+    let tipo = clean_v(proprio.and_then(|m| m.get("sportsMarketType"))).to_lowercase();
+    let explicito = grupo(&c, 3);
+    let escopo = draw_scope(explicito).filter(|s| !s.is_empty()).unwrap_or_else(|| {
+        if tipo.contains("first_half") || tipo.contains("halftime") {
+            "1st Half".into()
+        } else if tipo.contains("second_half") {
+            "2nd Half".into()
+        } else {
+            String::new()
+        }
+    });
+    if !explicito.is_empty() && escopo.is_empty() {
+        return Ok(String::new());
+    }
+    Ok(format!(
+        "{} vs {} - Empate{}{}",
+        clean(&c[1]),
+        clean(&c[2]),
+        if escopo.is_empty() { String::new() } else { format!(" {escopo}") },
+        if E_NO.is_match(&lado) { " No" } else { "" }
+    ))
+}
+
+regex_exata!(CB_TOTAL, r"(?i)\b(Over|Under|O\/U)\s+(\d+(?:[.,]\d+)?)\s+rounds?\b");
+regex_exata!(CB_LUTA, r"(?i)^(?:UFC|Bellator|PFL|Boxing|Boxe)[^:]*:\s*");
+regex_exata!(CB_HIFEN_OU, r"(?i)\s+-\s+(?:Over|Under|O\/U)\b.*$");
+regex_exata!(CB_DOIS_PONTOS_OU, r"(?i):\s*(?:Over|Under|O\/U)\b.*$");
+
+/// `combatTitle(d)`: total de rounds de lutas. `Err` = exceção no JS.
+pub fn combat_title(d: &Value) -> Result<String, ()> {
+    let Some(m) = exact_market(d, d.get("_sportMeta"))? else { return Ok(String::new()) };
+    let q = clean_v(m.get("question"));
+    let Some(total) = CB_TOTAL.captures(&q) else { return Ok(String::new()) };
+    let resultado = clean_v(d.get("outcome"));
+    let mut lado = if ET_LADO_OU.is_match(&resultado) { capitalizar(&resultado) } else { String::new() };
+    let mut negativo = "";
+    if lado.is_empty() && SIM_NAO.is_match(&resultado) && ET_LADO_OU.is_match(&total[1]) {
+        lado = capitalizar(&total[1]);
+        negativo = if E_NO.is_match(&resultado) { " No" } else { "" };
+    }
+    if lado.is_empty() {
+        return Ok(String::new());
+    }
+    let mut candidatos = vec![clean_v(d.get("title"))];
+    candidatos.extend(espalhar(d.get("_sportMeta").and_then(|s| s.get("texts")))?.iter().map(|t| clean_v(Some(t))));
+    let Some(base) = candidatos.into_iter().find(|t| VS_DENTRO.is_match(t)) else { return Ok(String::new()) };
+    let a = CB_LUTA.replace(&base, "");
+    let b = CB_HIFEN_OU.replace(&a, "");
+    let c = CB_DOIS_PONTOS_OU.replace(&b, "");
+    let confronto = VS_DENTRO.replace(&c, " vs ");
+    Ok(format!("{confronto} - {lado} {} rounds{negativo}", total[2].replacen(',', ".", 1)))
+}
+
+/// `extendedTitle(d, matchupHint)`. `Err` = exceção no JS.
+pub fn extended_title(d: &Value, dica: &str) -> Result<String, ()> {
+    Ok(match exact_market(d, d.get("_sportMeta"))? {
+        Some(m) => extended_title_mercado(d, m, dica),
+        None => String::new(),
+    })
+}
+
+/// `extendedTitle()` depois de achar o mercado exato `m` da linha `d`.
+fn extended_title_mercado(d: &Value, m: &Value, dica: &str) -> String {
+    let tipo = ET_TIPO_SEP.replace_all(&clean_v(m.get("sportsMarketType")).to_lowercase(), "_").into_owned();
+    let q = clean_v(m.get("question"));
+    let resultado = clean_v(d.get("outcome"));
+    if tipo.is_empty() || q.is_empty() || resultado.is_empty() {
+        return String::new();
+    }
+    let pergunta = Value::String(q.clone());
+    let fonte = [d.get("_titleDisplay"), d.get("title"), Some(&pergunta)]
+        .into_iter()
+        .find(|v| VS_DENTRO.is_match(clean_v(*v).split(" - ").next().unwrap_or("")))
+        .flatten();
+    let escolhido = if !dica.is_empty() {
+        clean(dica)
+    } else if let Some(v) = fonte {
+        clean_v(Some(v))
+    } else {
+        clean_v(ou(d.get("_titleDisplay"), d.get("title")))
+    };
+    let mut base = ET_VS_PONTO.replace(escolhido.split(" - ").next().unwrap_or(""), " vs ").into_owned();
+    if let Some(t) = ET_TIMES.captures(&base) {
+        let a = js::trim_js(t[1].rsplit(':').next().unwrap_or("")).to_string();
+        let b = js::trim_js(t[2].split(':').next().unwrap_or("")).to_string();
+        base = format!("{a} vs {b}");
+    }
+    let prefixo = if base.is_empty() { String::new() } else { format!("{base} - ") };
+    extended_core(&q, &tipo, &resultado, m.get("line"), &prefixo)
+}
+
+/// `kalshiSpecialTitle(d)` sobre a linha inteira (com `_titleDisplay` e o
+/// `matchup` do metadado).
+pub fn kalshi_special_title_linha(d: &Value) -> String {
+    let meta = d.get("_kalshiTitleMeta");
+    let Some(mercado) = meta.and_then(|m| m.get("market")).filter(|m| js::truthy(Some(m))) else { return String::new() };
+    if plataforma(d, "") != "kalshi" {
+        return String::new();
+    }
+    let q = clean_v(mercado.get("title"));
+    let escopo = clean_v(meta.and_then(|m| m.get("scope")));
+    let fonte = format!("{q} {escopo}");
+    let lado = clean_v(d.get("outcome"));
+    let mut detalhe = compact_kalshi_total(&q, &lado, &escopo);
+    if detalhe.is_empty() {
+        detalhe = selection_detail(&q, &lado, &escopo);
+    }
+    if !detalhe.is_empty() {
+        let bruto = clean_v(d.get("title")).split(" - ").next().unwrap_or("").to_string();
+        let regras = clean_v(mercado.get("rules_primary"));
+        let oficial = KS_OFICIAL.captures(&regras).map(|c| clean(&c[1])).unwrap_or_default();
+        let confirmado = clean_v(d.get("_titleDisplay")).split(" - ").next().unwrap_or("").to_string();
+        let do_meta = clean_v(meta.and_then(|m| m.get("matchup")));
+        let confronto = [confirmado.as_str(), do_meta.as_str(), oficial.as_str(), bruto.as_str()]
+            .into_iter()
+            .find(|t| VS_DENTRO.is_match(t) && !KS_INTERROGACAO_DOIS_PONTOS.is_match(t));
+        if let Some(c) = confronto {
+            return format!("{} - {detalhe}", ET_VS_PONTO.replace(c, " vs "));
+        }
+    }
+    let tipo = tipo_especial_kalshi(&q, &fonte);
+    if tipo.is_empty() {
+        return String::new();
+    }
+    let confronto = clean_v(d.get("title")).split(" - ").next().unwrap_or("").to_string();
+    // `exactMarket()` acha o mercado sintético pelo slug `d.slug || 'exact'`
+    // (ele não tem tokenIds nem conditionId), a não ser que o slug fique vazio.
+    let exato = Value::String("exact".into());
+    let slug = ou(d.get("slug"), Some(&exato)).cloned().unwrap_or(Value::Null);
+    if clean_v(Some(&slug)).is_empty() {
+        return String::new();
+    }
+    let sintetico = serde_json::json!({ "slug": slug, "question": q, "sportsMarketType": tipo });
+    extended_title_mercado(d, &sintetico, &confronto)
+}
+
+/// O `type` que `kalshiSpecialTitle()` deduz do título do mercado.
+fn tipo_especial_kalshi(q: &str, fonte: &str) -> String {
+    if let Some(c) = KS_PERIODO_NUM.captures(fonte).filter(|_| KS_VENCE.is_match(q)) {
+        format!("hockey_team_period{}_winner", &c[1])
+    } else if KS_SET.is_match(q) {
+        "tennis_set_winner".into()
+    } else if KS_MAPA.is_match(q) {
+        "child_moneyline".into()
+    } else if KS_METODO.is_match(q) {
+        "combat_method_of_victory".into()
+    } else if KS_PODIO.is_match(q) {
+        "f1_race_podium".into()
+    } else if q.contains(':') && KS_LINHA.is_match(q) {
+        if KS_CHUTES.is_match(q) {
+            "soccer_player_shots_on_target".into()
+        } else if KS_STRIKEOUTS.is_match(q) {
+            "baseball_player_strikeouts".into()
+        } else if KS_ASSISTS.is_match(q) {
+            "assists".into()
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    }
+}
+
+/// `inningWinnerTitle(row)` sobre a linha inteira. `Err` quando o JS lançaria
+/// exceção (`market.title` que não é texto).
+pub fn inning_winner_title_linha(d: &Value) -> Result<String, ()> {
+    if plataforma(d, "") != "kalshi" {
+        return Ok(String::new());
+    }
+    let ticker = js::texto_ou_vazio(ou(ou(d.get("slug"), d.get("ticker")), d.get("market_ticker"))).to_uppercase();
+    let Some(t) = INNING_WIN_TICKER.captures(&ticker) else { return Ok(String::new()) };
+    let lado = js::texto_ou_vazio(d.get("outcome")).to_lowercase();
+    if lado != "yes" && lado != "no" {
+        return Ok(String::new());
+    }
+    let bruto = clean_v(d.get("title"));
+    let Some(corte) = bruto.find(" - ") else { return Ok(String::new()) };
+    let confronto = &bruto[..corte];
+    let times: Vec<&str> = VS_SPLIT.split(confronto).collect();
+    if times.len() != 2 {
+        return Ok(String::new());
+    }
+    let detalhe = &bruto[corte + 3..];
+    let mercado = d.get("_kalshiTitleMeta").and_then(|m| m.get("market"));
+    let titulo_mercado = match mercado.and_then(|m| m.get("title")) {
+        None | Some(Value::Null) => String::new(),
+        Some(Value::String(s)) => WINS_FINAL.replace(s, "").into_owned(),
+        Some(_) => return Err(()),
+    };
+    let do_detalhe = {
+        let a = INNING_PREFIXO.replace(detalhe, "");
+        let b = ML_FINAL.replace(&a, "");
+        NO_FINAL.replace(&b, "").into_owned()
+    };
+    let candidatos = [titulo_mercado, clean_v(mercado.and_then(|m| m.get("yes_sub_title"))), do_detalhe];
+    let escolhidos: Vec<&str> = times
+        .iter()
+        .copied()
+        .filter(|time| candidatos.iter().any(|c| so_alfanumerico_minusculo(c) == so_alfanumerico_minusculo(time)))
+        .collect();
+    if escolhidos.len() != 1 {
+        return Ok(String::new());
+    }
+    Ok(format!("{confronto} - {} Inning {} ML{}", ordinal_texto(&t[1]), escolhidos[0], if lado == "no" { " No" } else { "" }))
 }
 
 #[cfg(test)]
