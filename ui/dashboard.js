@@ -7499,21 +7499,33 @@ function fmtDolarSinal(v) {
 }
 function classeSinal(v) { return (Number(v) || 0) >= 0 ? "pos" : "neg"; }
 function kpisVazios(texto) {
-  return ["PnL realizado", "PnL não realizado", "Exposição", "ROI"].map((k, i) =>
+  return ["Patrimônio", "PnL não realizado", "Exposição", "ROI"].map((k, i) =>
     `<div class="fx kpi-vazio"><div class="k">${k}</div><div class="v2">—</div>${i ? "" : `<div class="sm mu">${escapeHtml(texto)}</div>`}</div>`).join("");
 }
 function saldoPorCasa() {
   return { polymarket: POLY_API_BALANCE, kalshi: KALSHI_API_BALANCE, predict: PREDICT_API_BALANCE, sxbet: SXBET_API_BALANCE };
 }
+// Texto do patrimônio: "—" quando nenhuma casa conectada informa saldo.
+function textoPatrimonio(d) {
+  return d.patrimonioParcial && !d.casasPatrimonio.length ? "—" : fmtDolar(d.patrimonio);
+}
+// O número grande é o PnL realizado, o mesmo que a curva do PnL Acumulado
+// mostra logo abaixo; o patrimônio fica na linha de baixo e no 1º KPI.
 function pintarVisaoGeral(d) {
-  const rotulo = document.getElementById("heroPatrimonioRotulo");
-  const valor = document.getElementById("heroPatrimonio");
+  const valor = document.getElementById("heroValor");
+  const secundario = document.getElementById("heroSecundario");
   const chips = document.getElementById("heroChips");
-  if (rotulo) rotulo.textContent = d.patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio";
-  if (valor) valor.textContent = d.patrimonioParcial && !d.casasPatrimonio.length ? "—" : fmtDolar(d.patrimonio);
+  if (valor) {
+    valor.textContent = fmtDolarSinal(d.pnlRealizado);
+    valor.classList.toggle("pos", d.pnlRealizado > 0);
+    valor.classList.toggle("neg", d.pnlRealizado < 0);
+  }
+  if (secundario) {
+    secundario.innerHTML = `${d.patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio"} <b>${textoPatrimonio(d)}</b>`
+      + ` · <span class="${classeSinal(d.pnlHoje)}">${d.pnlHoje >= 0 ? "▲" : "▼"} ${fmtDolarSinal(d.pnlHoje)} hoje</span>`;
+  }
   if (chips) {
     const partes = [
-      `<span class="chip ${classeSinal(d.pnlHoje)}">${d.pnlHoje >= 0 ? "▲" : "▼"} ${fmtDolarSinal(d.pnlHoje)} hoje</span>`,
       `<span class="chip ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)} em 7 dias${d.pnlAnterior == null ? "" : ` · antes ${fmtDolarSinal(d.pnlAnterior)}`}</span>`,
       d.patrimonioParcial
         ? `<span class="sm mu">Inclui ${escapeHtml(d.casasPatrimonio.map(c => NOMES_CASAS[c]).join(", ") || "nenhuma casa")}</span>`
@@ -7565,7 +7577,7 @@ function pintarKpisVisao(d) {
   // Faixa: os quatro números calculados aqui; taxa de acerto e odd média
   // são células fixas do HTML, preenchidas por renderizarStats.
   el.innerHTML = `
-<div class="fx"><div class="k">PnL realizado</div><div class="v2 ${classeSinal(d.pnlRealizado)}">${fmtDolarSinal(d.pnlRealizado)}</div></div>
+<div class="fx"><div class="k">${d.patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio"}</div><div class="v2">${textoPatrimonio(d)}</div></div>
 <div class="fx"><div class="k">PnL não realizado</div><div class="v2 ${soSxBet ? "" : classeSinal(d.pnlNaoRealizado)}">${soSxBet ? "—" : fmtDolarSinal(d.pnlNaoRealizado)}</div></div>
 <div class="fx"><div class="k">Exposição</div><div class="v2">${fmtDolar(d.stakeAbertas)}</div></div>
 <div class="fx"><div class="k">ROI</div><div class="v2 ${classeSinal(d.roiGeral)}">${(d.roiGeral >= 0 ? "+" : "") + d.roiGeral.toFixed(2)}%</div></div>`;

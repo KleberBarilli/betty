@@ -262,7 +262,10 @@ body:not([data-secao="visao"]) #visaoGeral { display: none !important; }
   font: 700 3rem/1.02 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   letter-spacing: -0.03em;
 }
-.hero-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.hero-secundario { margin-top: 10px; color: var(--muted); font-size: 0.92rem; }
+.hero-secundario:empty { display: none; }
+.hero-secundario b { color: var(--text); font-weight: 650; }
+.hero-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 .hero-chips b { color: var(--text); }
 .hero-ctrl { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
 .hero-ctrl-linha { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
