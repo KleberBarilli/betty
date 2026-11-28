@@ -297,6 +297,12 @@ fn manutencao_do_banco(db: db::Db) {
 
 /// Os caches em memória só servem dentro do prazo de cada um, mas os vencidos
 /// ficavam guardados até chegar uma consulta igual. A cada minuto eles saem.
+///
+/// Na mesma volta, o alocador devolve ao sistema o que segurava. As threads
+/// das consultas ao banco saem depois de 10 s paradas, e a memória livre das
+/// heaps delas só voltava quando outra thread a reaproveitasse: numa cópia do
+/// banco real, depois de uma carga como a da abertura, eram 111 MB presos
+/// (`api::tests::medir_memoria_parada`).
 fn limpar_caches_periodicamente(estado: &api::Estado) {
     let (kalshi, poly, instantaneo) = (estado.kalshi.clone(), estado.poly.clone(), estado.instantaneo.clone());
     tauri::async_runtime::spawn(async move {
@@ -305,6 +311,8 @@ fn limpar_caches_periodicamente(estado: &api::Estado) {
             kalshi.limpar_vencidos();
             poly.limpar_vencidos();
             instantaneo.limpar_vencido();
+            // SAFETY: função do mimalloc sem pré-condições; só devolve páginas livres.
+            unsafe { libmimalloc_sys::mi_collect(true) };
         }
     });
 }

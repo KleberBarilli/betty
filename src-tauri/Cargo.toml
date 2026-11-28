@@ -39,6 +39,9 @@ futures = "0.3"
 # Alocador muito mais rápido que o padrão do Windows para JSON com milhares de
 # objetos pequenos (histórico da Polymarket).
 mimalloc = { version = "0.1", default-features = false }
+# `mi_collect`: devolve ao sistema a memória que o alocador segura depois dos
+# picos (heaps de threads que já saíram). Mesma versão que o `mimalloc` usa.
+libmimalloc-sys = { version = "0.1", features = ["extended"] }
 tokio = { version = "1", features = ["time"] }
 unicode-normalization = "0.1"
 chrono-tz = { version = "0.10", default-features = false }

@@ -869,6 +869,52 @@ mod tests {
         );
     }
 
+    /// Memória privada do processo antes e depois de uma carga como a da
+    /// abertura (rotas grandes, em paralelo), e depois de `mi_collect`, num
+    /// banco real (cópia em BETTY_COMPARAR_DB). Mostra quanto o alocador
+    /// segura depois do pico.
+    #[test]
+    #[ignore]
+    fn medir_memoria_parada() {
+        let privada = || -> f64 {
+            let saida = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-Command", &format!("(Get-Process -Id {}).PrivateMemorySize64", std::process::id())])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&saida.stdout).trim().parse::<f64>().unwrap() / 1_048_576.0
+        };
+        let mut conn = db::abrir(std::path::Path::new(&std::env::var("BETTY_COMPARAR_DB").unwrap())).unwrap();
+        let usuario = db::usuario_local(&mut conn).unwrap();
+        let db = Db::com_leitura(conn, db::CONEXOES_DE_LEITURA).unwrap();
+        tauri::async_runtime::block_on(db.mapear_leitura()).unwrap();
+        let chave = Arc::new(MasterKey::from_hex(&"00".repeat(32)).unwrap());
+        let e = Arc::new(Estado { db, chave, usuario, kalshi: Default::default(), poly: Default::default(), tracked: Default::default(), instantaneo: Default::default() });
+        let inicio = privada();
+        let rotas = ["/api/history/closed", "/api/history/closed/export", "/api/history/closed/stats", "/api/history/closed/query?page=1&pageSize=50", "/api/history/closed/pnl"];
+        for volta in 0..3 {
+            let tarefas: Vec<_> = rotas
+                .iter()
+                .map(|rota| {
+                    let e = e.clone();
+                    let (path, query) = rota.split_once('?').map_or((*rota, None), |(p, q)| (p, Some(q.to_string())));
+                    std::thread::spawn(move || tauri::async_runtime::block_on(handle(&e, &Method::GET, path, query.as_deref(), b"")).status)
+                })
+                .collect();
+            for t in tarefas {
+                assert_eq!(t.join().unwrap(), StatusCode::OK);
+            }
+            eprintln!("volta {volta}: {:.0} MB", privada());
+        }
+        let depois = privada();
+        // As threads do spawn_blocking saem depois de 10 s paradas.
+        std::thread::sleep(Duration::from_secs(15));
+        let parado = privada();
+        // Como em `lib.rs::limpar_caches_periodicamente`: numa tarefa do runtime.
+        tauri::async_runtime::block_on(tauri::async_runtime::spawn(async { unsafe { libmimalloc_sys::mi_collect(true) } })).unwrap();
+        let coletado = privada();
+        eprintln!("início {inicio:.0} MB | logo depois da carga {depois:.0} MB | 15 s parado {parado:.0} MB | depois de mi_collect {coletado:.0} MB");
+    }
+
     /// Perfil do `delta` por fase, com os lotes de `BETTY_COMPARAR_URLS`
     /// sobre `BETTY_COMPARAR_DB` (5 voltas; a partir da 2ª tudo é inalterado).
     #[test]

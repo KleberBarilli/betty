@@ -38,11 +38,11 @@ Medidos em 2026-11-27 numa conta real: 4.232 apostas, sendo 2.281 da Polymarket,
 
 ### No app instalado
 
-Medido em 2026-11-27 com `medir_memoria.ps1` e `medir_app.mjs`. O build novo tem tudo até a seção 6 de [O que já foi feito](#o-que-já-foi-feito). A memória foi lida 1 minuto depois de abrir, com o app parado.
+Medido em 2026-11-27 com `medir_memoria.ps1` e `medir_app.mjs`. O build novo tem tudo até a seção 7 de [O que já foi feito](#o-que-já-foi-feito). A memória foi lida com o app parado: 1 minuto depois de abrir no WebView2, e de 3 a 5 minutos no `betty.exe`, depois que a devolução de memória do alocador roda.
 
 | Processo (memória privada) | Build antigo | Build novo |
 |---|---|---|
-| `betty.exe` (Rust) | 212–215 MB, com pico de 1.174 MB | 233–278 MB logo depois de abrir, pico de 404–559 MB (ver item 2 de [O que falta](#o-que-falta)) |
+| `betty.exe` (Rust) | 212–215 MB, com pico de 1.174 MB | 144–147 MB parado (3 a 5 min depois de abrir), pico de 380–559 MB |
 | WebView2: página | 193–225 MB | 77–88 MB |
 | WebView2: GPU | 83–131 MB | 100–103 MB |
 | WebView2: browser, rede, storage | 37 + 11 + 11 MB | 36 + 12 + 8 MB |
@@ -139,7 +139,7 @@ Só compacta quando duas condições valem juntas:
 
 **Corrigido depois:** a conexão de escrita fechava antes das de leitura. Uma conexão só de leitura não consegue juntar o WAL ao arquivo, então o `betty.db-wal` ficava com as últimas gravações (23 MB depois da manutenção) e uma cópia só do `betty.db` saía sem elas. Agora os campos de `db::Db` estão na ordem em que precisam fechar (`db::tests::fechar_junta_o_wal_ao_arquivo`).
 
-### 5. Cache de metadados mais leve
+### 5. Cache de metadados mais leve (`1385998`)
 
 **Polymarket (`POST /api/polymarket-metadata/cache`):** 260 ms por lote grande da abertura (400 eventos, 10 MB lidos), em três partes:
 
@@ -169,7 +169,7 @@ Só compacta quando duas condições valem juntas:
 | 60 eventos, 30 com recorte | 102 ms | 18 ms |
 | 400 eventos, recorte das apostas | 153 ms | 136 ms |
 
-### 6. Entregue no app instalado, e a memória do WebView2
+### 6. Entregue no app instalado, e a memória do WebView2 (`8110947`)
 
 - **Instalação:** `cargo tauri build` em `src-tauri` e o instalador com `/S /UPDATE` (o modo de atualização não cria atalhos novos). Antes, uma cópia do banco com `copiar_banco.py`. Os números estão em [No app instalado](#no-app-instalado).
 - **Janela minimizada:** `lib.rs::memoria_ao_minimizar` pede ao WebView2 o nível de memória baixo (`ICoreWebView2_19::SetMemoryUsageTargetLevel`, pelo `with_webview` do Tauri e o crate `webview2-com`) quando a janela minimiza, e o normal quando volta. A página não é suspensa: timers e sincronização seguem.
@@ -177,6 +177,19 @@ Só compacta quando duas condições valem juntas:
   - Ao restaurar, a página era a mesma (`medir_app.mjs conferir`).
   - Não houve controle no mesmo build sem o recurso, então parte da queda pode ser do próprio Windows.
 - **`--disable-gpu-rasterization`:** sem diferença na memória da GPU (ver [O que não vale a pena mexer](#o-que-não-vale-a-pena-mexer)).
+
+### 7. Memória do processo Rust parado
+
+- **Medido:** sem mudança no alocador, o `betty.exe` novo ficou em 236 MB parado durante 15 minutos, contra 212 MB do build antigo. Os cerca de 20 MB a mais cabem no cache das duas conexões de leitura (até 8 MB cada).
+- **Causa do resto:** `api::tests::medir_memoria_parada` roda numa cópia do banco real as rotas grandes da abertura, em paralelo, três vezes:
+  - logo depois da carga: 323–362 MB;
+  - 15 s depois: 127 MB;
+  - depois de `mi_collect(true)`: 16 MB.
+
+  O `mimalloc` já devolve sozinho o que é liberado (`purge_decommits` e `purge_delay` de 10 ms, os padrões), mas não as heaps das threads do `spawn_blocking` que já saíram (elas saem depois de 10 s paradas). Essa memória só voltava quando outra thread a reaproveitasse.
+- **Solução:** `lib.rs::limpar_caches_periodicamente` chama `libmimalloc_sys::mi_collect(true)` a cada minuto, na mesma volta que tira os caches vencidos. Não muda nada do que o app faz, só devolve páginas livres.
+- **No app instalado:** 198 MB um minuto depois de abrir, 147 MB aos 3 minutos e 144 MB aos 5. O total privado do app (Rust mais WebView2) foi de 474 MB sem a chamada para 374 MB com ela. No build antigo eram 547–631 MB.
+- **Não foi preciso mexer:** nos snapshots da Polymarket, que já saem a cada minuto, nem nas liquidações da Kalshi e nas agendas das casas rastreadas, que mudam comportamento se expirarem.
 
 ## Como validar
 
@@ -252,17 +265,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Antes de fazer:** falta um gravador de respostas das casas. As linhas são normalizadas, filtradas, juntadas com o cache de activity no SQLite e paginadas para a interface, então mudar a leitura exige comparar byte a byte com respostas reais gravadas. Hoje não há como reproduzir uma sessão sem rede.
 - **Validar:** respostas das rotas das casas idênticas (`despejar_rotas_para_comparacao` contra respostas gravadas de uma sessão real) e oráculos existentes (`tracked::tests::oraculo_predict`, `kalshi_dados::tests::oraculo_titulos`, `ledger::tests::oraculo_ledger`).
 
-### 2. Memória do processo Rust parado
-
-- **Problema:** 211 MB privados parado no build antigo. Ainda não foi medido depois das mudanças.
-- **Proposta:** medir primeiro (item 1). Se continuar alto, os suspeitos são:
-  - o `mimalloc` segurando memória depois de picos (testar `mi_option_purge_decommits` ou `mi_collect`, ou comparar com o alocador do sistema);
-  - o cache de páginas das conexões de leitura (até 8 MB cada, em `db::abrir_leitura`). As páginas lidas por `mmap` não entram nele nem na memória privada;
-  - os snapshots da Polymarket (até 64 MB serializados, mais em `Value`);
-  - as liquidações da Kalshi guardadas em memória (`EstadoKalshi::liquidacoes`, cerca de 1.944 linhas).
-- **Cuidado:** `EstadoKalshi::liquidacoes` e `revisados`, e as agendas de `EstadoTracked`, mudam comportamento (cache da sessão, agenda vencida usada como reserva). Não basta expirar por tempo.
-
-### 3. Sincronização inteira no Rust (o item grande)
+### 2. Sincronização inteira no Rust (o item grande)
 
 - **Problema:**
   - Toda a sincronização está no `dashboard.js` (`carregarAba`). A interface baixa as listas das casas pelo backend, enriquece, concilia, compara com o ledger, envia o delta e reindexa, com centenas de idas e voltas pelo `betty://` e o histórico inteiro no heap do JS.
@@ -295,7 +298,7 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
   4. Manter o pipeline do JS atrás de uma chave até o Rust dar o mesmo índice, o mesmo ledger e os mesmos números em várias sincronizações reais. Depois, apagar.
 - **Validar:** ledger e índice byte a byte iguais entre o pipeline do JS e o do Rust na mesma cópia de banco e com as mesmas respostas das casas. Gravar as respostas de uma sessão real e reproduzir.
 
-### 4. Sincronização incremental (depois do item 3)
+### 3. Sincronização incremental (depois do item 2)
 
 - **Problema:** cada sincronização baixa o histórico inteiro de fechadas da Polymarket (3 páginas de 1.000 no v2) e conferem tudo de novo. A activity da Polymarket (`poly::atividade_incremental`) e as liquidações da Kalshi (`kalshi::liquidacoes_incrementais`) já são incrementais.
 - **Proposta:** as fechadas vêm em ordem de `TIMESTAMP DESC`. Parar quando aparecerem K linhas seguidas que já estão no ledger com a mesma assinatura. Fazer a varredura completa em segundo plano de tempos em tempos (por exemplo 1 vez por dia ou na abertura).
