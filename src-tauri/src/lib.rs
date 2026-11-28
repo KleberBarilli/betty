@@ -48,9 +48,11 @@ use tauri::{App, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn run() {
     tauri::Builder::default()
-        // A segunda abertura só traz a janela existente para a frente.
+        // A segunda abertura só traz a janela existente para a frente (e a
+        // mostra, se ela ainda estava esperando a página pintar).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(janela) = app.get_webview_window("main") {
+                mostrar_janela(&janela);
                 let _ = janela.unminimize();
                 let _ = janela.set_focus();
             }
@@ -74,11 +76,17 @@ pub fn run() {
                 .title("Betty")
                 .inner_size(1440.0, 920.0)
                 .min_inner_size(1080.0, 700.0)
-                .maximized(true)
-                // Janela e WebView já nascem na cor de fundo do app (`--bg` do
-                // dashboard.css). O padrão é branco, e a tela piscava branca entre
-                // abrir a janela e a página pintar.
+                // A janela nasce escondida e só aparece, maximizada, quando a página
+                // termina de carregar (`mostrar_janela`). Criada visível, ela aparecia
+                // antes de o laço de mensagens pintar o fundo, e piscava branca.
+                .visible(false)
+                // Janela e WebView na cor de fundo do app (`--bg` do dashboard.css).
                 .background_color(tauri::window::Color(8, 8, 10, 255))
+                .on_page_load(|janela, carga| {
+                    if carga.event() == tauri::webview::PageLoadEvent::Finished {
+                        mostrar_janela(&janela);
+                    }
+                })
                 // Rasterização na CPU: na GPU (D3D11) o WebView2 suaviza SVG com MSAA e as
                 // curvas/diagonais do logo e dos gráficos saem serrilhadas (3 níveis de
                 // cobertura contra 44 na CPU). A composição continua na GPU. Os três
@@ -98,14 +106,33 @@ pub fn run() {
                 // Exportação em CSV: salva na pasta Downloads com o nome sugerido.
                 .on_download(download::tratar)
                 .build()?;
+            // Se a página demorar a terminar de carregar, a janela aparece mesmo assim.
+            let reserva = janela.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                mostrar_janela(&reserva);
+            });
             #[cfg(windows)]
             memoria_ao_minimizar(&janela);
-            #[cfg(not(windows))]
-            let _ = janela;
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o Betty");
+}
+
+/// Mostra a janela principal maximizada, uma vez só: quando a página termina
+/// de carregar, na segunda abertura ou depois de 3 s, o que vier primeiro.
+/// Maximizar já mostra a janela (o tao chama `ShowWindow(SW_MAXIMIZE)`), por
+/// isso o `maximized(true)` saiu do construtor: ele a mostrava antes da hora.
+fn mostrar_janela(janela: &tauri::WebviewWindow) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static MOSTRADA: AtomicBool = AtomicBool::new(false);
+    if MOSTRADA.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let _ = janela.maximize();
+    let _ = janela.show();
+    let _ = janela.set_focus();
 }
 
 /// Com a janela minimizada, o WebView2 é avisado de que pode liberar memória
