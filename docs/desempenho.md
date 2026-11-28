@@ -223,6 +223,7 @@ Só compacta quando duas condições valem juntas:
 | `observar_abertura.mjs` | Linha do tempo da abertura e capturas pelo CDP (porta da depuração remota). |
 | `oraculo_compactacao.mjs` | Modelo de oráculo: compara o que a interface deriva de dois bancos. |
 | `oraculo_recorte.mjs` + `preparar_meta.py` | Modelo de oráculo para respostas de rota (evento inteiro x recortado). |
+| `oraculo_categorias.mjs` | Casos e respostas do `classificarAposta()` real para `categorias::tests::oraculo_categorias`, a partir de um despejo com `GET /api/history/closed`. |
 | `rotas_leitura.py` + `comparar_rotas.py` | Lista de 64 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
 | `medir_app.mjs` | Pelo CDP, sem capturas: linha do tempo da abertura (tela, dados salvos, confirmação), compilação e execução de cada script numa recarga, e um marcador para saber se a página recarregou. |
 | `medir_memoria.ps1` | Memória privada do `betty.exe` (e o pico) e de cada processo do WebView2 dele, por papel (página, GPU, rede...). |
@@ -278,9 +279,12 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Já portado para o Rust, com oráculo:**
   - `titles.rs` (o `market-title-utils.js`, incluindo `exactMarket`);
   - `breakdown.rs`, `audit.rs` (`pnlTimestamp`, `protectClosedDate`) e `ledger.rs` (`ledgerMerge`);
-  - `kalshi_dados.rs` (títulos, datas e modalidade da Kalshi), `poly_datas.rs` e `tracked.rs`.
+  - `kalshi_dados.rs` (títulos, datas e modalidade da Kalshi), `poly_datas.rs` e `tracked.rs`;
+  - `categorias.rs`: `classificarAposta()` e todos os auxiliares (`sinaisDaAposta`, `normalizarEsporte`, `categoriaPorTema`, `esportePorTicker`, `esportePorTiposMercado`, `slugDeConfronto`, `metadadoDizEsporte`, `esportePorConfronto`, `temaDoMercadoProprio`). Ainda não é chamado pelas rotas.
+    - Oráculo `categorias::tests::oraculo_categorias`, com os casos de `oraculo_categorias.mjs`: 27.709 casos iguais ao JS. São as 4.232 apostas do ledger como a interface as recebe, seis variantes de cada (sem `_sportMeta`, título de outra, outra casa, sem campos de esporte, slugs de outra, metadado de outra) e 36 casos de borda, 4 deles com exceção no JS, que o Rust devolve como `Err`.
+    - Controle negativo: 555 respostas estragadas de propósito, 555 acusadas.
+    - Cuidados que o porte já resolve e que valem para os próximos: `\s` e `trim()` do JS (incluem U+FEFF, não U+0085), `.` do JS (não casa `\r`, U+2028 e U+2029), `String([a, b])` = `"a,b"`, e o espalhamento `...(x || [])`, que percorre um texto letra a letra e lança exceção num número ou objeto.
 - **Só existe no JS (precisa portar com oráculo):**
-  - `classificarAposta()` e auxiliares (`sinaisDaAposta`, `esportePorTicker`, `esportePorTiposMercado`...);
   - `normalizarNomeMercadoPolymarket()` e `tituloExibicao()`;
   - `resolverDataInicio()` com `metaDatasGamma()` e `extrairMetaEsporteEvento()`;
   - `corrigirPnlPorFluxo()`, `mesclarPerdasNasFechadas()`, as reconciliações e `indiceHistoricoFechado()`.
@@ -296,6 +300,8 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
 - **Problema:** cada sincronização baixa o histórico inteiro de fechadas da Polymarket (3 páginas de 1.000 no v2) e conferem tudo de novo. A activity da Polymarket (`poly::atividade_incremental`) e as liquidações da Kalshi (`kalshi::liquidacoes_incrementais`) já são incrementais.
 - **Proposta:** as fechadas vêm em ordem de `TIMESTAMP DESC`. Parar quando aparecerem K linhas seguidas que já estão no ledger com a mesma assinatura. Fazer a varredura completa em segundo plano de tempos em tempos (por exemplo 1 vez por dia ou na abertura).
 - **Antes de fazer:** confirmar com dados reais se uma aposta antiga pode mudar (`realizedPnl`, resgate) sem subir para o topo da ordenação. Para isso, compare duas varreduras completas em dias diferentes.
+  - O ledger sozinho não responde: o `updated_at` também muda quando o próprio app enriquece a aposta (datas recuperadas, `_sportMeta`, o reenvio depois de mudar o formato do metadado), e não há histórico das versões.
+  - O caminho é gravar a lista inteira de fechadas (`GET` das fechadas da Polymarket, pelas rotas do app) em dois dias diferentes e comparar, aposta por aposta, quem mudou e em que posição estava.
 
 ## O que não vale a pena mexer
 

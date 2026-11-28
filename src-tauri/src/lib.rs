@@ -8,6 +8,8 @@
 mod api;
 mod audit;
 mod breakdown;
+#[allow(dead_code)] // ainda não usada pelas rotas: primeira peça da sincronização no Rust
+mod categorias;
 mod crypto;
 mod db;
 mod download;
