@@ -75,6 +75,10 @@ pub fn run() {
                 .inner_size(1440.0, 920.0)
                 .min_inner_size(1080.0, 700.0)
                 .maximized(true)
+                // Janela e WebView já nascem na cor de fundo do app (`--bg` do
+                // dashboard.css). O padrão é branco, e a tela piscava branca entre
+                // abrir a janela e a página pintar.
+                .background_color(tauri::window::Color(8, 8, 10, 255))
                 // Rasterização na CPU: na GPU (D3D11) o WebView2 suaviza SVG com MSAA e as
                 // curvas/diagonais do logo e dos gráficos saem serrilhadas (3 níveis de
                 // cobertura contra 44 na CPU). A composição continua na GPU. Os três
