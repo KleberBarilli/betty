@@ -239,7 +239,7 @@ Só compacta quando duas condições valem juntas:
 | `oraculo_categorias.mjs` | Casos e respostas do `classificarAposta()` real para `categorias::tests::oraculo_categorias`, a partir de um despejo com `GET /api/history/closed`. |
 | `contexto_ui.mjs` | Base comum dos oráculos novos: carrega `ui/*.js` num `node:vm`, lê as apostas do despejo e grava `{id, entrada, saida \| erro}` por linha. |
 | `oraculo_titulos.mjs` | Casos e respostas do `tituloExibicao()` real para `exibicao::tests::oraculo_titulos_exibicao`. |
-| `oraculo_indice.mjs` | Casos e respostas dos auxiliares de `indiceHistoricoFechado()` (modo `ajudantes`, para `indice::tests::oraculo_ajudantes_indice`) e da própria função (modo `indice`). Lê também o `exportar_metadados.py`. |
+| `oraculo_indice.mjs` | Casos e respostas dos auxiliares de `indiceHistoricoFechado()` (modo `ajudantes`, para `indice::tests::oraculo_ajudantes_indice`) e da própria função (modo `indice`, para `indice::tests::oraculo_indice`). Lê também o `exportar_metadados.py`. |
 | `oraculo_gamma.mjs` | Casos e respostas de `metaDatasGamma()`, `extrairMetaEsporteEvento()` e `resolverDataInicio()` para `gamma::tests::oraculo_gamma`. Lê também o `polymarket_metadata_cache` da cópia, exportado por `exportar_metadados.py`. |
 | `rotas_leitura.py` + `comparar_rotas.py` | Lista de 64 rotas de leitura para o `despejar_rotas_para_comparacao` e comparação byte a byte dos dois despejos, com o tempo de cada rota. |
 | `medir_app.mjs` | Pelo CDP, sem capturas: linha do tempo da abertura (tela, dados salvos, confirmação), compilação e execução de cada script numa recarga, e um marcador para saber se a página recarregou. |
@@ -308,8 +308,13 @@ Em ordem de prioridade. Cada item diz o problema, a evidência, a proposta, os c
     - Controle negativo: 495 respostas inteiras estragadas, 495 acusadas; e um campo por caso (83, 83, 83, 82, 82, 82), cada um acusado no seu campo.
     - Este `pnlTimestamp()` é o do JS (lança exceção com `_platform` que não é texto e lê datas com `gamma::data_js`). O `audit::pnl_timestamp` das rotas usa `js::data_ms`/`js::number`; os dois só diferem fora do que as APIs mandam.
     - `Number()` exato é `js::numero` (espaços do JS nas pontas, `Number([[5]])` = 5). A assinatura conta e ordena por unidades UTF-16 e escreve os números como o `JSON.stringify`.
+  - `indice.rs`: `indiceHistoricoFechado()` (com `chaveIndiceHistorico()`, `chaveLedgerFechada()` e `ymdHistoricoDb()`), com a categoria de `categorias::classificar` e o título de `exibicao::titulo_exibicao`. Ainda não é chamado pelas rotas.
+    - Oráculo `indice::tests::oraculo_indice`, com os casos de `oraculo_indice.mjs indice` (os mesmos 44.018 dos auxiliares): 44.018 linhas do índice iguais ao JS, comparando o JSON escrito com os 17 campos, 852 delas com exceção no JS. Aparecem as quatro casas, 12 categorias, as duas versões de título, datas vazias, stake e odd `Infinity` (que o JSON escreve `null`) e datas no instante 0.
+    - Controle negativo: 495 respostas inteiras estragadas, 495 acusadas; e um campo por caso (706, de 41 a 42 em cada um dos 17 campos), todos acusados.
+    - `ymdHistoricoDb` não é o `history::ymd_sao_paulo`: o `Intl.DateTimeFormat("en-CA")` escreve o instante 0 (`1969-12-31`), o ano sem zeros à esquerda e o ano antes de Cristo sem a era.
+    - O `pnlTs` e o `pnlYmd` que a interface calcula continuam sendo ignorados pelo `ledger::salvar_indice`, que os recalcula com `audit::pnl_timestamp`.
 - **Só existe no JS (precisa portar com oráculo):**
-  - `corrigirPnlPorFluxo()`, `mesclarPerdasNasFechadas()`, as reconciliações e `indiceHistoricoFechado()`.
+  - `corrigirPnlPorFluxo()`, `mesclarPerdasNasFechadas()` e as reconciliações.
 - **Proposta:**
   1. Portar as funções puras uma a uma, cada uma com oráculo contra o JS real sobre todas as apostas do ledger. É o mesmo método já usado em `titles.rs` (918.675 casos de título idênticos).
   2. Uma tarefa em segundo plano no Rust faz a sincronização inteira. A gravação do ledger e do índice vira **uma transação**: as leituras em WAL veem ou o estado antigo ou o novo, e a trava de leitura da interface deixa de ser necessária.

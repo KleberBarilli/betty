@@ -1,5 +1,6 @@
-//! Campos do índice de apostas fechadas, iguais aos auxiliares de
-//! `indiceHistoricoFechado()` do `dashboard.js`: `dataInicioAposta()` (com
+//! Campos do índice de apostas fechadas, iguais a `indiceHistoricoFechado()`
+//! do `dashboard.js` (com `chaveIndiceHistorico()`, `chaveLedgerFechada()` e
+//! `ymdHistoricoDb()`) e aos auxiliares dela: `dataInicioAposta()` (com
 //! `startFromKalshiTicker()`), `getTsResultadoPnL()` (com o `pnlTimestamp()`,
 //! o `resolvedLoss()` e o `timestampMs()` do `audit-utils.js`), `getStake()`,
 //! `getOddNum()`, `assinaturaFonteLedger()` (com `serializarLedgerEstavel()`)
@@ -16,13 +17,17 @@
 //!   mandam.
 //! - `metasDatasPnl` (o mapa global que a sincronização preenche) entra como
 //!   parâmetro: `None` é o `{}` de `lerCacheMetasDatasGamma()`.
+//! - As datas do `Intl.DateTimeFormat("en-CA")` em São Paulo saem como no ICU
+//!   (ano sem zeros à esquerda, antes de Cristo sem a era); fora dos ±262.142
+//!   anos do `chrono` ficam vazias.
 
 use chrono::{Datelike, TimeZone, Utc};
-use serde_json::Value;
+use chrono_tz::America::Sao_Paulo;
+use serde_json::{Value, json};
 
-use crate::categorias::Excecao;
+use crate::categorias::{self, Excecao};
 use crate::titles::{self, Escopo, clean_v, ou};
-use crate::{gamma, js, regex_exata};
+use crate::{exibicao, gamma, js, regex_exata};
 
 type R<T> = Result<T, Excecao>;
 
@@ -333,10 +338,86 @@ pub fn versao_titulo_confirmado(d: &Value, titulo: &Value) -> R<&'static str> {
     Ok(if titulo_diferente(d, titulo) || !detalhe.is_empty() || vence { VERSAO_INDICE_TITULO } else { "" })
 }
 
+/// `chaveLedgerFechada(d)`: a identidade estável da aposta no ledger.
+pub fn chave_ledger_fechada(d: &Value) -> R<String> {
+    let plataforma = match verdadeiro(d.get("_platform")) {
+        None => "polymarket".to_string(),
+        Some(Value::String(s)) => s.to_lowercase(),
+        Some(_) => return Err(Excecao),
+    };
+    let texto = |v: Option<&Value>| js::texto_ou_vazio(v);
+    Ok(match plataforma.as_str() {
+        "predict" | "sxbet" => format!("{plataforma}|{}", texto(ou(d.get("slug"), d.get("id")))),
+        // O ticker é a identidade do mercado; versões antigas mudavam o conditionId.
+        "kalshi" => format!("kalshi|{}", js::trim_js(&texto(ou(ou(d.get("slug"), d.get("ticker")), d.get("market_ticker"))))),
+        _ => {
+            let resultado = [d.get("outcomeIndex"), d.get("outcome")].into_iter().flatten().find(|v| !v.is_null());
+            format!("polymarket|{}|{}|{}", texto(d.get("conditionId")), texto(d.get("asset")), resultado.map_or(String::new(), |v| js::texto(Some(v))))
+        }
+    })
+}
+
+/// `ymdHistoricoDb(data)`: `AAAA-MM-DD` em São Paulo, como o `Intl.DateTimeFormat("en-CA")`.
+fn ymd_historico(ms: Option<f64>) -> String {
+    let Some(t) = ms.filter(|m| m.is_finite()).and_then(|m| Utc.timestamp_millis_opt(m.trunc() as i64).single()) else { return String::new() };
+    let local = t.with_timezone(&Sao_Paulo);
+    let ano = if local.year() >= 1 { local.year() } else { 1 - local.year() };
+    format!("{ano}-{:02}-{:02}", local.month(), local.day())
+}
+
+/// `x || 0` de um número.
+fn ou_zero(n: f64) -> f64 {
+    if n.is_nan() || n == 0.0 { 0.0 } else { n }
+}
+
+/// `indiceHistoricoFechado(d)`: a linha de `closed_bets_index` de uma aposta
+/// fechada, com categoria, título e datas. `Err` quando o JS lançaria exceção.
+pub fn indice_historico_fechado(d: &Value, metas: Option<&Value>) -> R<Value> {
+    let chave = chave_ledger_fechada(d)?;
+    let (plataforma, aposta) = chave.split_once('|').map_or(("polymarket".to_string(), chave.clone()), |(p, a)| (p.to_string(), a.to_string()));
+    if d.is_null() {
+        return Err(Excecao);
+    }
+    let inicio_estrito = gamma::parse_api_date(d.get("_startDate"));
+    let casa = d.get("_platform").and_then(Value::as_str);
+    let aquisicao = if matches!(casa, Some("predict" | "sxbet")) { timestamp_ms(d.get("timestamp")).map(f64::trunc) } else { None };
+    let tabela = if casa == Some("predict") { aquisicao } else { data_inicio_aposta(d)?.or(aquisicao) };
+    let pnl_ts = get_ts_resultado_pnl(d, metas)?;
+    let titulo = exibicao::titulo_exibicao(d)?;
+    let zero = json!(0);
+    let pnl = ou_zero(js::numero(ou(d.get("realizedPnl"), Some(&zero))));
+    let stake = ou_zero(get_stake(d)?.numero());
+    let odd = ou_zero(get_odd_num(d)?);
+    let categoria = categorias::classificar(d)?;
+    let assinatura = verdadeiro(d.get("_ledgerSourceSignature")).cloned().unwrap_or_else(|| Value::String(assinatura_fonte_ledger(d)));
+    // `titulo.toLocaleLowerCase("pt-BR")`: um título que não é texto lança exceção.
+    let Value::String(texto_titulo) = &titulo else { return Err(Excecao) };
+    let busca = texto_titulo.to_lowercase();
+    let versao = versao_titulo_confirmado(d, &titulo)?;
+    Ok(json!({
+        "platform": plataforma,
+        "betKey": aposta,
+        "category": categoria,
+        "startYmd": ymd_historico(inicio_estrito),
+        "tableYmd": ymd_historico(tabela),
+        "tableTs": js::numero_json(tabela.unwrap_or(0.0)),
+        "pnlTs": js::numero_json(pnl_ts),
+        "pnlYmd": ymd_historico(Some(pnl_ts).filter(|t| *t != 0.0)),
+        "pnlValue": js::numero_json(pnl),
+        "stakeValue": js::numero_json(stake),
+        "oddValue": js::numero_json(odd),
+        "won": i32::from(pnl > 0.0),
+        "sourceSignature": assinatura,
+        "metricsReady": 1,
+        "titleSearch": busca,
+        "titleDisplay": titulo,
+        "titleVersion": versao,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     /// Um número no formato dos oráculos: `{"n": 1.5}`, ou `{"n": "NaN"}`,
     /// `{"n": "Infinity"}`, `{"n": "-0"}`.
@@ -364,6 +445,40 @@ mod tests {
         // A posição na lista não entra na assinatura.
         assert_eq!(assinatura_fonte_ledger(&json!({ "b": 1, "a": [1.50, "x"], "_order": 3 })), assinatura_fonte_ledger(&json!({ "a": [1.5, "x"], "b": 1 })));
         assert_eq!(assinatura_fonte_ledger(&json!(null)), assinatura_fonte_ledger(&json!({})));
+    }
+
+    #[test]
+    fn datas_do_indice_como_o_icu() {
+        assert_eq!(ymd_historico(Some(0.0)), "1969-12-31");
+        assert_eq!(ymd_historico(Some(-58_998_369_600_000.0)), "100-06-01");
+        assert_eq!(ymd_historico(Some(-77_932_584_000_000.0)), "501-06-01");
+        assert_eq!(ymd_historico(Some(1_792_551_599_999.0)), "2026-10-20");
+        assert_eq!(ymd_historico(None), "");
+    }
+
+    /// Oráculo contra o `indiceHistoricoFechado()` real: os casos e as
+    /// respostas do JS vêm de `ferramentas/validacao/oraculo_indice.mjs indice`
+    /// (`BETTY_ORACULO_INDICE=<arquivo .jsonl>`). Compara o JSON escrito.
+    #[test]
+    #[ignore]
+    fn oraculo_indice() {
+        let caminho = std::env::var("BETTY_ORACULO_INDICE").expect("defina BETTY_ORACULO_INDICE");
+        let texto = std::fs::read_to_string(caminho).unwrap();
+        let (mut total, mut diferentes, mut exemplos) = (0usize, 0usize, Vec::new());
+        for linha in texto.lines().filter(|l| !l.trim().is_empty()) {
+            let caso: Value = serde_json::from_str(linha).unwrap();
+            let esperado = if caso.get("erro").is_some() { Err(Excecao) } else { Ok(js::para_texto(&caso["saida"])) };
+            let obtido = indice_historico_fechado(&caso["entrada"]["d"], caso["entrada"].get("metas")).map(|v| js::para_texto(&v));
+            total += 1;
+            if obtido != esperado {
+                diferentes += 1;
+                if exemplos.len() < 20 {
+                    exemplos.push(format!("{}:\n   JS   {:?}\n   Rust {:?}", caso["id"], esperado, obtido));
+                }
+            }
+        }
+        assert!(diferentes == 0, "{diferentes} de {total} casos diferentes; os primeiros:\n{}", exemplos.join("\n"));
+        eprintln!("{total} casos iguais ao JS");
     }
 
     /// Oráculo contra os auxiliares reais de `indiceHistoricoFechado()`: os
