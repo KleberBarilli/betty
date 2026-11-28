@@ -15,6 +15,8 @@ mod db;
 mod download;
 #[allow(dead_code)] // ainda não usada pelas rotas: sincronização no Rust
 mod exibicao;
+#[allow(dead_code)] // ainda não usada pelas rotas: sincronização no Rust
+mod gamma;
 mod history;
 mod import;
 mod js;

@@ -260,11 +260,44 @@ pub fn truthy(valor: Option<&Value>) -> bool {
 }
 
 /// `String(valor)` completo: listas viram `"a,b"` (com `null` vazio), como no
-/// `Array.prototype.join`.
+/// `Array.prototype.join`, e números saem como o `f64` que o `JSON.parse` do
+/// JS teria lido (acima de 2^53 perdem dígitos; fora do `f64`, `Infinity`).
 pub fn texto(valor: Option<&Value>) -> String {
     match valor {
         Some(Value::Array(itens)) => itens.iter().map(|i| if i.is_null() { String::new() } else { texto(Some(i)) }).collect::<Vec<_>>().join(","),
+        Some(Value::Number(n)) => match n.as_f64() {
+            Some(f) if f == f64::INFINITY => "Infinity".into(),
+            Some(f) if f == f64::NEG_INFINITY => "-Infinity".into(),
+            Some(f) => numero_texto(f).unwrap_or_else(|| "NaN".into()),
+            // `as_f64` não devolve infinito: o texto guardado (`1e400`) diz o sinal.
+            None => match n.to_string().parse::<f64>() {
+                Ok(f) if f == f64::INFINITY => "Infinity".into(),
+                Ok(f) if f == f64::NEG_INFINITY => "-Infinity".into(),
+                _ => "NaN".into(),
+            },
+        },
         outro => string(outro),
+    }
+}
+
+/// `obj[chave]` do JavaScript sobre um valor JSON, sem o protótipo: campo de
+/// objeto, índice ou `length` de lista e de texto (unidades UTF-16; metade de
+/// um par substituto fica `None`).
+pub fn propriedade(obj: &Value, chave: &str) -> Option<Value> {
+    let indice = || -> Option<usize> {
+        let canonico = chave == "0" || (!chave.starts_with('0') && !chave.is_empty() && chave.bytes().all(|b| b.is_ascii_digit()));
+        chave.parse::<u64>().ok().filter(|n| canonico && *n < 4_294_967_295).map(|n| n as usize)
+    };
+    match obj {
+        Value::Object(m) => m.get(chave).cloned(),
+        Value::Array(a) if chave == "length" => Some(Value::from(a.len())),
+        Value::Array(a) => indice().and_then(|i| a.get(i).cloned()),
+        Value::String(s) if chave == "length" => Some(Value::from(tamanho_utf16(s))),
+        Value::String(s) => {
+            let unidade = s.encode_utf16().nth(indice()?)?;
+            char::from_u32(u32::from(unidade)).map(|c| Value::String(c.to_string()))
+        }
+        _ => None,
     }
 }
 
