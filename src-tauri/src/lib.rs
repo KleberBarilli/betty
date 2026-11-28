@@ -19,6 +19,8 @@ mod exibicao;
 mod gamma;
 mod history;
 mod import;
+#[allow(dead_code)] // ainda não usada pelas rotas: sincronização no Rust
+mod indice;
 mod js;
 mod json_bruto;
 mod kalshi;

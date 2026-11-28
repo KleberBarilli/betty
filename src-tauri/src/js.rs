@@ -27,7 +27,11 @@ pub fn number(valor: Option<&Value>) -> f64 {
 }
 
 fn texto_para_numero(s: &str) -> f64 {
-    let t = s.trim();
+    numero_aparado(s.trim())
+}
+
+/// `StringToNumber` de um texto já sem os espaços das pontas.
+fn numero_aparado(t: &str) -> f64 {
     if t.is_empty() {
         return 0.0;
     }
@@ -298,6 +302,18 @@ pub fn propriedade(obj: &Value, chave: &str) -> Option<Value> {
             char::from_u32(u32::from(unidade)).map(|c| Value::String(c.to_string()))
         }
         _ => None,
+    }
+}
+
+/// `Number(valor)` com as regras do JS também para os espaços das pontas de
+/// um texto (`trim_js`), para listas (`Number([[5]])` = 5, pelo `String`) e
+/// para números fora do `f64` (`1e400` = `Infinity`).
+pub fn numero(valor: Option<&Value>) -> f64 {
+    match valor {
+        Some(Value::String(s)) => numero_aparado(trim_js(s)),
+        Some(Value::Array(_)) => numero_aparado(trim_js(&texto(valor))),
+        Some(Value::Number(n)) => n.as_f64().unwrap_or_else(|| n.to_string().parse().unwrap_or(f64::NAN)),
+        outro => number(outro),
     }
 }
 

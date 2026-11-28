@@ -230,10 +230,12 @@ regex_exata!(
     r"^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?\s*(?:([Zz]|UTC|GMT)|([+-])(\d{1,4})(?::(\d{2}))?)?$"
 );
 
-/// `new Date(s).getTime()` (`None` = `NaN`).
+/// `new Date(s).getTime()` (`None` = `NaN`). Com espaços do JS nas pontas, o
+/// V8 só usa o leitor antigo: `" 2026-10-20"` é meia-noite local.
 pub fn data_js(s: &str) -> Option<f64> {
     let n = |m: Option<regex::Match<'_>>, padrao: u32| m.map_or(Some(padrao), |m| m.as_str().parse::<u32>().ok());
-    if let Some(c) = DATA_ES5.captures(s) {
+    let aparado = js::trim_js(s);
+    if let Some(c) = DATA_ES5.captures(s).filter(|_| aparado.len() == s.len()) {
         let ano: i32 = c.get(1).or(c.get(2))?.as_str().parse().ok()?;
         let tem_hora = c.get(5).is_some();
         let fuso = if c.get(9).is_some() {
@@ -251,6 +253,7 @@ pub fn data_js(s: &str) -> Option<f64> {
         };
         return compor(ano, n(c.get(3), 1)?, n(c.get(4), 1)?, n(c.get(5), 0)?, n(c.get(6), 0)?, n(c.get(7), 0)?, fracao_ms(c.get(8)), fuso);
     }
+    let s = aparado;
     // Depois do `T`, o V8 não volta para o leitor antigo.
     if DATA_COM_T.is_match(s) {
         return None;
