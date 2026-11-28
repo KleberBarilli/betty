@@ -10,16 +10,20 @@
   let instalando = false;
 
   const $ = id => document.getElementById(id);
+  // Tradução via i18n.js; sem ele, fica o português com os marcadores preenchidos.
+  const tx = (texto, vars) => globalThis.BettyI18n ? globalThis.BettyI18n.t(texto, vars)
+    : String(texto).replace(/\{(\w+)\}/g, (marca, nome) => vars && vars[nome] != null ? String(vars[nome]) : marca);
+  const txMsg = msg => globalThis.BettyI18n ? globalThis.BettyI18n.tMsg(msg) : String(msg);
 
   function formatarTamanho(bytes) {
     if (!Number.isFinite(bytes) || bytes <= 0) return '';
-    return (bytes / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' MB';
+    return (bytes / 1048576).toLocaleString(globalThis.BettyI18n?.locale || 'pt-BR', { maximumFractionDigits: 1 }) + ' MB';
   }
 
   function formatarData(iso) {
     const d = new Date(iso);
     if (!iso || Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+    return d.toLocaleDateString(globalThis.BettyI18n?.locale || 'pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Sao_Paulo' });
   }
 
   // Notas da release em texto simples (o corpo vem em Markdown).
@@ -38,7 +42,7 @@
     const versao = $('sidebarVersao');
     if (versao && info?.atual) {
       versao.textContent = 'Betty ' + info.atual;
-      versao.title = info.disponivel ? 'Versão ' + info.ultima + ' disponível' : 'Você está na versão mais recente';
+      versao.title = info.disponivel ? tx('Versão {versao} disponível', { versao: info.ultima }) : tx('Você está na versão mais recente');
     }
     if (!botao) return;
     botao.hidden = !info?.disponivel;
@@ -59,17 +63,17 @@
     foco = document.activeElement;
     const tamanho = formatarTamanho(info.tamanho);
     const data = formatarData(info.publicada);
-    $('atualizacaoTitulo').textContent = 'Betty ' + info.ultima + ' disponível';
-    $('atualizacaoSub').textContent = 'Você está na versão ' + info.atual + '.'
-      + (data ? ' Publicada em ' + data + '.' : '')
-      + (tamanho ? ' Download de ' + tamanho + '.' : '');
+    $('atualizacaoTitulo').textContent = tx('Betty {versao} disponível', { versao: info.ultima });
+    $('atualizacaoSub').textContent = tx('Você está na versão {versao}.', { versao: info.atual })
+      + (data ? ' ' + tx('Publicada em {data}.', { data }) : '')
+      + (tamanho ? ' ' + tx('Download de {tamanho}.', { tamanho }) : '');
     const notas = notasSimples(info.notas);
     $('atualizacaoNotas').textContent = notas;
     $('atualizacaoNotas').hidden = !notas;
     $('atualizacaoErro').textContent = '';
     const instalar = $('atualizacaoInstalar');
     instalar.disabled = false;
-    instalar.textContent = 'Atualizar agora';
+    instalar.textContent = tx('atualizacao::Atualizar agora');
     const modal = $('atualizacaoModal');
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
@@ -90,19 +94,19 @@
     instalando = true;
     const botao = $('atualizacaoInstalar');
     botao.disabled = true;
-    botao.textContent = 'Baixando…';
+    botao.textContent = tx('Baixando…');
     $('atualizacaoErro').textContent = '';
     try {
       const r = await fetch('/api/atualizacao/instalar', { method: 'POST', cache: 'no-store' });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.ok) throw new Error(d.error || 'Não foi possível atualizar.');
-      botao.textContent = 'Instalando… o Betty vai reabrir';
+      botao.textContent = tx('Instalando… o Betty vai reabrir');
       // O backend fecha o app em seguida; nada mais a fazer aqui.
     } catch (e) {
       instalando = false;
       botao.disabled = false;
-      botao.textContent = 'Tentar de novo';
-      $('atualizacaoErro').textContent = (e && e.message) || 'Não foi possível atualizar.';
+      botao.textContent = tx('Tentar de novo');
+      $('atualizacaoErro').textContent = txMsg((e && e.message) || 'Não foi possível atualizar.');
     }
   }
 

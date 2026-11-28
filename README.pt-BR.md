@@ -26,7 +26,7 @@
 
 ## Instalar
 
-Baixe o instalador em [Releases](https://github.com/KleberBarilli/betty/releases/latest) e execute. Ele instala sem perguntas e abre o Betty no fim. Depois, cadastre suas contas em **Conexões**.
+Baixe o instalador em [Releases](https://github.com/KleberBarilli/betty/releases/latest) e execute. Ele instala sem perguntas e abre o Betty no fim. Depois, cadastre suas contas em **Conexões**. A interface está em português do Brasil (padrão) e em inglês: troque em **Configurações → Idioma**.
 
 O instalador não tem assinatura digital, então o SmartScreen do Windows pode bloquear: escolha **Mais informações** e **Executar assim mesmo**.
 

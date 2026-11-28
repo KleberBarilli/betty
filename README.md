@@ -26,7 +26,7 @@
 
 ## Install
 
-Download the installer from [Releases](https://github.com/KleberBarilli/betty/releases/latest) and run it. It installs without prompts and opens Betty when done. Then add your accounts under **Conexões** (the interface is in Portuguese).
+Download the installer from [Releases](https://github.com/KleberBarilli/betty/releases/latest) and run it. It installs without prompts and opens Betty when done. The interface comes in Brazilian Portuguese (default) and English: switch under **Configurações → Idioma**. Then add your accounts under **Connections** (**Conexões**).
 
 The installer is not code-signed, so Windows SmartScreen may block it: choose **More info**, then **Run anyway**.
 

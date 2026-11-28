@@ -54,7 +54,7 @@ Atualizar agora
 <div class="atualizacao-notas" id="atualizacaoNotas"></div>
 <p class="muted">O Betty baixa o instalador do GitHub, confere se o arquivo chegou íntegro, fecha e abre de novo já atualizado. Seus dados e conexões continuam como estão.</p>
 <div class="account-error" id="atualizacaoErro" role="alert"></div>
-<div class="account-actions"><button type="button" class="btn-ghost" data-on-click="fecharAtualizacao()">Depois</button><button type="button" class="btn-save" id="atualizacaoInstalar" data-on-click="instalarAtualizacao()">Atualizar agora</button></div>
+<div class="account-actions"><button type="button" class="btn-ghost" data-on-click="fecharAtualizacao()">Depois</button><button type="button" class="btn-save" id="atualizacaoInstalar" data-i18n="atualizacao::Atualizar agora" data-on-click="instalarAtualizacao()">Atualizar agora</button></div>
 </div></div>
 <div class="account-modal" id="connectionTestModal" role="dialog" aria-modal="true" aria-labelledby="connectionTestTitle" aria-hidden="true">
 <div class="account-box"><button type="button" class="account-close" aria-label="Fechar teste" data-on-click="fecharTesteConexao()">×</button>
@@ -353,6 +353,17 @@ data-on-input="aplicarFiltrosDebounced()"
 <div class="connection-actions"><button type="button" class="btn-save" data-on-click="conectarKalshi()">Conectar / alterar</button>
 <button type="button" class="btn-ghost" data-connection-test="kalshi" data-on-click="testarKalshi()">Testar</button>
 <button type="button" class="btn-ghost" data-on-click="desconectarKalshi()">Desconectar</button></div></section></div></div>
+<div class="config-card" id="idiomaCard">
+<h2>Idioma</h2>
+<p class="hint">Idioma da interface. Ao trocar, o Betty recarrega a tela já no idioma novo.</p>
+<div class="config-field" style="max-width:260px">
+<label for="cfgIdioma">Idioma do Betty</label>
+<select id="cfgIdioma" data-on-change="trocarIdioma(this.value)">
+<option value="pt-BR" lang="pt-BR">Português (Brasil)</option>
+<option value="en" lang="en">English</option>
+</select>
+</div>
+</div>
 <div class="config-card">
 <h2>Período das apostas fechadas</h2>
 <p class="hint">Defina o período de resultados de cada casa pela data de venda ou resolução. Deixe em branco para incluir todo o histórico.</p>
@@ -407,6 +418,8 @@ data-on-input="aplicarFiltrosDebounced()"
 Dados via <a href="https://polymarket.com" target="_blank" rel="noopener">Polymarket</a> · <a href="https://kalshi.com" target="_blank" rel="noopener">Kalshi</a> · <a href="https://predict.fun/" target="_blank" rel="noopener">Predict.fun</a> · <a href="https://sx.bet/" target="_blank" rel="noopener">SX Bet</a> · Betty
 </footer>
 </main>
+<script src="/i18n.js"></script>
+<script src="/i18n-en.js"></script>
 <script src="/audit-utils.js"></script>
 <script src="/market-title-utils.js"></script>
 <script src="/market-breakdown.js"></script>

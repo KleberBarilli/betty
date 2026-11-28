@@ -43,7 +43,7 @@ function contexto({ banco, local = {}, falhaBanco = false }) {
   };
   const ctx = vm.createContext(g);
   vm.runInContext('globalThis.window = globalThis;', ctx);
-  for (const s of ['audit-utils.js', 'market-title-utils.js', 'market-breakdown.js', 'odds-ranges.js', 'profit-calendar.js', 'acoes.js', 'dashboard.js']) {
+  for (const s of ['i18n.js', 'i18n-en.js', 'audit-utils.js', 'market-title-utils.js', 'market-breakdown.js', 'odds-ranges.js', 'profit-calendar.js', 'acoes.js', 'dashboard.js']) {
     vm.runInContext(fs.readFileSync(path.join(ui, s), 'utf8'), ctx, { filename: s });
   }
   return { ctx, armazenamento, posts, run: code => vm.runInContext(code, ctx) };

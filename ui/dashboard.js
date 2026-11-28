@@ -187,20 +187,20 @@ const config = configStakeDaCasa(casa);
 const el = document.getElementById("stakeRulesList-" + casa);
 if (!el) return;
 if (!config.regras.length) {
-el.innerHTML = '<div style="font-size:0.78rem;color:var(--muted-2);padding:4px 0;">Nenhuma regra — vale só o stake padrão.</div>';
+el.innerHTML = '<div style="font-size:0.78rem;color:var(--muted-2);padding:4px 0;">' + tx("Nenhuma regra — vale só o stake padrão.") + '</div>';
 return;
 }
 el.innerHTML = config.regras.map((r, i) => `
 <div class="stake-rule" data-i="${i}">
 <div>
-<div class="rule-lbl">A partir de</div>
+<div class="rule-lbl">${tx("A partir de")}</div>
 <input type="date" value="${r.from}" data-on-change="atualizarRegraStake('${casa}',${i},'from',this.value)" />
 </div>
 <div>
-<div class="rule-lbl">1 u ($)</div>
+<div class="rule-lbl">${tx("1 u ($)")}</div>
 <input type="number" step="0.01" min="0.01" value="${Number(r.unidade).toFixed(2)}" data-on-change="atualizarRegraStake('${casa}',${i},'unidade',this.value)" />
 </div>
-<button type="button" class="btn-del" title="Remover" data-on-click="removerRegraStake('${casa}',${i})">×</button>
+<button type="button" class="btn-del" title="${tx("Remover")}" data-on-click="removerRegraStake('${casa}',${i})">×</button>
 </div>
 `).join("");
 }
@@ -258,7 +258,7 @@ if (fim) fim.value = "";
 atualizarBotoesPeriodoFechadasConfigurado();
 }
 function atualizarBotoesPeriodoFechadasConfigurado() {
-const texto = valor => valor ? valor.split("-").reverse().join("/") : "dd/mm/aaaa";
+const texto = valor => valor ? BettyI18n.dataYmd(valor) : tx("dd/mm/aaaa");
 for (const casa of CASAS_STAKE) for (const campo of ["start", "end"]) {
 const input = inputPeriodoFechadas(casa, campo);
 const valor = document.getElementById(idCampoPeriodoFechadas(casa, campo, "Value"));
@@ -352,7 +352,8 @@ celulas += `<div class="${classe}" data-on-click="selecionarDiaPeriodoFechadasCo
 }
 const resto = (primeiroDia + diasNoMes) % 7;
 if (resto) for (let dia = 1; dia <= 7 - resto; dia++) celulas += `<div class="day other">${dia}</div>`;
-popup.innerHTML = `<div class="date-popup-head"><span>${nomesMes[mes]} de ${ano}</span><div class="date-popup-nav"><button type="button" data-on-click="navegarMesCalendarioPeriodoFechadasConfigurado(-1,event)">‹</button><button type="button" data-on-click="navegarMesCalendarioPeriodoFechadasConfigurado(1,event)">›</button></div></div><div class="date-grid"><div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" data-on-click="limparCampoPeriodoFechadasConfigurado(event)">Limpar</button><button type="button" data-on-click="selecionarDiaPeriodoFechadasConfigurado('${hoje}',event)">Hoje</button></div>`;
+const diasSemana = tx("D S T Q Q S S").split(" ").map(d => `<div class="dow">${d}</div>`).join("");
+popup.innerHTML = `<div class="date-popup-head"><span>${tx("{mes} de {ano}", { mes: tx(nomesMes[mes]), ano })}</span><div class="date-popup-nav"><button type="button" data-on-click="navegarMesCalendarioPeriodoFechadasConfigurado(-1,event)">‹</button><button type="button" data-on-click="navegarMesCalendarioPeriodoFechadasConfigurado(1,event)">›</button></div></div><div class="date-grid">${diasSemana}${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" data-on-click="limparCampoPeriodoFechadasConfigurado(event)">${tx("Limpar")}</button><button type="button" data-on-click="selecionarDiaPeriodoFechadasConfigurado('${hoje}',event)">${tx("Hoje")}</button></div>`;
 }
 function selecionarDiaPeriodoFechadasConfigurado(ymd, ev) {
 if (ev) ev.stopPropagation();
@@ -374,7 +375,7 @@ const periodos = {};
 for (const casa of CASAS_STAKE) {
 const periodo = normalizarPeriodoFechadas(inputPeriodoFechadas(casa, "start")?.value, inputPeriodoFechadas(casa, "end")?.value);
 if (!periodo) {
-if (msg) { msg.textContent = "A data inicial não pode ser posterior à data final."; msg.className = "config-msg err"; }
+if (msg) { msg.textContent = tx("A data inicial não pode ser posterior à data final."); msg.className = "config-msg err"; }
 return;
 }
 periodos[casa] = periodo;
@@ -384,11 +385,11 @@ const config = configStakeDaCasa(casa);
 const input = document.getElementById("cfgStakeUnidade-" + casa);
 const unidade = parseFloat(input && input.value);
 if (!isFinite(unidade) || unidade <= 0) {
-if (msg) { msg.textContent = "A unidade de stake da " + NOMES_CASAS[casa] + " deve ser > 0."; msg.className = "config-msg err"; }
+if (msg) { msg.textContent = tx("A unidade de stake da {casa} deve ser > 0.", { casa: NOMES_CASAS[casa] }); msg.className = "config-msg err"; }
 return;
 }
 if (config.regras.some(r => !r.from || !isFinite(r.unidade) || r.unidade <= 0)) {
-if (msg) { msg.textContent = "Regras de stake inválidas (data e valor > 0)."; msg.className = "config-msg err"; }
+if (msg) { msg.textContent = tx("Regras de stake inválidas (data e valor > 0)."); msg.className = "config-msg err"; }
 return;
 }
 config.unidade = Math.round(unidade * 100) / 100;
@@ -400,7 +401,7 @@ salvarConfiguracaoRemota().then(function(ok) {
 if (!ok) {
 const m = document.getElementById("configMsg");
 if (m) {
-m.textContent = "Não foi possível salvar no servidor. Verifique sua conexão.";
+m.textContent = tx("Não foi possível salvar no servidor. Verifique sua conexão.");
 m.className = "config-msg err";
 }
 }
@@ -410,7 +411,7 @@ renderizarStats();
 if (typeof desenharGrafico === "function") try { desenharGrafico(); } catch (e) {}
 if (viewAtual === "estatisticas") renderEstatisticas();
 if (abaAtual === "fechado") aplicarFiltros({ manterPagina: false });
-if (msg) { msg.textContent = "Configurações atualizadas."; msg.className = "config-msg ok"; }
+if (msg) { msg.textContent = tx("Configurações atualizadas."); msg.className = "config-msg ok"; }
 }
 function restaurarConfiguracao() {
 STAKE_POR_CASA = criarConfiguracaoStakePadrao();
@@ -423,7 +424,7 @@ if (typeof desenharGrafico === "function") try { desenharGrafico(); } catch (e) 
 if (viewAtual === "estatisticas") renderEstatisticas();
 if (abaAtual === "fechado") aplicarFiltros({ manterPagina: false });
 const msg = document.getElementById("configMsg");
-if (msg) { msg.textContent = "Restaurado para o padrão."; msg.className = "config-msg ok"; }
+if (msg) { msg.textContent = tx("Restaurado para o padrão."); msg.className = "config-msg ok"; }
 }
 // A configuração é carregada do servidor para a conta autenticada.
 sincronizarConfiguracaoRemota().catch(function() {});
@@ -467,7 +468,7 @@ ultimoErr = e;
 await new Promise(function (r) { setTimeout(r, 400 * (i + 1)); });
 }
 }
-throw ultimoErr || new Error("Falha de rede");
+throw ultimoErr || new Error(tx("Falha de rede"));
 }
 function salvarCacheLocal() {
 try {
@@ -818,6 +819,8 @@ const res = await fetch("/api/me", { cache: "no-store", headers: { "Accept": "ap
 if (!res.ok) { location.href = "/"; throw new Error("Sessão necessária"); }
 const data = await res.json();
 BETTY_USER = data.user;
+// Nome padrão vem do backend em português; é só para exibição.
+if (BETTY_USER?.name) BETTY_USER.name = BettyI18n.tMsg(BETTY_USER.name);
 BETTY_CONNECTIONS = data.connections || {};
 atualizarSaldosFixos();
 // O filtro de Estatísticas é individual por usuário. Releia-o somente depois
@@ -834,7 +837,7 @@ const footer = document.querySelector(".sidebar-footer");
 if (footer && !document.getElementById("bettyUserBox")) {
 const box = document.createElement("div");
 box.id = "bettyUserBox";
-box.innerHTML = `<span class="sidebar-account-avatar" aria-hidden="true">${escapeHtml(BETTY_USER.name.trim().charAt(0).toUpperCase())}</span><div class="sidebar-account-info"><strong class="sidebar-user-name">${escapeHtml(BETTY_USER.name)}</strong><small>Conta local</small></div><button type="button" class="sidebar-user-logout" aria-label="Sair" data-on-click="logoutBetty()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button>`;
+box.innerHTML = `<span class="sidebar-account-avatar" aria-hidden="true">${escapeHtml(BETTY_USER.name.trim().charAt(0).toUpperCase())}</span><div class="sidebar-account-info"><strong class="sidebar-user-name">${escapeHtml(BETTY_USER.name)}</strong><small>${tx("Conta local")}</small></div><button type="button" class="sidebar-user-logout" aria-label="${tx("Sair")}" data-on-click="logoutBetty()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg></button>`;
 footer.append(box);
 }
 // A configuração passa a ser do usuário logado, não global.
@@ -929,7 +932,7 @@ sortDir = "asc";
 paginaAtual = 1;
 const labelCasa = document.getElementById("casaValueLabel");
 if (labelCasa) {
-labelCasa.textContent = "Todas";
+labelCasa.textContent = tx("Todas");
 labelCasa.classList.remove(...CASAS_STAKE.map(casa => "casa-" + casa));
 }
 const popupCasa = document.getElementById("casaPopup");
@@ -940,7 +943,7 @@ b.classList.toggle("active", b.dataset.value === "todas");
 }
 const labelData = document.getElementById("dataValueLabel");
 if (labelData) {
-labelData.textContent = "Todas";
+labelData.textContent = tx("Todas");
 labelData.classList.remove("active");
 }
 fecharPopupCasa();
@@ -952,8 +955,8 @@ if (busca) busca.value = "";
 const sel = document.getElementById("ordenar");
 if (sel) {
 sel.innerHTML = `
-<option value="inicio-asc" selected>Data</option>
-<option value="negociado">Negociado</option>
+<option value="inicio-asc" selected>${tx("Data")}</option>
+<option value="negociado">${tx("Negociado")}</option>
 `;
 }
 if (renderizar) aplicarFiltros();
@@ -965,29 +968,29 @@ if (!card) continue;
 const connected=Boolean(BETTY_CONNECTIONS?.[casa]);
 card.classList.toggle('is-connected',connected);
 const status=card.querySelector('.hint');
-status.textContent=connected ? 'Conectada' : 'Não conectada';
+status.textContent=connected ? tx('Conectada') : tx('Não conectada');
 let detail=card.querySelector('.connection-detail');
 if (!detail) {
 detail=document.createElement('span');
 detail.className='connection-detail';
 status.after(detail);
 }
-detail.textContent=connected ? (casa==='polymarket' ? BETTY_CONNECTIONS.polymarketWalletHint || '' : 'Protegida') : '';
+detail.textContent=connected ? (casa==='polymarket' ? BETTY_CONNECTIONS.polymarketWalletHint || '' : tx('Protegida')) : '';
 const primary=card.querySelector('.btn-save');
-primary.textContent=connected ? 'Alterar' : '+ Conectar';
+primary.textContent=connected ? tx('Alterar') : tx('+ Conectar');
 if (!card.querySelector('[data-connection-test]')) {
 const test=document.createElement('button');
 test.type='button'; test.className='btn-ghost';
 test.dataset.connectionTest=casa;
-test.textContent='Testar';
+test.textContent=tx('Testar');
 test.onclick=()=>testarConexaoCasa(casa);
 card.querySelector('.connection-actions').insertBefore(test,primary.nextSibling);
 }
 for (const button of card.querySelectorAll('.btn-ghost')) {
 const test=button.dataset.connectionTest===casa;
 button.disabled=!connected;
-button.textContent=test ? 'Testar' : '×';
-if (!test) button.setAttribute('aria-label','Desconectar ' + NOMES_CASAS[casa]);
+button.textContent=test ? tx('Testar') : '×';
+if (!test) button.setAttribute('aria-label',tx('Desconectar {casa}', { casa: NOMES_CASAS[casa] }));
 }
 }
 }
@@ -996,10 +999,10 @@ for (const [casa, nome] of Object.entries(CASAS_NOVAS)) {
 document.getElementById("connectionGrid").insertAdjacentHTML("beforeend", `
 <section class="stake-platform-card connection-card" data-house="${casa}">
 <h3><img src="/assets/platforms/${casa}.png" alt="" width="28" height="28">${nome}</h3>
-<p class="hint" id="${casa}ConnectionStatus">Não conectada</p>
+<p class="hint" id="${casa}ConnectionStatus">${tx("Não conectada")}</p>
 <div class="connection-actions">
-<button type="button" class="btn-save" data-on-click="abrirContaModal('${casa}')">Conectar / alterar</button>
-<button type="button" class="btn-ghost" id="${casa}Disconnect" data-on-click="desconectarNovaCasa('${casa}')" disabled>Desconectar</button>
+<button type="button" class="btn-save" data-on-click="abrirContaModal('${casa}')">${tx("Conectar / alterar")}</button>
+<button type="button" class="btn-ghost" id="${casa}Disconnect" data-on-click="desconectarNovaCasa('${casa}')" disabled>${tx("Desconectar")}</button>
 </div>
 </section>`);
 document.getElementById("closedRangeGrid").insertAdjacentHTML("beforeend", `
@@ -1008,26 +1011,26 @@ document.getElementById("closedRangeGrid").insertAdjacentHTML("beforeend", `
 <div class="closed-range-fields">
 ${[["Start", "start", "Data inicial"], ["End", "end", "Data final"]].map(([campo, tipo, label]) => `
 <div class="config-field">
-<label for="cfgClosedRange${campo}-${casa}Button">${label}</label>
+<label for="cfgClosedRange${campo}-${casa}Button">${tx(label)}</label>
 <input type="hidden" id="cfgClosedRange${campo}-${casa}">
 <button type="button" class="config-date-button" id="cfgClosedRange${campo}-${casa}Button"
   data-on-click="toggleCalendarioPeriodoFechadasConfigurado('${casa}','${tipo}',event)" aria-haspopup="dialog" aria-expanded="false">
-<span id="cfgClosedRange${campo}-${casa}Value">dd/mm/aaaa</span>
+<span id="cfgClosedRange${campo}-${casa}Value">${tx("dd/mm/aaaa")}</span>
 </button>
 </div>`).join("")}
-<button type="button" class="closed-range-clear" data-on-click="limparPeriodoFechadasConfigurado('${casa}')" aria-label="Limpar período de ${nome}">×</button>
+<button type="button" class="closed-range-clear" data-on-click="limparPeriodoFechadasConfigurado('${casa}')" aria-label="${tx("Limpar período de {casa}", { casa: nome })}">×</button>
 </div>
 </section>`);
 document.getElementById("stakeGrid").insertAdjacentHTML("beforeend", `
 <section class="stake-platform-card">
 <h3>${nome}</h3>
 <div class="config-field">
-<label for="cfgStakeUnidade-${casa}">Stake padrão — 1 u ($)</label>
+<label for="cfgStakeUnidade-${casa}">${tx("Stake padrão — 1 u ($)")}</label>
 <input type="number" id="cfgStakeUnidade-${casa}" step="0.01" min="0.01" inputmode="decimal">
 </div>
-<label style="display:block;font-size:.72rem;color:var(--muted);margin:4px 0 8px;">Mudanças por data</label>
+<label style="display:block;font-size:.72rem;color:var(--muted);margin:4px 0 8px;">${tx("Mudanças por data")}</label>
 <div class="stake-rules" id="stakeRulesList-${casa}"></div>
-<button type="button" class="btn-add-rule" data-on-click="adicionarRegraStake('${casa}')">+ Adicionar mudança</button>
+<button type="button" class="btn-add-rule" data-on-click="adicionarRegraStake('${casa}')">${tx("+ Adicionar mudança")}</button>
 </section>`);
 }
 organizarConfiguracaoPorCasa();
@@ -1037,15 +1040,15 @@ const ranges=document.getElementById('closedRangeGrid'),stakes=document.getEleme
 if (!ranges || !stakes) return;
 const section=ranges.closest('.config-card'),oldStake=stakes.closest('.config-card');
 section.id='houseSettingsCard';
-section.querySelector('h2').innerHTML='<svg class="connections-heading-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="8" cy="6" r="2" fill="var(--bg)"/><circle cx="16" cy="12" r="2" fill="var(--bg)"/><circle cx="10" cy="18" r="2" fill="var(--bg)"/></svg>Período por casa';
-section.querySelector('.hint').textContent='Datas de venda ou resolução. Sem datas, todo o histórico.';
+section.querySelector('h2').innerHTML='<svg class="connections-heading-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="8" cy="6" r="2" fill="var(--bg)"/><circle cx="16" cy="12" r="2" fill="var(--bg)"/><circle cx="10" cy="18" r="2" fill="var(--bg)"/></svg>'+tx('Período por casa');
+section.querySelector('.hint').textContent=tx('Datas de venda ou resolução. Sem datas, todo o histórico.');
 const scroll=document.createElement('div');
 scroll.className='config-matrix-scroll';
 scroll.tabIndex=0;
-scroll.setAttribute('aria-label','Período por casa');
+scroll.setAttribute('aria-label',tx('Período por casa'));
 const table=document.createElement('table');
 table.className='config-matrix';
-table.innerHTML='<thead><tr><th scope="col"><span class="sr-only">Configuração</span></th>'+
+table.innerHTML='<thead><tr><th scope="col"><span class="sr-only">'+tx('Configuração')+'</span></th>'+
 CASAS_STAKE.map(casa=>'<th scope="col"><span class="config-house-name"><img src="/assets/platforms/'+casa+'.png" alt="" width="24" height="24">'+escapeHtml(NOMES_CASAS[casa])+'</span></th>').join('')+
 '</tr></thead><tbody></tbody>';
 const body=table.querySelector('tbody');
@@ -1054,7 +1057,7 @@ const tr=document.createElement('tr'),th=document.createElement('th');
 th.scope='row';th.textContent=label;tr.append(th);body.append(tr);
 return tr;
 };
-for (const [label,field] of [['Data inicial','Start'],['Data final','End']]) {
+for (const [label,field] of [[tx('Data inicial'),'Start'],[tx('Data final'),'End']]) {
 const tr=row(label);
 for (const casa of CASAS_STAKE) {
 const td=document.createElement('td');
@@ -1067,14 +1070,14 @@ if (clear) td.append(clear);
 tr.append(td);
 }
 }
-const units=row('1 u padrão (US$)'),rules=row('Mudanças por data');
+const units=row(tx('1 u padrão (US$)')),rules=row(tx('Mudanças por data'));
 for (const casa of CASAS_STAKE) {
 const unitCell=document.createElement('td');
 unitCell.append(document.getElementById('cfgStakeUnidade-'+casa).closest('.config-field'));
 units.append(unitCell);
 const ruleCell=document.createElement('td'),list=document.getElementById('stakeRulesList-'+casa);
 const add=list.parentElement.querySelector('.btn-add-rule');
-add.textContent='+ Regra';
+add.textContent=tx('+ Regra');
 ruleCell.append(list,add);rules.append(ruleCell);
 }
 scroll.append(table);
@@ -1082,7 +1085,7 @@ ranges.replaceWith(scroll);
 const stakeScroll=document.createElement('div');
 stakeScroll.className='config-matrix-scroll';
 stakeScroll.tabIndex=0;
-stakeScroll.setAttribute('aria-label','Stake por casa');
+stakeScroll.setAttribute('aria-label',tx('Stake por casa'));
 const stakeTable=document.createElement('table');
 stakeTable.className='config-matrix';
 stakeTable.append(table.querySelector('thead').cloneNode(true));
@@ -1091,8 +1094,8 @@ stakeBody.append(units,rules);
 stakeTable.append(stakeBody);
 stakeScroll.append(stakeTable);
 oldStake.id='stakeSettingsCard';
-oldStake.querySelector('h2').innerHTML=section.querySelector('h2').innerHTML.replace('Período por casa','Stake por casa');
-oldStake.querySelector('.hint').textContent='Defina o valor de 1 u e as mudanças por data para cada casa.';
+oldStake.querySelector('h2').innerHTML=section.querySelector('h2').innerHTML.replace(tx('Período por casa'),tx('Stake por casa'));
+oldStake.querySelector('.hint').textContent=tx('Defina o valor de 1 u e as mudanças por data para cada casa.');
 stakes.replaceWith(stakeScroll);
 for (const [card,content] of [[section,scroll],[oldStake,stakeScroll]]) {
 const heading=card.querySelector('h2'),toggle=document.createElement('button');
@@ -1125,29 +1128,29 @@ const modal=document.getElementById("accountModal"), fields=document.getElementB
 const nome = CASAS_NOVAS[tipo];
 if (nome) {
 const predict = tipo === "predict";
-document.getElementById("accountModalTitle").textContent = "Conectar " + nome;
-document.getElementById("accountModalSub").textContent = "A chave de API fica criptografada no Betty.";
+document.getElementById("accountModalTitle").textContent = tx("Conectar {casa}", { casa: nome });
+document.getElementById("accountModalSub").textContent = tx("A chave de API fica criptografada no Betty.");
 fields.innerHTML = `
-${predict ? '<label for="novaCasaWallet">Endereço público da conta Predict.fun</label><input id="novaCasaWallet" placeholder="0x..." autocomplete="off" spellcheck="false">' : ''}
-<label for="novaCasaApiKey">Chave de API</label><input id="novaCasaApiKey" type="password" autocomplete="off">
+${predict ? '<label for="novaCasaWallet">' + tx("Endereço público da conta Predict.fun") + '</label><input id="novaCasaWallet" placeholder="0x..." autocomplete="off" spellcheck="false">' : ''}
+<label for="novaCasaApiKey">${tx("Chave de API")}</label><input id="novaCasaApiKey" type="password" autocomplete="off">
 <div class="connection-note">${predict
-? 'Use o endereço da carteira da própria conta Predict.fun e uma chave do <a href="https://developers.predict.fun/" target="_blank" rel="noopener">console de desenvolvedores</a>.'
-: 'Use uma chave da seção Conta da SX Bet com acesso de leitura aos dados da sua conta.'}</div>`;
+? tx('Use o endereço da carteira da própria conta Predict.fun e uma chave do <a href="https://developers.predict.fun/" target="_blank" rel="noopener">console de desenvolvedores</a>.')
+: tx('Use uma chave da seção Conta da SX Bet com acesso de leitura aos dados da sua conta.')}</div>`;
 document.getElementById("accountModalError").textContent = "";
-document.getElementById("accountModalSave").textContent = "Salvar conexão";
+document.getElementById("accountModalSave").textContent = tx("Salvar conexão");
 modal.classList.add("show");
 modal.setAttribute("aria-hidden", "false");
 fields.querySelector("input").focus();
 return;
 }
-document.getElementById("accountModalTitle").textContent=tipo==="poly"?"Conectar Polymarket":"Conectar Kalshi";
-document.getElementById("accountModalSub").textContent=tipo==="poly"?"Informe a wallet pública. Validamos a proxy (onde ficam fundos e posições) antes de confirmar.":"As credenciais são enviadas por HTTPS e armazenadas criptografadas no servidor. Nunca ficam no HTML.";
-fields.innerHTML=tipo==="poly"?`<label>Wallet pública</label><input id="modalWallet" placeholder="0x..." autocomplete="off"><div id="polyPreviewBox"></div><div class="connection-note">Cole o endereço de login ou a proxy wallet. O Betty resolve a proxy e mostra saldo e posições antes de gravar. Nunca envie seed phrase nem Private Key.</div>`:`<label>API Key ID (Read only)</label><input id="modalKalshiKey" placeholder="Ex.: 123e4567-e89b-12d3-a456-426614174000" autocomplete="off"><label>Private Key PEM</label><textarea id="modalKalshiPrivate" placeholder="-----BEGIN PRIVATE KEY-----
+document.getElementById("accountModalTitle").textContent=tx("Conectar {casa}", { casa: tipo==="poly"?"Polymarket":"Kalshi" });
+document.getElementById("accountModalSub").textContent=tipo==="poly"?tx("Informe a wallet pública. Validamos a proxy (onde ficam fundos e posições) antes de confirmar."):tx("As credenciais são enviadas por HTTPS e armazenadas criptografadas no servidor. Nunca ficam no HTML.");
+fields.innerHTML=tipo==="poly"?`<label>${tx("Wallet pública")}</label><input id="modalWallet" placeholder="0x..." autocomplete="off"><div id="polyPreviewBox"></div><div class="connection-note">${tx("Cole o endereço de login ou a proxy wallet. O Betty resolve a proxy e mostra saldo e posições antes de gravar. Nunca envie seed phrase nem Private Key.")}</div>`:`<label>${tx("API Key ID (Read only)")}</label><input id="modalKalshiKey" placeholder="${tx("Ex.: {exemplo}", { exemplo: "123e4567-e89b-12d3-a456-426614174000" })}" autocomplete="off"><label>Private Key PEM</label><textarea id="modalKalshiPrivate" placeholder="-----BEGIN PRIVATE KEY-----
 ...
------END PRIVATE KEY-----"></textarea><div class="connection-note">Use uma API Key <strong>Read only</strong> da Kalshi. A API Key ID e a Private Key são enviadas somente ao backend e ficam criptografadas. O Betty não envia ordens nem precisa de permissão de escrita.</div>`;
+-----END PRIVATE KEY-----"></textarea><div class="connection-note">${tx("Use uma API Key <strong>Read only</strong> da Kalshi. A API Key ID e a Private Key são enviadas somente ao backend e ficam criptografadas. O Betty não envia ordens nem precisa de permissão de escrita.")}</div>`;
 document.getElementById("accountModalError").textContent="";
 const save=document.getElementById("accountModalSave");
-if (save) save.textContent = tipo==="poly" ? "Validar carteira" : "Salvar conexão";
+if (save) save.textContent = tipo==="poly" ? tx("Validar carteira") : tx("Salvar conexão");
 modal.classList.add("show"); modal.setAttribute("aria-hidden","false");
 if (tipo==="poly") {
 const inp=document.getElementById("modalWallet");
@@ -1156,7 +1159,7 @@ if (!polyPreview) return;
 polyPreview=null;
 const box=document.getElementById("polyPreviewBox");
 if (box) box.innerHTML="";
-if (save) save.textContent="Validar carteira";
+if (save) save.textContent=tx("Validar carteira");
 });
 }
 }
@@ -1183,7 +1186,7 @@ method, headers: { "Content-Type": "application/json" },
 body: credentials ? JSON.stringify(credentials) : undefined
 });
 const data = await response.json();
-if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível atualizar a conexão.");
+if (!response.ok || !data.ok) throw new Error(BettyI18n.tMsg(data.error) || tx("Não foi possível atualizar a conexão."));
 BETTY_CONNECTIONS = data.connections;
 if (casa === "predict") {
 PREDICT_API_BALANCE = null;
@@ -1210,18 +1213,18 @@ async function desconectarNovaCasa(casa) {
 const button = document.getElementById(casa + "Disconnect");
 button.disabled = true;
 try { await atualizarConexaoNovaCasa(casa, "DELETE"); }
-catch (erro) { alert(erro.message); atualizarStatusConexoes(); }
+catch (erro) { alert(BettyI18n.tMsg(erro.message)); atualizarStatusConexoes(); }
 }
 function renderPolyPreview(d) {
 const box=document.getElementById("polyPreviewBox");
 if (!box) return;
 const abertas = d.openPositionsCapped ? d.openPositions + "+" : String(d.openPositions);
 box.innerHTML = `<div class="preview-box">
-<div class="row"><span>Proxy wallet</span><strong>${escapeHtml(d.proxyWalletHint || "")}</strong></div>
-${d.resolvedFromLogin ? `<div class="row"><span>Endereço informado</span><span>login — resolvido para a proxy</span></div>` : ""}
-<div class="row"><span>Saldo pUSD</span><strong>$${Number(d.balance||0).toFixed(2)}</strong></div>
-<div class="row"><span>Posições abertas</span><strong>${abertas}</strong></div>
-${d.warning ? `<div class="warn">${escapeHtml(d.warning)}</div>` : `<div class="muted" style="margin-top:8px;color:var(--muted);font-size:.74rem">Confira se o saldo e as posições batem com a conta na Polymarket antes de confirmar.</div>`}
+<div class="row"><span>${tx("Proxy wallet")}</span><strong>${escapeHtml(d.proxyWalletHint || "")}</strong></div>
+${d.resolvedFromLogin ? `<div class="row"><span>${tx("Endereço informado")}</span><span>${tx("login — resolvido para a proxy")}</span></div>` : ""}
+<div class="row"><span>${tx("Saldo pUSD")}</span><strong>$${Number(d.balance||0).toFixed(2)}</strong></div>
+<div class="row"><span>${tx("Posições abertas")}</span><strong>${abertas}</strong></div>
+${d.warning ? `<div class="warn">${escapeHtml(BettyI18n.tMsg(d.warning))}</div>` : `<div class="muted" style="margin-top:8px;color:var(--muted);font-size:.74rem">${tx("Confira se o saldo e as posições batem com a conta na Polymarket antes de confirmar.")}</div>`}
 </div>`;
 }
 document.getElementById("accountModalSave").onclick=async()=>{
@@ -1237,60 +1240,60 @@ const wallet=document.getElementById("modalWallet").value.trim();
 if(!polyPreview){
 const r=await fetch("/api/connections/polymarket/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({wallet})});
 const d=await r.json();
-if(!r.ok || !d.ok) throw new Error(d.error||"Não foi possível validar a wallet.");
+if(!r.ok || !d.ok) throw new Error(d.error||tx("Não foi possível validar a wallet."));
 polyPreview=d;
 renderPolyPreview(d);
-btn.textContent="Confirmar conta";
+btn.textContent=tx("Confirmar conta");
 return;
 }
 const r=await fetch("/api/connections/polymarket",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({wallet})});
-const d=await r.json(); if(!r.ok)throw new Error(d.error||"Não foi possível salvar a conexão.");
+const d=await r.json(); if(!r.ok)throw new Error(d.error||tx("Não foi possível salvar a conexão."));
 BETTY_CONNECTIONS=d.connections; KALSHI_API_BALANCE=null; POLY_API_BALANCE=null; atualizarStatusConexoes(); limparCachesBetty(); abertos=[]; fechados=[]; snapshotAoVivoConfirmado=false; carregado={aberto:false,fechado:false}; fecharContaModal(); await atualizarAgora();
 }else{
 const r=await fetch("/api/connections/kalshi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apiKey:document.getElementById("modalKalshiKey").value.trim(),privateKey:document.getElementById("modalKalshiPrivate").value.trim()})});
-const d=await r.json(); if(!r.ok)throw new Error(d.error||"Não foi possível salvar a conexão.");
+const d=await r.json(); if(!r.ok)throw new Error(d.error||tx("Não foi possível salvar a conexão."));
 BETTY_CONNECTIONS=d.connections; KALSHI_API_BALANCE=null; POLY_API_BALANCE=null; atualizarStatusConexoes(); limparCachesBetty(); abertos=[]; fechados=[]; snapshotAoVivoConfirmado=false; carregado={aberto:false,fechado:false}; fecharContaModal(); await atualizarAgora();
 }
-}catch(e){err.textContent=e.message}finally{btn.disabled=false}
+}catch(e){err.textContent=BettyI18n.tMsg(e.message)}finally{btn.disabled=false}
 };
 async function conectarPolymarket(){abrirContaModal("poly")}
 async function desconectarPolymarket() {
-if(!confirm("Desconectar a Polymarket desta conta?")) return;
+if(!confirm(tx("Desconectar a Polymarket desta conta?"))) return;
 const r=await fetch("/api/connections/polymarket",{method:"DELETE"}); const d=await r.json();
 if(r.ok){BETTY_CONNECTIONS=d.connections;POLY_API_BALANCE=null;atualizarStatusConexoes();atualizarSaldosFixos();limparCachesBetty();abertos=[];fechados=[];snapshotAoVivoConfirmado=false;carregado={aberto:false,fechado:false};posAtualizarDados()}
 }
 async function fetchPolymarketSaldo() {
 if (!BETTY_CONNECTIONS?.polymarket) return null;
 const res = await fetch("/api/polymarket/balance", { cache: "no-store" });
-if (!res.ok) throw new Error("Polymarket balance HTTP " + res.status);
+if (!res.ok) throw new Error(tx("Saldo da {casa}: HTTP {status}", { casa: "Polymarket", status: res.status }));
 const data = await res.json();
-if (!data.ok) throw new Error(data.error || "Polymarket balance error");
+if (!data.ok) throw new Error(BettyI18n.tMsg(data.error) || tx("Erro ao consultar o saldo da {casa}.", { casa: "Polymarket" }));
 const balance = Number(data.balance);
-if (!Number.isFinite(balance)) throw new Error("Saldo da Polymarket inválido.");
+if (!Number.isFinite(balance)) throw new Error(tx("Saldo da Polymarket inválido."));
 return balance;
 }
 async function fetchKalshiSaldo() {
 if (!BETTY_CONNECTIONS?.kalshi) return null;
 const res = await fetchComRetry(KALSHI_PROXY + "/balance", { cache: "no-store" });
-if (!res.ok) throw new Error("Kalshi balance HTTP " + res.status);
+if (!res.ok) throw new Error(tx("Saldo da {casa}: HTTP {status}", { casa: "Kalshi", status: res.status }));
 const data = await res.json();
-if (!data.ok) throw new Error(data.error || "Kalshi balance error");
+if (!data.ok) throw new Error(BettyI18n.tMsg(data.error) || tx("Erro ao consultar o saldo da {casa}.", { casa: "Kalshi" }));
 const balance = Number(data.balance);
-if (!Number.isFinite(balance)) throw new Error("Saldo da Kalshi inválido.");
+if (!Number.isFinite(balance)) throw new Error(tx("Saldo da Kalshi inválido."));
 return balance;
 }
 async function fetchPredictSaldo() {
 const response = await fetch("/api/tracked/predict/balance", { cache: "no-store" });
-if (!response.ok) throw new Error("Saldo do Predict.fun indisponível.");
+if (!response.ok) throw new Error(tx("Saldo do Predict.fun indisponível."));
 const data = await response.json();
-if (!data.ok || !Number.isFinite(data.balance) || data.balance < 0) throw new Error("Saldo do Predict.fun inválido.");
+if (!data.ok || !Number.isFinite(data.balance) || data.balance < 0) throw new Error(tx("Saldo do Predict.fun inválido."));
 return data.balance;
 }
 async function fetchSxBetSaldo() {
 const response = await fetch("/api/tracked/sxbet/balance", { cache: "no-store" });
 const data = await response.json().catch(() => null);
 if (!response.ok || !data?.ok || !Number.isFinite(data.balance) || !Number.isFinite(data.escrowedAmount)) {
-throw new Error(data?.error || "Não foi possível consultar o saldo da SX Bet.");
+throw new Error(BettyI18n.tMsg(data?.error) || tx("Não foi possível consultar o saldo da SX Bet."));
 }
 return data;
 }
@@ -1332,8 +1335,8 @@ testeConexaoFoco=document.activeElement;
 const modal=document.getElementById('connectionTestModal');
 const status=document.getElementById('connectionTestStatus');
 const values=document.getElementById('connectionTestValues');
-document.getElementById('connectionTestTitle').textContent='Conexão · '+NOMES_CASAS[casa];
-status.textContent='Testando conexão…';
+document.getElementById('connectionTestTitle').textContent=tx('Conexão · {casa}',{casa:NOMES_CASAS[casa]});
+status.textContent=tx('Testando conexão…');
 status.className='muted';
 values.replaceChildren();
 modal.classList.add('show');
@@ -1341,12 +1344,12 @@ modal.setAttribute('aria-hidden','false');
 modal.querySelector('.account-close').focus();
 try {
 let balance=null,portfolio=null;
-let portfolioLabel='Valor do portfólio';
+let portfolioLabel=tx('Valor do portfólio');
 let sxBetBalanceError='';
 if (casa==='kalshi') {
 const response=await fetchComRetry('/api/kalshi/test',{cache:'no-store'});
 const data=await response.json();
-if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível consultar a Kalshi.');
+if (!response.ok || !data.ok) throw new Error(data.error || tx('Não foi possível consultar a Kalshi.'));
 balance=data.balance; portfolio=data.portfolioValue;
 } else if (casa==='polymarket') {
 balance=await fetchPolymarketSaldo();
@@ -1354,36 +1357,36 @@ balance=await fetchPolymarketSaldo();
 const [response,sxBetSaldo]=await Promise.all([
 fetch('/api/connections/'+casa+'/test',{cache:'no-store'}),
 casa==='sxbet' ? fetchSxBetSaldo().catch(error=>{
-sxBetBalanceError=error instanceof TypeError ? 'Não foi possível consultar o saldo da SX Bet.' : error.message;
+sxBetBalanceError=error instanceof TypeError ? tx('Não foi possível consultar o saldo da SX Bet.') : BettyI18n.tMsg(error.message);
 return null;
 }) : null
 ]);
 const data=await response.json();
-if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível validar a conexão.');
+if (!response.ok || !data.ok) throw new Error(data.error || tx('Não foi possível validar a conexão.'));
 if (casa==='predict') balance=await fetchPredictSaldo();
 if (sxBetSaldo) {
 balance=sxBetSaldo.balance;
 portfolio=sxBetSaldo.escrowedAmount;
-portfolioLabel='Em garantia nas apostas';
+portfolioLabel=tx('Em garantia nas apostas');
 }
 }
 if (versao!==testeConexaoVersao || conta!==BETTY_USER?.id || conexoes!==BETTY_CONNECTIONS) return;
 if (sxBetBalanceError) {
-status.textContent='Conexão confirmada. '+sxBetBalanceError;
+status.textContent=tx('Conexão confirmada. {erro}',{erro:sxBetBalanceError});
 return;
 }
-status.textContent='Conexão confirmada';
+status.textContent=tx('Conexão confirmada');
 status.className='connection-test-success';
 const money=value=>typeof value==='number' && Number.isFinite(value)
-? value.toLocaleString('pt-BR',{style:'currency',currency:'USD'}) : 'Não informado pela plataforma';
-for (const [label,value] of [['Saldo disponível',balance],[portfolioLabel,portfolio]]) {
+? value.toLocaleString(BettyI18n.locale,{style:'currency',currency:'USD'}) : tx('Não informado pela plataforma');
+for (const [label,value] of [[tx('Saldo disponível'),balance],[portfolioLabel,portfolio]]) {
 const term=document.createElement('dt'),detail=document.createElement('dd');
 term.textContent=label; detail.textContent=money(value);
 values.append(term,detail);
 }
 } catch(error) {
 if (versao!==testeConexaoVersao || conta!==BETTY_USER?.id || conexoes!==BETTY_CONNECTIONS) return;
-status.textContent=error.message || 'Não foi possível concluir o teste.';
+status.textContent=BettyI18n.tMsg(error.message) || tx('Não foi possível concluir o teste.');
 status.className='account-error';
 }
 }
@@ -1399,7 +1402,7 @@ else if (!event.shiftKey && document.activeElement===buttons.at(-1)) {event.prev
 }
 });
 async function desconectarKalshi() {
-if(!confirm("Desconectar a Kalshi desta conta?")) return;
+if(!confirm(tx("Desconectar a Kalshi desta conta?"))) return;
 const r=await fetch("/api/connections/kalshi",{method:"DELETE"}); const d=await r.json();
 if(r.ok){
 BETTY_CONNECTIONS=d.connections;
@@ -1491,20 +1494,20 @@ abaAtual = "aberto";
 document.querySelectorAll(".tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "aberto"));
 }
 if (view === "posicoes") {
-if (h1) h1.textContent = "Posições";
-if (sub) sub.textContent = "Todas as suas posições, ativas e fechadas";
+if (h1) h1.textContent = tx("Posições");
+if (sub) sub.textContent = tx("Todas as suas posições, ativas e fechadas");
 } else if (view === "estatisticas") {
-if (h1) h1.textContent = "Estatísticas";
-if (sub) sub.textContent = "Análise completa do seu desempenho (posições fechadas)";
+if (h1) h1.textContent = tx("Estatísticas");
+if (sub) sub.textContent = tx("Análise completa do seu desempenho (posições fechadas)");
 } else if (isCalendario) {
-if (h1) h1.textContent = "Calendário";
-if (sub) sub.textContent = "Seu resultado dia a dia, mês a mês";
+if (h1) h1.textContent = tx("Calendário");
+if (sub) sub.textContent = tx("Seu resultado dia a dia, mês a mês");
 } else if (view === "config") {
-if (h1) h1.textContent = "Configurações";
-if (sub) sub.textContent = "Contas, histórico e preferências de stake";
+if (h1) h1.textContent = tx("Configurações");
+if (sub) sub.textContent = tx("Contas, histórico e preferências de stake");
 } else {
-if (h1) h1.textContent = TITULOS_SECAO.visao[0];
-if (sub) sub.textContent = TITULOS_SECAO.visao[1];
+if (h1) h1.textContent = tx(TITULOS_SECAO.visao[0]);
+if (sub) sub.textContent = tx(TITULOS_SECAO.visao[1]);
 }
 atualizarSecaoNavegacao(view);
 // Permite que o navegador apresente a aba selecionada antes de executar os
@@ -1535,7 +1538,7 @@ function voltarOrdemPadrao() {
 const sel = document.getElementById("ordenar");
 if (!sel) return;
 if (sel.value !== "inicio-asc") {
-sel.innerHTML = `<option value="inicio-asc" selected>Data</option>`;
+sel.innerHTML = `<option value="inicio-asc" selected>${tx("Data")}</option>`;
 sortCol = null;
 aplicarFiltros();
 }
@@ -1573,7 +1576,7 @@ document.querySelectorAll(".tabs .tab").forEach(t => {
 t.classList.toggle("active", t.dataset.tab === aba);
 });
 const sel = document.getElementById("ordenar");
-if (sel) sel.innerHTML = `<option value="inicio-asc" selected>Data</option>`;
+if (sel) sel.innerHTML = `<option value="inicio-asc" selected>${tx("Data")}</option>`;
 if (!carregado[aba]) {
 carregarAba(aba);
 } else {
@@ -1587,7 +1590,7 @@ const duracao = 2 * 60 * 60 * 1000;
 // Não altera abertos/fechados, filtros, ledger ou dados usados pelo CSV.
 let base = filtrarExcluidos([...(abertos || []), ...(fechados || [])]);
 const termo = document.getElementById("filtroTitulo")?.value.toLowerCase().trim() || "";
-if (termo) base = base.filter(d => tituloExibicao(d).toLowerCase().includes(termo));
+if (termo) base = base.filter(d => BettyI18n.tituloContem(tituloExibicao(d), termo));
 base = filtrarPorPlataforma(base);
 base = filtrarPorEsporte(base);
 if (filtroDataDia) base = base.filter(d => apostaNoDia(d, filtroDataDia));
@@ -1863,16 +1866,16 @@ return confirmadas;
 }
 if (!r.ok) {
 const erro = new Error(r.status === 413
-? 'Uma aposta contém dados maiores que o limite de envio. O histórico foi preservado, mas a sincronização não foi concluída.'
-: 'Não foi possível salvar o histórico: HTTP ' + r.status);
+? tx('Uma aposta contém dados maiores que o limite de envio. O histórico foi preservado, mas a sincronização não foi concluída.')
+: tx('Não foi possível salvar o histórico: HTTP {status}', { status: r.status }));
 erro.httpStatus = r.status;
 throw erro;
 }
 const d = await r.json();
-if (!d?.ok || !Array.isArray(d.fechados)) throw new Error('Confirmação do histórico inválida');
+if (!d?.ok || !Array.isArray(d.fechados)) throw new Error(tx('Confirmação do histórico inválida'));
 if (titleVersion != null) {
 const chaves = new Set(d.fechados.map(chaveLedgerFechada));
-if (lote.linhas.some(row=>!chaves.has(chaveLedgerFechada(row)))) throw new Error('O servidor não confirmou todas as apostas enviadas');
+if (lote.linhas.some(row=>!chaves.has(chaveLedgerFechada(row)))) throw new Error(tx('O servidor não confirmou todas as apostas enviadas'));
 }
 return d.fechados;
 }
@@ -2196,7 +2199,7 @@ box.hidden = false;
 box.classList.toggle('compact', snapshotAoVivoConfirmado);
 box.classList.toggle('complete', resultado === 'ok');
 box.classList.toggle('warning', resultado === 'warning');
-document.getElementById('syncProgressTitle').textContent = resultado === 'ok' ? 'Dados confirmados' : resultado === 'warning' ? 'Atualização incompleta' : snapshotAoVivoConfirmado ? 'Atualizando seus dados' : 'Preparando seus dados';
+document.getElementById('syncProgressTitle').textContent = resultado === 'ok' ? tx('Dados confirmados') : resultado === 'warning' ? tx('Atualização incompleta') : snapshotAoVivoConfirmado ? tx('Atualizando seus dados') : tx('Preparando seus dados');
 document.getElementById('syncProgressDetail').textContent = detalhe;
 box.setAttribute('aria-label', detalhe);
 box.style?.setProperty('--sync-progress', `${resultado === 'ok' ? 100 : [8,32,62,88][Math.max(0,Math.min(3,etapa))]}%`);
@@ -2268,9 +2271,9 @@ atualizarSaldosFixos();
 function horaDadosSalvos() {
 if (!dadosSalvosEm) return '';
 const quando = new Date(dadosSalvosEm);
-const hora = quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+const hora = quando.toLocaleTimeString(BettyI18n.locale, { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 if (ymdBrasil(quando) === ymdBrasil(new Date())) return hora;
-return quando.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ', ' + hora;
+return quando.toLocaleDateString(BettyI18n.locale, { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ', ' + hora;
 }
 function atualizarSeloDadosSalvos(detalhe, resultado = '') {
 const selo = document.getElementById('seloDadosSalvos');
@@ -2281,17 +2284,17 @@ const falhou = resultado === 'warning';
 selo.hidden = false;
 selo.classList.toggle('aviso', falhou);
 document.getElementById('seloDadosSalvosTexto').textContent = falhou
-? (hora ? `Dados salvos de ${hora} · não foi possível atualizar` : 'Dados salvos · não foi possível atualizar')
-: (hora ? `Atualizando · dados de ${hora}` : 'Atualizando · dados salvos');
+? (hora ? tx('Dados salvos de {hora} · não foi possível atualizar', { hora }) : tx('Dados salvos · não foi possível atualizar'))
+: (hora ? tx('Atualizando · dados de {hora}', { hora }) : tx('Atualizando · dados salvos'));
 selo.title = falhou
-? 'Os números são os últimos salvos. Use Atualizar agora para tentar de novo.'
-: (detalhe || 'Os números são os últimos salvos e serão trocados pelos confirmados ao fim da atualização.');
+? tx('Os números são os últimos salvos. Use Atualizar agora para tentar de novo.')
+: (detalhe || tx('Os números são os últimos salvos e serão trocados pelos confirmados ao fim da atualização.'));
 }
 async function carregarAba(aba, opcoes = {}) {
 if (carregandoAba && !opcoes.forcar) return;
 const generation = ++refreshGeneration;
 let versaoSincronizacaoIndice = opcoes.versaoIndice ?? null;
-atualizarProgressoSync(generation, 0, 'Buscando posições nas casas conectadas…');
+atualizarProgressoSync(generation, 0, tx('Buscando posições nas casas conectadas…'));
 carregandoAba = true;
 // Indicador textual abaixo do "Online": avisa que uma atualização está
 // em andamento sem tocar nas caixas de estatísticas. Volta a mostrar
@@ -2299,7 +2302,7 @@ carregandoAba = true;
 // a atualização terminar (sucesso ou falha), via atualizarStatusOnline().
 mostrandoAtualizando = true;
 const statusAtualizadoEl = document.getElementById("statusAtualizado");
-if (statusAtualizadoEl) statusAtualizadoEl.textContent = "Atualizando...";
+if (statusAtualizadoEl) statusAtualizadoEl.textContent = tx("Atualizando...");
 for (const casa of CASAS_STAKE) {
 const connected = Boolean(BETTY_CONNECTIONS?.[casa]);
 registrarSyncCasa(casa, { connected, state: connected ? "syncing" : "disconnected", lastError: null });
@@ -2315,7 +2318,7 @@ else renderizarStats();
 const content = document.getElementById("content");
 const btn = document.getElementById("btnAtualizarTabela");
 if (!abertos.length && !fechados.length && content) {
-content.innerHTML = '<div class="loading">Carregando posições...</div>';
+content.innerHTML = '<div class="loading">' + tx('Carregando posições...') + '</div>';
 }
 if (btn) btn.classList.add("spinning");
 // Snapshot usado somente como fallback por plataforma. Nunca fazemos merge
@@ -2346,7 +2349,7 @@ const data = await cronometrar(NOMES_CASAS[casa], async () => {
 const response = await fetch("/api/tracked/" + casa + "/sync", { method: "POST", cache: "no-store" });
 const result = await response.json();
 if (!response.ok || !result.ok || !Array.isArray(result.open) || !Array.isArray(result.recent)) {
-throw new Error(result.error || "Resposta de sincronização inválida.");
+throw new Error(result.error || tx("Resposta de sincronização inválida."));
 }
 return result;
 });
@@ -2419,7 +2422,7 @@ if (podePoly && polyClosedResult.ok) polyClosedSnapshotCache = { at: Date.now(),
 if (podeKalshi && kalshiClosedResult.ok) kalshiClosedSnapshotCache = { at: Date.now(), data: kalshiClosedResult.value || [] };
 const resultadosNovasCasas = await novasCasasPromise;
 if (generation !== refreshGeneration) return;
-atualizarProgressoSync(generation, 1, 'Conferindo resultados e conciliando o histórico…');
+atualizarProgressoSync(generation, 1, tx('Conferindo resultados e conciliando o histórico…'));
 // Cada plataforma é atualizada de forma atômica. Se a API oscilar e devolver
 // menos posições sem que elas tenham sido fechadas, preservamos o snapshot anterior.
 let nextPolyOpen = (polyOpen || []).filter(d => !isPerdaResolvida(d));
@@ -2456,7 +2459,7 @@ console.warn('Reconciliação Polymarket ignorada:', e);
 }
 nextPolyClosed = normalizarDatasPolymarketPersistidas(nextPolyClosed);
 const candidatasFechadas = dedupePolymarket(nextPolyClosed).concat(nextKalshiClosed);
-atualizarProgressoSync(generation, 2, 'Salvando alterações e preparando o histórico…');
+atualizarProgressoSync(generation, 2, tx('Salvando alterações e preparando o histórico…'));
 // A fonte externa ainda pode ser lida integralmente para detectar mudanças,
 // mas o navegador consulta do SQLite somente assinaturas compactas. Assim não
 // reconstrói o histórico completo em memória a cada refresh.
@@ -2555,7 +2558,7 @@ resultadosNovasCasas.every(({ data }) => data && (!data.warning || data.closedCo
 carregado.aberto = polyOpenResult.ok || kalshiOpenResult.ok || recebeuNovaCasa || carregado.aberto;
 carregado.fechado = polyClosedResult.ok || kalshiClosedResult.ok || recebeuNovaCasa || carregado.fechado;
 salvarCacheLocal();
-atualizarProgressoSync(generation, 3, 'Atualizando as telas com os dados recebidos…');
+atualizarProgressoSync(generation, 3, tx('Atualizando as telas com os dados recebidos…'));
 // As telas só saem dos dados salvos quando o snapshot vivo e o índice foram
 // confirmados e a Polymarket e a Kalshi responderam. Se uma delas falhou, o
 // selo avisa e os saldos salvos continuam na tela até a próxima atualização.
@@ -2563,12 +2566,12 @@ if (exibindoDadosSalvos && snapshotAoVivoConfirmado && historicoFechadoIndexado 
 posAtualizarDados();
 atualizarStatusOnline(polyOk && kalshiOk && novasCasasOk);
 const syncCompleta = polyOk && kalshiOk && historicoFechadoIndexado && novasCasasOk;
-atualizarProgressoSync(generation, 3, syncCompleta ? 'Dados recebidos e histórico conferido.' : 'Algumas fontes não foram confirmadas. Os últimos dados disponíveis foram preservados.', syncCompleta ? 'ok' : 'warning');
+atualizarProgressoSync(generation, 3, syncCompleta ? tx('Dados recebidos e histórico conferido.') : tx('Algumas fontes não foram confirmadas. Os últimos dados disponíveis foram preservados.'), syncCompleta ? 'ok' : 'warning');
 } catch (err) {
 if (versaoSincronizacaoIndice != null) concluirSincronizacaoIndiceHistorico(versaoSincronizacaoIndice);
 if (generation !== refreshGeneration) return;
 console.error("Refresh Betty:", err);
-atualizarProgressoSync(generation, 0, 'Não foi possível concluir a atualização. Os dados já salvos foram preservados.', 'warning');
+atualizarProgressoSync(generation, 0, tx('Não foi possível concluir a atualização. Os dados já salvos foram preservados.'), 'warning');
 for (const casa of casasConectadas()) {
 registrarSyncCasa(casa, { ...casaSync[casa], connected: true, state: casaSync[casa].lastOk ? "stale" : "error", lastError: mensagemErroSync(err) });
 }
@@ -2587,10 +2590,10 @@ posAtualizarDados();
 } else if (content) {
 content.innerHTML = `
 <div class="error">
-Não foi possível carregar os dados.<br>
-<small>Falha de rede ou API bloqueada neste dispositivo.</small><br>
+${tx("Não foi possível carregar os dados.")}<br>
+<small>${tx("Falha de rede ou API bloqueada neste dispositivo.")}</small><br>
 <button type="button" data-on-click="recarregarAbaAtual()" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;">
-Tentar de novo
+${tx("Tentar de novo")}
 </button>
 </div>`;
 }
@@ -4076,8 +4079,8 @@ const opcoes = ordem.filter(categoria => categoriasPresentes.has(categoria))
 .concat([...categoriasPresentes].filter(categoria => !ordem.includes(categoria)).sort((a, b) => a.localeCompare(b, "pt-BR")));
 const assinatura = opcoes.join("\u001f");
 if (select.dataset.categorias !== assinatura) {
-select.innerHTML = `<option value="todos">Todos</option>` + opcoes.map(esporte =>
-`<option value="${escapeHtml(esporte)}">${escapeHtml(esporte)}</option>`
+select.innerHTML = `<option value="todos">${tx("Todos")}</option>` + opcoes.map(esporte =>
+`<option value="${escapeHtml(esporte)}">${escapeHtml(tx(esporte))}</option>`
 ).join("");
 select.dataset.categorias = assinatura;
 }
@@ -4100,7 +4103,7 @@ if (!select) continue;
 const disponiveis = CASAS_STAKE.filter(casa => casas.has(casa));
 const assinatura = disponiveis.join('|');
 if (select.dataset.casasComApostas !== assinatura) {
-const todas = id === 'profitCalendarHouse' ? 'Todas as casas' : 'Todas';
+const todas = id === 'profitCalendarHouse' ? tx('Todas as casas') : tx('Todas');
 select.innerHTML = '<option value="todas">' + todas + '</option>' +
 disponiveis.map(casa => '<option value="' + casa + '">' + escapeHtml(NOMES_CASAS[casa]) + '</option>').join('');
 select.dataset.casasComApostas = assinatura;
@@ -4155,10 +4158,10 @@ aplicarFiltros();
 function selecionarCasa(valor, ev) {
 if (ev) ev.stopPropagation();
 filtroCasaAtual = valor;
-const labels = { todas: "Todas", ...NOMES_CASAS };
+const labels = { todas: tx("Todas"), ...NOMES_CASAS };
 const labelEl = document.getElementById("casaValueLabel");
 if (labelEl) {
-labelEl.textContent = labels[valor] || "Todas";
+labelEl.textContent = labels[valor] || tx("Todas");
 labelEl.classList.remove(...CASAS_STAKE.map(casa => "casa-" + casa));
 if (CASAS_STAKE.includes(valor)) labelEl.classList.add("casa-" + valor);
 }
@@ -4310,7 +4313,7 @@ const statsEl = document.getElementById("stats");
 // permanecer visível. Já um esqueleto de carregamento ainda não representa
 // números financeiros, então o substituímos pelo estado de sincronização.
 if (!statsEl || (statsEl.innerHTML.trim() && !statsEl.querySelector(".kpi-vazio"))) return;
-statsEl.innerHTML = kpisVazios("Sincronizando o histórico…");
+statsEl.innerHTML = kpisVazios(tx("Sincronizando o histórico…"));
 }
 async function renderizarStats(opcoes = {}) {
 const pintar = opcoes.pintar ?? dashboardEstaVisivel();
@@ -4336,7 +4339,7 @@ const fechadosF = fechadoDb ? [] : apostasFechadasNoSite();
 if (!snapshotAoVivoConfirmado && !abertosF.length && !fechadoDb && !fechadosF.length) {
 const statsEl = document.getElementById("stats");
 if (pintar && statsEl && !statsEl.innerHTML.trim()) {
-statsEl.innerHTML = kpisVazios("Carregando…");
+statsEl.innerHTML = kpisVazios(tx("Carregando…"));
 }
 return;
 }
@@ -4369,7 +4372,7 @@ const pnlAnterior = periodoDb?.anterior ? Number(periodoDb.anterior.lucroD) || 0
 const porMercado = {};
 for (const d of abertosF) {
 const k = chaveMercado(d);
-if (!porMercado[k]) porMercado[k] = { stake: 0, titulo: tituloExibicao(d) || "—" };
+if (!porMercado[k]) porMercado[k] = { stake: 0, titulo: BettyI18n.tTitulo(tituloExibicao(d)) || "—" };
 porMercado[k].stake += getStake(d);
 }
 const concMercado = Object.values(porMercado).sort((a, b) => b.stake - a.stake)[0] || null;
@@ -4413,13 +4416,13 @@ if (!valEl) return;
 const box = document.getElementById("filtroDataBox");
 if (filtroDataDia) {
 const [yy, mm, dd] = filtroDataDia.split("-");
-valEl.textContent = `${dd}/${mm}/${yy}`;
+valEl.textContent = BettyI18n.dataCompleta(dd, mm, yy);
 valEl.classList.add("active");
-if (box) box.setAttribute("aria-label", `Filtrar por data: ${dd}/${mm}/${yy}`);
+if (box) box.setAttribute("aria-label", tx("Filtrar por data: {data}", { data: BettyI18n.dataCompleta(dd, mm, yy) }));
 } else {
-valEl.textContent = "Todas";
+valEl.textContent = tx("Todas");
 valEl.classList.remove("active");
-if (box) box.setAttribute("aria-label", "Filtrar por data: Todas");
+if (box) box.setAttribute("aria-label", tx("Filtrar por data: Todas"));
 }
 }
 function toggleDatePopup(ev) {
@@ -4518,19 +4521,19 @@ for (let d = 1; d <= 7 - resto; d++) cells += `<div class="day other">${d}</div>
 }
 popup.innerHTML = `
 <div class="date-popup-head">
-<span>${nomesMes[mes]} de ${ano}</span>
+<span>${tx("{mes} de {ano}", { mes: tx(nomesMes[mes]), ano })}</span>
 <div class="date-popup-nav">
 <button type="button" data-on-click="navegarMesCalendario(-1, event)">‹</button>
 <button type="button" data-on-click="navegarMesCalendario(1, event)">›</button>
 </div>
 </div>
 <div class="date-grid">
-<div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>
+${(BettyI18n.idioma === "en" ? ["S", "M", "T", "W", "T", "F", "S"] : ["D", "S", "T", "Q", "Q", "S", "S"]).map(dia => `<div class="dow">${dia}</div>`).join("")}
 ${cells}
 </div>
 <div class="date-popup-foot">
-<button type="button" class="limpar" data-on-click="limparFiltroData(event)">Limpar</button>
-<button type="button" data-on-click="selecionarDiaCalendario('${hojeYmd}', event)">Hoje</button>
+<button type="button" class="limpar" data-on-click="limparFiltroData(event)">${tx("Limpar")}</button>
+<button type="button" data-on-click="selecionarDiaCalendario('${hojeYmd}', event)">${tx("Hoje")}</button>
 </div>
 `;
 }
@@ -4590,6 +4593,9 @@ const params = new URLSearchParams({
 platform: filtroCasaAtual || "todas", category: filtroEsportePosicoesAtual || "todos", title: termo, day: filtroDataDia || "",
 sort: ordem.sort, dir: ordem.dir, page: String(pagina), pageSize: String(itensPorPagina())
 });
+// Em inglês, procura também as palavras que o índice guarda em português.
+const termoIndice = BettyI18n.termoNoIndice(termo);
+if (termoIndice) params.set('titleAlt', termoIndice);
 return params;
 }
 function consultarPaginaFechadas(params) {
@@ -4693,7 +4699,7 @@ let lista = [...getDadosAtuais()];
 if (abaAtual === "fechado") lista = lista.filter(apostaNoPeriodoFechadasConfigurado);
 const termo = document.getElementById("filtroTitulo").value.toLowerCase().trim();
 if (termo) {
-lista = lista.filter(d => tituloExibicao(d).toLowerCase().includes(termo));
+lista = lista.filter(d => BettyI18n.tituloContem(tituloExibicao(d), termo));
 }
 lista = filtrarPorPlataforma(lista);
 lista = filtrarPorEsporte(lista);
@@ -4855,8 +4861,8 @@ function montarThData() {
 const sortActive = sortCol === "data";
 const sortInd = sortActive ? (sortDir === "asc" ? "▲" : "▼") : "⇅";
 const sortCls = sortActive ? " sorted" : "";
-const tituloData = abaAtual === "fechado" ? "Data de fechamento" : "Data do evento";
-const ajudaData = abaAtual === "fechado" ? ' title="Data da venda ou resolução da aposta"' : ' title="Data e horário da partida ou evento"';
+const tituloData = abaAtual === "fechado" ? tx("Data de fechamento") : tx("Data do evento");
+const ajudaData = abaAtual === "fechado" ? ' title="' + tx("Data da venda ou resolução da aposta") + '"' : ' title="' + tx("Data e horário da partida ou evento") + '"';
 return `<th class="col-data sortable${sortCls}"${ajudaData} data-on-click="ordenarPorColuna('data')">${tituloData}<span class="sort-ind">${sortInd}</span></th>`;
 }
 function montarThead() {
@@ -4868,12 +4874,12 @@ return `<th class="${extraClass} sortable${sorted}" data-on-click="ordenarPorCol
 }
 return `<thead><tr>
 ${montarThData()}
-<th class="col-casa">Casa</th>
-${th("titulo", "Jogo", "col-jogo")}
-<th class="col-aposta">Aposta</th>
-${th("odd", "Odd", "col-mid")}
+<th class="col-casa">${tx("Casa")}</th>
+${th("titulo", tx("Jogo"), "col-jogo")}
+<th class="col-aposta">${tx("Aposta")}</th>
+${th("odd", tx("Odd"), "col-mid")}
 ${th("stake", "Stake ($)", "col-mid col-stake")}
-${abaAtual === "ao-vivo" ? '<th class="col-profit" title="Lucro líquido estimado se a aposta vencer">Profit</th>' : ""}
+${abaAtual === "ao-vivo" ? '<th class="col-profit" title="' + tx("Lucro líquido estimado se a aposta vencer") + '">Profit</th>' : ""}
 ${th("pnl", "PnL", "col-num")}
 </tr></thead>`;
 }
@@ -4908,10 +4914,10 @@ footer.style.display = "none";
 return;
 }
 footer.style.display = "flex";
-texto.innerHTML = `Mostrando ${startIdx + 1} a ${startIdx + sliceLen} de ${total} posições
+texto.innerHTML = `${tx("Mostrando {inicio} a {fim} de {total} posições", { inicio: startIdx + 1, fim: startIdx + sliceLen, total })}
 <span style="margin-left:10px;color:var(--muted);">·</span>
 <label style="margin-left:10px;display:inline-flex;align-items:center;gap:5px;">
-<span>Por página</span>
+<span>${tx("Por página")}</span>
 <select data-on-change="alterarItensPorPagina(this.value)" style="height:28px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);padding:0 6px;font-weight:650;">
 <option value="10" ${pageSize===10?'selected':''}>10</option>
 <option value="20" ${pageSize===20?'selected':''}>20</option>
@@ -4956,7 +4962,7 @@ if (carregandoAba && !snapshotAoVivoConfirmado) {
 content.innerHTML = `
 <table${classeTabelaAtual()}>
 ${montarThead()}
-<tbody><tr class="linha-vazia"><td colspan="${cols}"><div class="estado-vazio carregando"><span class="giro" aria-hidden="true"></span><span>Carregando posições…</span></div></td></tr></tbody>
+<tbody><tr class="linha-vazia"><td colspan="${cols}"><div class="estado-vazio carregando"><span class="giro" aria-hidden="true"></span><span>${tx("Carregando posições…")}</span></div></td></tr></tbody>
 </table>`;
 return;
 }
@@ -4965,22 +4971,22 @@ const comFiltro = Boolean(termoBusca || filtroDataDia || filtroCasaAtual !== "to
 let titulo, texto, acao = "";
 if (filtroDataDia) {
 const [yy, mm, dd] = filtroDataDia.split("-");
-titulo = "Nenhuma aposta em " + dd + "/" + mm + "/" + yy;
-texto = "Escolha outro dia ou veja o período inteiro.";
-acao = '<button type="button" class="btn" data-on-click="limparFiltroData()">Limpar data</button>';
+titulo = tx("Nenhuma aposta em {data}", { data: BettyI18n.dataCompleta(dd, mm, yy) });
+texto = tx("Escolha outro dia ou veja o período inteiro.");
+acao = '<button type="button" class="btn" data-on-click="limparFiltroData()">' + tx("Limpar data") + '</button>';
 } else if (comFiltro) {
-titulo = "Nada encontrado com estes filtros";
-texto = termoBusca ? "Nenhuma posição corresponde a \u201c" + escapeHtml(termoBusca) + "\u201d." : "Ajuste a casa ou o esporte.";
-acao = '<button type="button" class="btn" data-on-click="limparBuscaEFiltros()">Limpar filtros</button>';
+titulo = tx("Nada encontrado com estes filtros");
+texto = termoBusca ? tx("Nenhuma posição corresponde a \u201c{termo}\u201d.", { termo: escapeHtml(termoBusca) }) : tx("Ajuste a casa ou o esporte.");
+acao = '<button type="button" class="btn" data-on-click="limparBuscaEFiltros()">' + tx("Limpar filtros") + '</button>';
 } else if (abaAtual === "fechado") {
-titulo = "Nenhuma aposta fechada ainda";
-texto = "As apostas aparecem aqui quando são vendidas ou resolvidas.";
+titulo = tx("Nenhuma aposta fechada ainda");
+texto = tx("As apostas aparecem aqui quando são vendidas ou resolvidas.");
 } else if (abaAtual === "ao-vivo") {
-titulo = "Nenhum jogo ao vivo agora";
-texto = "As posições em jogos que já começaram aparecem aqui.";
+titulo = tx("Nenhum jogo ao vivo agora");
+texto = tx("As posições em jogos que já começaram aparecem aqui.");
 } else {
-titulo = "Nenhuma posição em aberto";
-texto = "Suas apostas em aberto nas casas conectadas aparecem aqui.";
+titulo = tx("Nenhuma posição em aberto");
+texto = tx("Suas apostas em aberto nas casas conectadas aparecem aqui.");
 }
 content.innerHTML = `
 <table${classeTabelaAtual()}>
@@ -5016,7 +5022,7 @@ const esporteLabel = classificarAposta(d);
 const dtInicio = dataPosicaoTabela(d, isAberto || isAoVivo);
 const inicioJogo = abaAtual === "fechado" && plat === "predict" && dataInicioAposta(d);
 if (dtInicio || inicioJogo) {
-renderizarTabela.formatoData ||= new Intl.DateTimeFormat("pt-BR", {
+renderizarTabela.formatoData ||= new Intl.DateTimeFormat(BettyI18n.locale, {
 day: "2-digit",
 month: "2-digit",
 year: "numeric",
@@ -5026,18 +5032,19 @@ timeZone: "America/Sao_Paulo"
 });
 }
 const dataCol = dtInicio ? renderizarTabela.formatoData.format(dtInicio) : "—";
-const tituloPosicao = tituloExibicao(d) || '—';
-const colunasPosicao = BettyMarketTitles.positionColumns(tituloPosicao,d.outcome,d);
-const descricaoJogo = inicioJogo ? " · Início " + renderizarTabela.formatoData.format(inicioJogo) : "";
+const tituloOriginal = tituloExibicao(d) || '—';
+const tituloPosicao = BettyI18n.tTitulo(tituloOriginal);
+const colunasPosicao = BettyI18n.tColunas(BettyMarketTitles.positionColumns(tituloOriginal,d.outcome,d));
+const descricaoJogo = inicioJogo ? " · " + tx("Início {data}", { data: renderizarTabela.formatoData.format(inicioJogo) }) : "";
 return `${grupo}
 <tr>
-<td class="col-data" data-label="${abaAtual === 'fechado' ? 'Data de fechamento' : 'Data do evento'}">${dataCol}</td>
-<td class="col-casa" data-label="Casa"><img class="casa-logo" src="/assets/platforms/${plat}.png" alt="${escapeHtml(casaLabel)}" title="${escapeHtml(casaLabel)}"></td>
-<td class="title-cell col-jogo" data-label="Jogo"><a href="${link}" target="_blank" rel="noopener" title="${escapeHtml(esporteLabel + ' — ' + tituloPosicao + descricaoJogo)}" aria-label="${escapeHtml(esporteLabel + ': ' + colunasPosicao.game + descricaoJogo)}">${iconeCategoria(esporteLabel)}${escapeHtml(colunasPosicao.game)}</a></td>
-<td class="title-cell col-aposta" data-label="Aposta"><a href="${link}" target="_blank" rel="noopener" title="${escapeHtml(tituloPosicao)}">${escapeHtml(colunasPosicao.bet)}</a></td>
-<td class="col-mid mono" data-label="Odd"${plat === "predict" && d.avgPrice > 0 ? ` title="Preço médio de entrada: ${(100 * d.avgPrice).toFixed(1).replace(".", ",")}¢ por cota"` : ""}>${odd}</td>
+<td class="col-data" data-label="${abaAtual === 'fechado' ? tx('Data de fechamento') : tx('Data do evento')}">${dataCol}</td>
+<td class="col-casa" data-label="${tx('Casa')}"><img class="casa-logo" src="/assets/platforms/${plat}.png" alt="${escapeHtml(casaLabel)}" title="${escapeHtml(casaLabel)}"></td>
+<td class="title-cell col-jogo" data-label="${tx('Jogo')}"><a href="${link}" target="_blank" rel="noopener" title="${escapeHtml(tx(esporteLabel) + ' — ' + tituloPosicao + descricaoJogo)}" aria-label="${escapeHtml(tx(esporteLabel) + ': ' + colunasPosicao.game + descricaoJogo)}">${iconeCategoria(esporteLabel)}${escapeHtml(colunasPosicao.game)}</a></td>
+<td class="title-cell col-aposta" data-label="${tx('Aposta')}"><a href="${link}" target="_blank" rel="noopener" title="${escapeHtml(tituloPosicao)}">${escapeHtml(colunasPosicao.bet)}</a></td>
+<td class="col-mid mono" data-label="${tx('Odd')}"${plat === "predict" && d.avgPrice > 0 ? ` title="${tx("Preço médio de entrada: {preco}¢ por cota", { preco: (100 * d.avgPrice).toFixed(1).replace(".", BettyI18n.idioma === "en" ? "." : ",") })}"` : ""}>${odd}</td>
 <td class="col-mid col-stake mono" data-label="Stake">$${stake.toFixed(2)}</td>
-${isAoVivo ? `<td class="col-profit live-profit-cell mono ${lucroClass}" data-label="Profit" title="Lucro líquido estimado se a aposta vencer">${lucroLabel}</td>` : ""}
+${isAoVivo ? `<td class="col-profit live-profit-cell mono ${lucroClass}" data-label="Profit" title="${tx("Lucro líquido estimado se a aposta vencer")}">${lucroLabel}</td>` : ""}
 <td class="col-num pnl-cell mono ${pnlClass}" data-label="PnL">${(isAberto || isAoVivo) && d._platform === "sxbet" && d.cashPnl == null ? "—" : `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`}</td>
 </tr>
 `;
@@ -5204,7 +5211,7 @@ patrimonio: "Evolução do PnL Acumulado",
 pnldia: "PnL por Dia",
 pnlmes: "PnL por Mês",
 };
-if (titleEl) titleEl.textContent = titles[tipo] || "Gráfico";
+if (titleEl) titleEl.textContent = tx(titles[tipo] || "Gráfico");
 // Período só no PnL acumulado
 const per = document.getElementById("chartPeriodButtons");
 // Mantém o espaço reservado para que o cartão não mude de altura ao trocar
@@ -5225,7 +5232,7 @@ desenharGrafico();
 }
 function alterarCasaGrafico(casa) {
 casaGraficoAtual = CASAS_STAKE.includes(casa) ? casa : "todas";
-const labels = { todas: "Todas", ...NOMES_CASAS };
+const labels = { todas: tx("Todas"), ...NOMES_CASAS };
 const menu = document.getElementById("graficoCasaMenu");
 const trigger = document.getElementById("graficoCasaTrigger");
 const valor = document.getElementById("graficoCasaValor");
@@ -5295,7 +5302,7 @@ if (!pintar) dashboardVisualPendente = true;
 if (!dadosFinanceirosConfirmados()) {
 if (pintar) {
 const area = document.getElementById("chartArea");
-if (area && !area.querySelector("svg")) area.innerHTML = '<div class="chart-empty">Sincronizando histórico...</div>';
+if (area && !area.querySelector("svg")) area.innerHTML = '<div class="chart-empty">' + tx("Sincronizando histórico...") + '</div>';
 }
 return;
 }
@@ -5317,7 +5324,7 @@ function renderizarGraficoComSerie(opcoes = {}) {
 const pintar = opcoes.pintar ?? dashboardEstaVisivel();
 if (!pintar) { dashboardVisualPendente = true; return; }
 const notice=document.getElementById('chartDateNotice');
-if(notice){const missing=pnlHistoricoDb?.missingDates || 0;notice.hidden=!missing;notice.textContent=missing ? `${missing} apostas ainda sem data de realização confirmada. Seus resultados não estão nesta curva; o total pode diferir até recuperar as datas.` : '';}
+if(notice){const missing=pnlHistoricoDb?.missingDates || 0;notice.hidden=!missing;notice.textContent=missing ? tx("{missing} apostas ainda sem data de realização confirmada. Seus resultados não estão nesta curva; o total pode diferir até recuperar as datas.", { missing }) : '';}
 if (tipoGraficoAtual === "pnldia") desenharGraficoPnlDia();
 else if (tipoGraficoAtual === "pnlmes") desenharGraficoPnlMes();
 else desenharGraficoPatrimonio();
@@ -5504,8 +5511,8 @@ const aviso = document.getElementById("avisoDownload");
 if (!aviso) return;
 const ok = Boolean(info?.ok);
 aviso.textContent = ok
-? `CSV salvo em ${info.pasta || "Downloads"}: ${info.nome || ""}`
-: "Não foi possível salvar o CSV. Tente exportar novamente.";
+? tx("CSV salvo em {pasta}: {nome}", { pasta: info.pasta || "Downloads", nome: info.nome || "" })
+: tx("Não foi possível salvar o CSV. Tente exportar novamente.");
 aviso.classList.toggle("erro", !ok);
 aviso.hidden = false;
 clearTimeout(temporizadorAvisoDownload);
@@ -5514,10 +5521,10 @@ temporizadorAvisoDownload = setTimeout(() => { aviso.hidden = true; }, 8000);
 async function baixarCSVPosicoes() {
 const botao = document.querySelector(".csv-export-confirm");
 if (botao?.disabled) return;
-const rotuloOriginal = botao?.getAttribute("aria-label") || "Baixar CSV";
+const rotuloOriginal = botao?.getAttribute("aria-label") || tx("Baixar CSV");
 if (botao) {
 botao.disabled = true;
-botao.setAttribute("aria-label", "Preparando download do CSV...");
+botao.setAttribute("aria-label", tx("Preparando download do CSV..."));
 }
 try {
 // O escopo selecionado é explícito; "todo o histórico" ignora filtros de período.
@@ -5527,7 +5534,7 @@ try {
 // de uma coleção durante a transição de aberta para fechada.
 const scope = document.getElementById('escopoCSV')?.value || 'all';
 const exportedAt = new Date().toISOString();
-const scopeLabel = { all: 'Todo o histórico carregado; inclui manuais e antigas', periods: 'Períodos por casa; abertas sem filtro de período', stats: 'Somente fechadas; mesmos filtros das estatísticas' }[scope];
+const scopeLabel = tx({ all: 'Todo o histórico carregado; inclui manuais e antigas', periods: 'Períodos por casa; abertas sem filtro de período', stats: 'Somente fechadas; mesmos filtros das estatísticas' }[scope]);
 const filters = scope === 'all' ? {} : {
 periodosPorCasa: PERIODO_FECHADAS_CONFIGURADO,
 ...(scope === 'stats' ? { casa: filtroCasaEstat, categoria: filtroEsporteEstat, oddsRange: filtroOddsEstat, inicio: dataInicioEstat, fim: dataFimEstat } : {})
@@ -5555,7 +5562,7 @@ _exportIndex: i
 }));
 const rows = apostasAbertas.concat(apostasFechadas);
 if (!rows.length) {
-alert("Ainda não há apostas carregadas para exportar.");
+alert(tx("Ainda não há apostas carregadas para exportar."));
 return;
 }
 rows.sort((a,b) => {
@@ -5569,7 +5576,7 @@ const header = [
 "Data ISO UTC","Exportado em UTC","Escopo","Filtros","Unidade do registro","Fonte do P&L",
 "Taxa conhecida","Lucro não realizado","Última sincronização da casa UTC","Histórico lido em UTC"
 ];
-const lines = [header.map(csvEsc).join(";")];
+const lines = [header.map(h => csvEsc(tx(h))).join(";")];
 rows.forEach((d, index) => {
 const stake = Number(getStake(d)) || 0;
 const pnl = Number(d.realizedPnl ?? d.cashPnl ?? 0) || 0;
@@ -5580,20 +5587,20 @@ d.conditionId || d.slug ||
 ((d._platform || "polymarket") + "-" + d._exportIndex + "-" + index);
 lines.push([
 tradeId,
-d._statusExport || "",
+tx(d._statusExport || ""),
 formatarDataCSV(timestampExportacaoPosicao(d)),
 NOMES_CASAS[casaDaAposta(d)],
-classificarAposta(d),
-tituloExibicaoCSV(d),
-d.outcome || "",
+tx(classificarAposta(d)),
+BettyI18n.tTitulo(tituloExibicaoCSV(d)),
+BettyI18n.tTitulo(d.outcome || ""),
 Number(getOddNum(d) || 0).toFixed(4),
 stake.toFixed(4),
 d._statusExport === 'Fechada' ? pnl.toFixed(4) : '',
 d._statusExport === 'Fechada' ? roi.toFixed(4) + '%' : '',
 (d._platform === 'predict' || d._platform === 'sxbet' ? d.conditionId : d.slug || d.conditionId) || '',
 BettyAudit.isoDate(timestampExportacaoPosicao(d)), exportedAt, scopeLabel, JSON.stringify(filters),
-'Posição por mercado/lado; pode agregar operações',
-d._statusExport === 'Aberta' ? 'Não realizado' : d._pnlFluxo ? 'Polymarket activity completo' : ({ kalshi: 'Kalshi settlements', predict: 'Predict.fun negociações e resgates', sxbet: 'SX Bet posições liquidadas' }[casaDaAposta(d)] || 'Polymarket positions'),
+tx('Posição por mercado/lado; pode agregar operações'),
+tx(d._statusExport === 'Aberta' ? 'Não realizado' : d._pnlFluxo ? 'Polymarket activity completo' : ({ kalshi: 'Kalshi settlements', predict: 'Predict.fun negociações e resgates', sxbet: 'SX Bet posições liquidadas' }[casaDaAposta(d)] || 'Polymarket positions')),
 d._feeCost == null ? '' : String(d._feeCost),
 d._statusExport === 'Aberta' && d.cashPnl != null ? String(d.cashPnl) : '',
 syncExportAt[casaDaAposta(d)] || '', dadosFechados.exportedAt || ''
@@ -5622,7 +5629,7 @@ a.remove();
 setTimeout(() => URL.revokeObjectURL(url), 30000);
 } catch (erro) {
 console.error("Falha ao exportar apostas em CSV:", erro);
-alert("Não foi possível gerar o CSV. Tente atualizar os dados e exportar novamente.");
+alert(tx("Não foi possível gerar o CSV. Tente atualizar os dados e exportar novamente."));
 } finally {
 if (botao) {
 botao.disabled = false;
@@ -5777,7 +5784,7 @@ const casa = document.getElementById("statsHouseFilter");
 if (casa) casa.value = filtroCasaEstat || "todas";
 const odds = document.getElementById("statsOddsFilter");
 if (odds) {
-if (odds.options.length === 1) odds.innerHTML += BettyOddsRanges.ranges.map(r => `<option value="${r.id}">${r.label}</option>`).join('');
+if (odds.options.length === 1) odds.innerHTML += BettyOddsRanges.ranges.map(r => `<option value="${r.id}">${escapeHtml(BettyI18n.tRotulo(r.label))}</option>`).join('');
 odds.value = filtroOddsEstat;
 }
 }
@@ -5785,15 +5792,15 @@ function renderFiltrosAtivosEstat() {
 const el = document.getElementById("statsActiveFilters");
 if (!el) return;
 const chips = [];
-const rotuloAtalho = { hoje: "Hoje", "7": "7 dias", "30": "30 dias", mes: "Mês atual", mesant: "Mês anterior", ano: "Ano atual", tudo: "Tudo", custom: "Período customizado" };
-if (atalhoPeriodoEstat && atalhoPeriodoEstat !== "tudo") chips.push({ k: "Período", v: rotuloAtalho[atalhoPeriodoEstat] || (dataInicioEstat + " → " + dataFimEstat), limpar: () => aplicarAtalhoPeriodoEstat("tudo") });
-else if (dataInicioEstat || dataFimEstat) chips.push({ k: "Período", v: (dataInicioEstat || "…") + " → " + (dataFimEstat || "…"), limpar: () => aplicarAtalhoPeriodoEstat("tudo") });
-if (filtroCasaEstat && filtroCasaEstat !== "todas") chips.push({ k: "Casa", v: NOMES_CASAS[filtroCasaEstat], limpar: () => alterarFiltroCasaEstat("todas") });
-if (filtroEsporteEstat && filtroEsporteEstat !== "todos") chips.push({ k: "Categoria", v: filtroEsporteEstat, limpar: () => alterarFiltroEsporte("todos") });
-if (BettyOddsRanges.get(filtroOddsEstat)) chips.push({ k: "Odds", v: BettyOddsRanges.get(filtroOddsEstat).label, limpar: () => alterarFiltroOddsEstat("todas") });
+const rotuloAtalho = { hoje: tx("Hoje"), "7": tx("7 dias"), "30": tx("30 dias"), mes: tx("Mês atual"), mesant: tx("Mês anterior"), ano: tx("Ano atual"), tudo: tx("Tudo"), custom: tx("Período customizado") };
+if (atalhoPeriodoEstat && atalhoPeriodoEstat !== "tudo") chips.push({ k: tx("Período"), v: rotuloAtalho[atalhoPeriodoEstat] || (BettyI18n.dataYmd(dataInicioEstat) + " → " + BettyI18n.dataYmd(dataFimEstat)), limpar: () => aplicarAtalhoPeriodoEstat("tudo") });
+else if (dataInicioEstat || dataFimEstat) chips.push({ k: tx("Período"), v: (BettyI18n.dataYmd(dataInicioEstat) || "…") + " → " + (BettyI18n.dataYmd(dataFimEstat) || "…"), limpar: () => aplicarAtalhoPeriodoEstat("tudo") });
+if (filtroCasaEstat && filtroCasaEstat !== "todas") chips.push({ k: tx("Casa"), v: NOMES_CASAS[filtroCasaEstat], limpar: () => alterarFiltroCasaEstat("todas") });
+if (filtroEsporteEstat && filtroEsporteEstat !== "todos") chips.push({ k: tx("Categoria"), v: tx(filtroEsporteEstat), limpar: () => alterarFiltroEsporte("todos") });
+if (BettyOddsRanges.get(filtroOddsEstat)) chips.push({ k: "Odds", v: BettyI18n.tRotulo(BettyOddsRanges.get(filtroOddsEstat).label), limpar: () => alterarFiltroOddsEstat("todas") });
 if (!chips.length) { el.classList.remove("show"); el.innerHTML = ""; return; }
 el.classList.add("show");
-el.innerHTML = `<span>Filtros:</span>` + chips.map(c => `<span class="filter-chip">${escapeHtml(c.k)}: ${escapeHtml(c.v)}<button type="button" aria-label="Remover ${escapeHtml(c.k)}">×</button></span>`).join("");
+el.innerHTML = `<span>${tx("Filtros:")}</span>` + chips.map(c => `<span class="filter-chip">${escapeHtml(c.k)}: ${escapeHtml(c.v)}<button type="button" aria-label="${tx("Remover {filtro}", { filtro: escapeHtml(c.k) })}">×</button></span>`).join("");
 el.querySelectorAll("button").forEach((btn, i) => { btn.onclick = chips[i].limpar; });
 }
 function sincronizarPeriodoEstatisticas() {
@@ -5810,7 +5817,7 @@ const inicio = document.getElementById("statsDateStart");
 const fim = document.getElementById("statsDateEnd");
 if (inicio) { inicio.value = dataInicioEstat; inicio.max = dataFimEstat || ""; }
 if (fim) { fim.value = dataFimEstat; fim.min = dataInicioEstat || ""; }
-const texto = data => data ? data.split("-").reverse().join("/") : "dd/mm/aaaa";
+const texto = data => data ? BettyI18n.dataYmd(data) : tx("dd/mm/aaaa");
 for (const [campo, data] of [["Start", dataInicioEstat], ["End", dataFimEstat]]) {
 const valor = document.getElementById(`statsDate${campo}Value`);
 const botao = document.getElementById(`statsDate${campo}Button`);
@@ -5895,7 +5902,8 @@ celulas += `<div class="${classe}" data-on-click="selecionarDiaPeriodoEstat('${y
 }
 const resto = (primeiroDia + diasNoMes) % 7;
 if (resto) for (let dia = 1; dia <= 7 - resto; dia++) celulas += `<div class="day other">${dia}</div>`;
-popup.innerHTML = `<div class="date-popup-head"><span>${nomesMes[mes]} de ${ano}</span><div class="date-popup-nav"><button type="button" data-on-click="navegarMesCalendarioPeriodoEstat(-1,event)">‹</button><button type="button" data-on-click="navegarMesCalendarioPeriodoEstat(1,event)">›</button></div></div><div class="date-grid"><div class="dow">D</div><div class="dow">S</div><div class="dow">T</div><div class="dow">Q</div><div class="dow">Q</div><div class="dow">S</div><div class="dow">S</div>${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" data-on-click="limparCampoPeriodoEstat(event)">Limpar</button><button type="button" data-on-click="selecionarDiaPeriodoEstat('${hoje}',event)">Hoje</button></div>`;
+const dows = tx("D S T Q Q S S").split(" ");
+popup.innerHTML = `<div class="date-popup-head"><span>${tx("{mes} de {ano}", { mes: tx(nomesMes[mes]), ano })}</span><div class="date-popup-nav"><button type="button" data-on-click="navegarMesCalendarioPeriodoEstat(-1,event)">‹</button><button type="button" data-on-click="navegarMesCalendarioPeriodoEstat(1,event)">›</button></div></div><div class="date-grid">${dows.map(d => `<div class="dow">${d}</div>`).join("")}${celulas}</div><div class="date-popup-foot"><button type="button" class="limpar" data-on-click="limparCampoPeriodoEstat(event)">${tx("Limpar")}</button><button type="button" data-on-click="selecionarDiaPeriodoEstat('${hoje}',event)">${tx("Hoje")}</button></div>`;
 }
 function selecionarDiaPeriodoEstat(ymd, ev) {
 if (ev) ev.stopPropagation();
@@ -6145,7 +6153,7 @@ const fromDb = resumoEstatDbAtual()?.categorias;
 const categorias = Array.isArray(fromDb) && fromDb.length ? fromDb : [...new Set(dadosEstat().map(classificarAposta))];
 const ordered = ORDEM_CATEGORIA.filter(x => categorias.includes(x)).concat(categorias.filter(c => !ORDEM_CATEGORIA.includes(c)));
 if (filtroEsporteEstat !== "todos" && !ordered.includes(filtroEsporteEstat)) ordered.push(filtroEsporteEstat);
-el.innerHTML = '<option value="todos">Todas</option>' + ordered.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
+el.innerHTML = '<option value="todos">' + tx("Todas") + '</option>' + ordered.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(tx(e))}</option>`).join("");
 el.value = ordered.includes(filtroEsporteEstat) ? filtroEsporteEstat : "todos";
 }
 function alterarFiltroEsporte(valor) {
@@ -6350,10 +6358,10 @@ statsEl.innerHTML = [
 [ICONS.db, "Volume de Apostas"],
 [ICONS.target, "Taxa de Acerto"],
 [ICONS.trendUp, "Odd Média"]
-].map(([icon,label]) => `<div class="stat-card"><div class="stat-icon blue">${icon}</div><div class="stat-body"><div class="label">${label}</div><div class="value">—</div><div class="sub">Sincronizando histórico...</div></div></div>`).join("");
+].map(([icon,label]) => `<div class="stat-card"><div class="stat-icon blue">${icon}</div><div class="stat-body"><div class="label">${tx(label)}</div><div class="value">—</div><div class="sub">${tx("Sincronizando histórico...")}</div></div></div>`).join("");
 }
 const subContent = document.getElementById("statsSubContent");
-if (subAbaEstat === "site" && subContent && !subContent.hasChildNodes()) subContent.innerHTML = renderPorSite(null, "Aguardando histórico");
+if (subAbaEstat === "site" && subContent && !subContent.hasChildNodes()) subContent.innerHTML = renderPorSite(null, tx("Aguardando histórico"));
 return;
 }
 const versaoHistorico = versaoLeituraHistorico();
@@ -6370,7 +6378,7 @@ if (extra) extra.innerHTML = "";
 const subContent = document.getElementById("statsSubContent");
 if (subContent) {
 if (subAbaEstat === "site") subContent.innerHTML = renderPorSite();
-else subContent.textContent = "Histórico indisponível";
+else subContent.textContent = tx("Histórico indisponível");
 }
 return;
 }
@@ -6384,7 +6392,7 @@ statsEl.innerHTML = `
 <div class="stat-card">
 <div class="stat-icon ${g.lucro >= 0 ? 'green' : 'red'}">${ICONS.trendUp}</div>
 <div class="stat-body">
-<div class="label">Lucro Total</div>
+<div class="label">${tx("Lucro Total")}</div>
 <div class="value ${g.lucro >= 0 ? 'positive' : 'negative'}">${fmtEstat(g.lucro, true)}</div>
 </div>
 </div>
@@ -6398,23 +6406,23 @@ statsEl.innerHTML = `
 <div class="stat-card">
 <div class="stat-icon blue">${ICONS.db}</div>
 <div class="stat-body">
-<div class="label">Volume de Apostas</div>
+<div class="label">${tx("Volume de Apostas")}</div>
 <div class="value">${fmtEstat(g.volume, false)}</div>
-<div class="sub">${g.total} apostas</div>
+<div class="sub">${tx(g.total === 1 ? "{n} aposta" : "{n} apostas", { n: g.total })}</div>
 </div>
 </div>
 <div class="stat-card stat-card-centered-sub">
 <div class="stat-icon purple">${ICONS.target}</div>
 <div class="stat-body">
-<div class="label">Taxa de Acerto</div>
+<div class="label">${tx("Taxa de Acerto")}</div>
 <div class="value">${g.taxaAcerto.toFixed(1)}%</div>
-<div class="sub">${g.wins} acertadas · ${g.losses || 0} perdas</div>
+<div class="sub">${tx("{wins} acertadas · {losses} perdas", { wins: g.wins, losses: g.losses || 0 })}</div>
 </div>
 </div>
 <div class="stat-card">
 <div class="stat-icon info">${ICONS.trendUp}</div>
 <div class="stat-body">
-<div class="label">Odd Média</div>
+<div class="label">${tx("Odd Média")}</div>
 <div class="value">${g.oddMedia > 0 ? g.oddMedia.toFixed(2) : '—'}</div>
 </div>
 </div>
@@ -6434,12 +6442,12 @@ const av = avancadas || {};
 const median = unidadeEstat === "stake" ? (av.medianPnlStake ?? av.medianPnl) : av.medianPnl;
 const tom = valor => Number(valor) > 0 ? "positive" : Number(valor) < 0 ? "negative" : "";
 const items = [
-["Expectativa / aposta", fmtEstat(g.avgPnl, true), tom(g.avgPnl)],
-["Mediana / aposta", fmtEstat(median || 0, true), tom(median)],
-["Ganho vs perda", `<span class="positive">${fmtEstat(g.avgWin, true)}</span> / <span class="negative">${fmtEstat(g.avgLoss, true)}</span>`, ""],
-["Profit factor", fmtProfitFactor(g.profitFactor), Number(g.profitFactor) > 1 ? "positive" : Number(g.profitFactor) < 1 ? "negative" : ""],
-["Sequências", `${av.maxWinStreak || 0} W · ${av.maxLossStreak || 0} L`, ""],
-["Drawdown máx. diário", fmtEstat(av.maxDrawdown || 0, true), tom(av.maxDrawdown)]
+[tx("Expectativa / aposta"), fmtEstat(g.avgPnl, true), tom(g.avgPnl)],
+[tx("Mediana / aposta"), fmtEstat(median || 0, true), tom(median)],
+[tx("Ganho vs perda"), `<span class="positive">${fmtEstat(g.avgWin, true)}</span> / <span class="negative">${fmtEstat(g.avgLoss, true)}</span>`, ""],
+[tx("Profit factor"), fmtProfitFactor(g.profitFactor), Number(g.profitFactor) > 1 ? "positive" : Number(g.profitFactor) < 1 ? "negative" : ""],
+[tx("Sequências"), `${av.maxWinStreak || 0} W · ${av.maxLossStreak || 0} L`, ""],
+[tx("Drawdown máx. diário"), fmtEstat(av.maxDrawdown || 0, true), tom(av.maxDrawdown)]
 ];
 el.innerHTML = items.map(([lbl, val, classe]) => `<div class="metric-mini"><div class="lbl">${lbl}</div><div class="val ${classe}">${val}</div></div>`).join("");
 }
@@ -6532,14 +6540,14 @@ return `<tr><td>${escapeHtml(r.d)}</td><td style="color:${valor >= 0 ? 'var(--po
 }).join("");
 return `<div class="stat-grid-2 pnl-period-grid" style="margin-top:14px;">
 <div class="card" style="padding:20px;">
-<div class="stat-card-title">PnL por semana</div>
-<div class="stat-card-sub">Últimas semanas do período filtrado</div>
-<table class="pnl-period-table"><thead><tr><th>Semana ISO</th><th>PnL</th></tr></thead><tbody>${linhas(weeks) || '<tr><td colspan="2" style="color:var(--muted)">Sem dados</td></tr>'}</tbody></table>
+<div class="stat-card-title">${tx("PnL por semana")}</div>
+<div class="stat-card-sub">${tx("Últimas semanas do período filtrado")}</div>
+<table class="pnl-period-table"><thead><tr><th>${tx("Semana ISO")}</th><th>PnL</th></tr></thead><tbody>${linhas(weeks) || '<tr><td colspan="2" style="color:var(--muted)">' + tx("Sem dados") + '</td></tr>'}</tbody></table>
 </div>
 <div class="card" style="padding:20px;">
-<div class="stat-card-title">PnL por mês</div>
-<div class="stat-card-sub">Últimos meses do período filtrado</div>
-<table class="pnl-period-table"><thead><tr><th>Mês</th><th>PnL</th></tr></thead><tbody>${linhas(months) || '<tr><td colspan="2" style="color:var(--muted)">Sem dados</td></tr>'}</tbody></table>
+<div class="stat-card-title">${tx("PnL por mês")}</div>
+<div class="stat-card-sub">${tx("Últimos meses do período filtrado")}</div>
+<table class="pnl-period-table"><thead><tr><th>${tx("Mês")}</th><th>PnL</th></tr></thead><tbody>${linhas(months) || '<tr><td colspan="2" style="color:var(--muted)">' + tx("Sem dados") + '</td></tr>'}</tbody></table>
 </div>
 </div>`;
 }
@@ -6557,10 +6565,10 @@ const grupos = casas.filter(casa => BETTY_CONNECTIONS?.[casa] &&
 casa, label: NOMES_CASAS[casa], row: resultados.get(casa)
 })).sort((a, b) => (b.row?.total ?? 0) - (a.row?.total ?? 0));
 const g = resumoDb ? metricasResumoDb(resumoDb.total) : null;
-const status = casa => estadoSiteSemResultados(casa, estadoPendente);
+const status = casa => tx(estadoSiteSemResultados(casa, estadoPendente));
 const vazio = resumoDb
-? (filtroEsporteEstat === "todos" ? "Sem posições fechadas no recorte" : "Sem posições fechadas em " + filtroEsporteEstat)
-: estadoPendente;
+? (filtroEsporteEstat === "todos" ? tx("Sem posições fechadas no recorte") : tx("Sem posições fechadas em {categoria}", { categoria: tx(filtroEsporteEstat) }))
+: tx(estadoPendente);
 const linhas = grupos.map(({ casa, label, row }) => `
 <tr>
 <td><span class="site-cell"><img class="casa-logo" src="/assets/platforms/${casa}.png" alt="">${escapeHtml(label)}</span></td>
@@ -6580,18 +6588,18 @@ perda: unidadeEstat === "stake" ? row.perdaStake : row.perdaBruta
 return `
 <div class="stat-grid-2 site-performance-grid">
 <div class="card" style="padding:20px;">
-<div class="stat-card-title">Desempenho por Site</div>
+<div class="stat-card-title">${tx("Desempenho por Site")}</div>
 <div class="stat-card-sub site-category-filter">
-<span>Posições fechadas${filtroEsporteEstat === "todos" ? "" : " · " + escapeHtml(filtroEsporteEstat)}</span>
-${filtroEsporteEstat === "todos" ? "" : '<button type="button" data-on-click="alterarFiltroEsporte(\'todos\')">Ver todas as categorias</button>'}
+<span>${tx("Posições fechadas")}${filtroEsporteEstat === "todos" ? "" : " · " + escapeHtml(tx(filtroEsporteEstat))}</span>
+${filtroEsporteEstat === "todos" ? "" : '<button type="button" data-on-click="alterarFiltroEsporte(\'todos\')">' + tx("Ver todas as categorias") + '</button>'}
 </div>
 <div style="overflow-x:auto;">
 <table class="stat-table site-table">
-<thead><tr><th>Site</th><th>Apostas</th><th>Volume</th><th>Lucro</th><th>ROI</th><th>Taxa de Acerto</th><th>Odd Média</th><th>Expectativa</th><th>Profit factor</th></tr></thead>
+<thead><tr><th>${tx("Site")}</th><th>${tx("Apostas")}</th><th>${tx("Volume")}</th><th>${tx("Lucro")}</th><th>ROI</th><th>${tx("Taxa de Acerto")}</th><th>${tx("Odd Média")}</th><th>${tx("Expectativa")}</th><th>${tx("Profit factor")}</th></tr></thead>
 <tbody>
 ${linhas || `<tr><td class="site-status" colspan="9">${escapeHtml(vazio)}</td></tr>`}
 ${g?.total ? `<tr class="total-row">
-<td>Total</td><td>${g.total}</td><td>${fmtEstat(g.volume, false)}</td>
+<td>${tx("Total")}</td><td>${g.total}</td><td>${fmtEstat(g.volume, false)}</td>
 <td style="color:${g.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(g.lucro, true)}</td>
 <td style="color:${g.roi >= 0 ? 'var(--pos)' : 'var(--danger)'}">${g.roi >= 0 ? '+' : ''}${g.roi.toFixed(2)}%</td>
 <td>${g.taxaAcerto.toFixed(1)}%</td><td>${g.oddMedia > 0 ? g.oddMedia.toFixed(2) : '—'}</td>
@@ -6602,8 +6610,8 @@ ${celulasMetricasExtras(g)}
 </div>
 </div>
 <div class="card" style="padding:20px;">
-<div class="stat-card-title">Ganhos e perdas por Site</div>
-<div class="stat-card-sub">Barra divergente — perdas à esquerda, ganhos à direita</div>
+<div class="stat-card-title">${tx("Ganhos e perdas por Site")}</div>
+<div class="stat-card-sub">${tx("Barra divergente — perdas à esquerda, ganhos à direita")}</div>
 ${gerarBarraDivergente(divItens)}
 </div>
 </div>
@@ -6628,7 +6636,7 @@ return b.total - a.total || b.lucro - a.lucro;
 const g = resumoDb ? metricasResumoDb(resumoDb.total) : computeStatsGerais(lista);
 const linhas = grupos.map(row => `
 <tr>
-<td><span class="site-cell">${iconeCategoria(row.chave)}${escapeHtml(row.chave)}</span></td>
+<td><span class="site-cell">${iconeCategoria(row.chave)}${escapeHtml(tx(row.chave))}</span></td>
 <td>${row.total}</td>
 <td>${fmtEstat(row.volume, false)}</td>
 <td style="color:${row.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(row.lucro, true)}</td>
@@ -6638,7 +6646,7 @@ const linhas = grupos.map(row => `
 ${celulasMetricasExtras(row)}
 </tr>
 `).join("");
-const barras = gerarBarrasHorizontais(grupos.map(row => ({ label: row.chave, value: row.lucro })));
+const barras = gerarBarrasHorizontais(grupos.map(row => ({ label: tx(row.chave), value: row.lucro })));
 setTimeout(() => {
 const c = document.getElementById("statsSubContent");
 if (c) animarBarras(c);
@@ -6646,15 +6654,15 @@ if (c) animarBarras(c);
 return `
 <div class="stat-grid-2">
 <div class="card" style="padding:20px;">
-<div class="stat-card-title">Desempenho por Categoria</div>
-<div class="stat-card-sub">Esportes por modalidade e os demais mercados por tema — classificação estimada a partir dos metadados, ticker e título</div>
+<div class="stat-card-title">${tx("Desempenho por Categoria")}</div>
+<div class="stat-card-sub">${tx("Esportes por modalidade e os demais mercados por tema — classificação estimada a partir dos metadados, ticker e título")}</div>
 <div style="overflow-x:auto;">
 <table class="stat-table">
-<thead><tr><th>Categoria</th><th>Apostas</th><th>Volume</th><th>Lucro</th><th>ROI</th><th>Taxa de Acerto</th><th>Odd Média</th><th>Expectativa</th><th>Profit factor</th></tr></thead>
+<thead><tr><th>${tx("Categoria")}</th><th>${tx("Apostas")}</th><th>${tx("Volume")}</th><th>${tx("Lucro")}</th><th>ROI</th><th>${tx("Taxa de Acerto")}</th><th>${tx("Odd Média")}</th><th>${tx("Expectativa")}</th><th>${tx("Profit factor")}</th></tr></thead>
 <tbody>
-${linhas || `<tr><td colspan="9" style="color:var(--muted);text-align:center;">Sem dados</td></tr>`}
+${linhas || `<tr><td colspan="9" style="color:var(--muted);text-align:center;">${tx("Sem dados")}</td></tr>`}
 <tr class="total-row">
-<td>Total</td><td>${g.total}</td><td>${fmtEstat(g.volume, false)}</td>
+<td>${tx("Total")}</td><td>${g.total}</td><td>${fmtEstat(g.volume, false)}</td>
 <td style="color:${g.lucro >= 0 ? 'var(--pos)' : 'var(--danger)'}">${fmtEstat(g.lucro, true)}</td>
 <td style="color:${g.roi >= 0 ? 'var(--pos)' : 'var(--danger)'}">${g.roi >= 0 ? '+' : ''}${g.roi.toFixed(2)}%</td>
 <td>${g.taxaAcerto.toFixed(1)}%</td><td>${g.oddMedia > 0 ? g.oddMedia.toFixed(2) : '—'}</td>
@@ -6665,9 +6673,9 @@ ${celulasMetricasExtras(g)}
 </div>
 </div>
 <div class="card" style="padding:20px;">
-<div class="stat-card-title">Lucro por Categoria</div>
-<div class="stat-card-sub">Valores negativos permanecem visíveis</div>
-${barras || '<div style="color:var(--muted);font-size:0.85rem;">Sem dados</div>'}
+<div class="stat-card-title">${tx("Lucro por Categoria")}</div>
+<div class="stat-card-sub">${tx("Valores negativos permanecem visíveis")}</div>
+${barras || '<div style="color:var(--muted);font-size:0.85rem;">' + tx("Sem dados") + '</div>'}
 </div>
 </div>
 `;
@@ -6702,7 +6710,7 @@ if (row.dataset.marketDetail === group) row.hidden = !expanded;
 function renderPorMercado() {
 const resumo = resumoEstatDbAtual();
 if (resumo && !Array.isArray(resumo.porMercado)) {
-return '<div class="card" style="padding:20px;">Reabra o aplicativo para carregar a análise por mercado nesta versão.</div>';
+return '<div class="card" style="padding:20px;">' + tx("Reabra o aplicativo para carregar a análise por mercado nesta versão.") + '</div>';
 }
 const groups = resumo ? resumo.porMercado.map(row => ({ chave: row.chave, ...metricasResumoDb(row) }))
   : agruparPor(dadosEstat(), d => BettyMarketBreakdown.key(tituloExibicao(d), classificarAposta(d)));
@@ -6718,8 +6726,8 @@ const totals = resumo ? new Map(resumo.porCategoria.map(r => [r.chave, metricasR
   : new Map(agruparPor(dadosEstat(),classificarAposta).map(r => [r.chave,r]));
 const ordered = [...categories].sort((a,b) => (totals.get(b[0])?.total || 0) - (totals.get(a[0])?.total || 0));
 return `<div class="card" style="padding:20px;">
-<div class="stat-card-title">Desempenho por Mercado</div>
-<div class="stat-card-sub">Posições fechadas por categoria, mercado, período e linha. Total do jogo e equipe/jogador ficam separados. Respeita os filtros acima.</div>
+<div class="stat-card-title">${tx("Desempenho por Mercado")}</div>
+<div class="stat-card-sub">${tx("Posições fechadas por categoria, mercado, período e linha. Total do jogo e equipe/jogador ficam separados. Respeita os filtros acima.")}</div>
 ${ordered.map(([category,rows]) => {
 rows.sort((a,b) => Number(Boolean(BettyMarketBreakdown.expandableGroup(category,b.market))) - Number(Boolean(BettyMarketBreakdown.expandableGroup(category,a.market))) || (ehCategoriaEsporte(category)
   ? BettyMarketBreakdown.compareFootball(a.market,b.market)
@@ -6751,14 +6759,14 @@ emitted.add(group);
 const aggregate = resumo ? metricasResumoDb(BettyMarketBreakdown.aggregateMetrics(resumo.porMercado.filter(raw => {
 const [cat,label] = JSON.parse(raw.chave); return cat === category && BettyMarketBreakdown.expandableGroup(cat,label) === group;
 }))) : computeStatsGerais(dadosEstat().filter(d => classificarAposta(d) === category && BettyMarketBreakdown.expandableGroup(category,BettyMarketBreakdown.describe(tituloExibicao(d),category)) === group));
-summary = `<tr><td><button type="button" data-category="${escapeHtml(category)}" data-group="${group}" aria-expanded="${expanded}" data-on-click="toggleMercadoMl(this)" style="background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;"><span class="ml-arrow">${expanded ? '▼' : '▶'}</span> ${groupLabels[group]}</button></td>${cells(aggregate)}</tr>`;
+summary = `<tr><td><button type="button" data-category="${escapeHtml(category)}" data-group="${group}" aria-expanded="${expanded}" data-on-click="toggleMercadoMl(this)" style="background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;"><span class="ml-arrow">${expanded ? '▼' : '▶'}</span> ${tx(groupLabels[group])}</button></td>${cells(aggregate)}</tr>`;
 }
-return summary + `<tr${group ? ` data-market-detail="${group}"${group === 'ml' ? ' data-ml-detail' : ''}${expanded ? '' : ' hidden'}` : ''}><td${group ? ' style="padding-left:30px;"' : ''}>${escapeHtml(r.market)}</td>${cells(r)}</tr>`;
+return summary + `<tr${group ? ` data-market-detail="${group}"${group === 'ml' ? ' data-ml-detail' : ''}${expanded ? '' : ' hidden'}` : ''}><td${group ? ' style="padding-left:30px;"' : ''}>${escapeHtml(BettyI18n.tRotulo(r.market))}</td>${cells(r)}</tr>`;
 }).join('');
-return `<details open style="margin-top:18px;"><summary style="cursor:pointer;font-weight:700;padding:10px 0;">${iconeCategoria(category)}${escapeHtml(category)} · ${total?.total || 0} apostas · <span style="color:${color(total?.lucro || 0)}">${fmtEstat(total?.lucro || 0,true)}</span></summary>
-<div style="overflow-x:auto;"><table class="stat-table"><thead><tr><th>Mercado</th><th>Apostas</th><th>Volume</th><th>Lucro</th><th>ROI</th><th>Taxa de Acerto</th><th>Odd Média</th><th>Expectativa</th><th>Profit factor</th></tr></thead>
-<tbody>${marketRows}${total ? `<tr class="total-row"><td>Total ${escapeHtml(category)}</td>${cells(total)}</tr>` : ''}</tbody></table></div></details>`;
-}).join('') || '<p style="color:var(--muted)">Sem apostas fechadas para os filtros selecionados.</p>'}
+return `<details open style="margin-top:18px;"><summary style="cursor:pointer;font-weight:700;padding:10px 0;">${iconeCategoria(category)}${escapeHtml(tx(category))} · ${tx((total?.total || 0) === 1 ? "{n} aposta" : "{n} apostas", { n: total?.total || 0 })} · <span style="color:${color(total?.lucro || 0)}">${fmtEstat(total?.lucro || 0,true)}</span></summary>
+<div style="overflow-x:auto;"><table class="stat-table"><thead><tr><th>${tx("Mercado")}</th><th>${tx("Apostas")}</th><th>${tx("Volume")}</th><th>${tx("Lucro")}</th><th>ROI</th><th>${tx("Taxa de Acerto")}</th><th>${tx("Odd Média")}</th><th>${tx("Expectativa")}</th><th>${tx("Profit factor")}</th></tr></thead>
+<tbody>${marketRows}${total ? `<tr class="total-row"><td>${tx("Total {categoria}", { categoria: escapeHtml(tx(category)) })}</td>${cells(total)}</tr>` : ''}</tbody></table></div></details>`;
+}).join('') || '<p style="color:var(--muted)">' + tx("Sem apostas fechadas para os filtros selecionados.") + '</p>'}
 </div>`;
 }
 function calcularSequenciaAtual(lista) {
@@ -6775,9 +6783,9 @@ return { venceu: primeiraVitoria, n };
 }
 function renderResumoGeral() {
 const resumoDb = resumoEstatDbAtual();
-if (!resumoDb || !Array.isArray(resumoDb.segmentos)) return '<p style="color:var(--muted);">Não foi possível carregar os segmentos. Tente abrir a aba novamente.</p>';
+if (!resumoDb || !Array.isArray(resumoDb.segmentos)) return '<p style="color:var(--muted);">' + tx("Não foi possível carregar os segmentos. Tente abrir a aba novamente.") + '</p>';
 const g = metricasResumoDb(resumoDb.total);
-if (!g.total) return '<div class="card" style="padding:20px;"><div class="stat-card-title">Resumo</div><p style="color:var(--muted);">Sem posições fechadas para os filtros selecionados.</p></div>';
+if (!g.total) return '<div class="card" style="padding:20px;"><div class="stat-card-title">' + tx("Resumo") + '</div><p style="color:var(--muted);">' + tx("Sem posições fechadas para os filtros selecionados.") + '</p></div>';
 const color = n => n > 0 ? 'var(--pos)' : n < 0 ? 'var(--danger)' : 'var(--text)';
 const segmentos = resumoDb.segmentos.map(raw => {
 const [category,market,odds] = JSON.parse(raw.chave);
@@ -6791,11 +6799,11 @@ const pequenas = [
 ...segmentos.filter(r=>r.total<50 && r.lucro<0).sort((a,b)=>a.lucro-b.lucro || tie(a,b)).slice(0,4)
 ];
 const section = (title,subtitle,rows) => `<section style="margin-bottom:24px;"><div class="stat-card-title">${title}</div><div class="stat-card-sub">${subtitle}</div>
-${rows.length ? `<div style="overflow-x:auto;"><table class="stat-table summary-segments" style="min-width:900px;table-layout:auto;"><thead><tr><th>Esporte / categoria</th><th>Mercado</th><th>Odds</th><th>Apostas</th><th>Volume</th><th>Lucro</th><th>ROI</th><th>Acerto</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${iconeCategoria(r.category)}${escapeHtml(r.category)}</td><td style="white-space:normal;min-width:260px;">${escapeHtml(r.market)}</td><td>${escapeHtml(r.odds)}</td><td>${r.total}</td><td>${fmtEstat(r.volume,false)}</td><td style="color:${color(r.lucro)}">${fmtEstat(r.lucro,true)}</td><td style="color:${color(r.roi)}">${r.roi>0?'+':''}${r.roi.toFixed(2)}%</td><td>${r.taxaAcerto.toFixed(1)}%</td></tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--muted);font-size:.85rem;">Nenhum segmento neste critério para os filtros selecionados.</p>'}</section>`;
-return `<div style="padding:4px 0;"><p style="color:var(--muted);font-size:.85rem;margin:0 0 20px;">Esporte/categoria × mercado × faixa de odds. Respeita todos os filtros acima. Usa os mesmos mercados detalhados de “Por Mercado”, sem juntar períodos ou escopos diferentes.</p>
-${section('Segmentos com lucro','Até 10 maiores lucros líquidos entre cruzamentos com pelo menos 50 apostas.',lucros)}
-${section('Segmentos com perdas','Até 10 maiores prejuízos entre cruzamentos com pelo menos 50 apostas.',perdas)}
-${section('Amostras pequenas','Até 4 maiores lucros e 4 maiores prejuízos entre cruzamentos com menos de 50 apostas. Não representam uma tendência confirmada.',pequenas)}
+${rows.length ? `<div style="overflow-x:auto;"><table class="stat-table summary-segments" style="min-width:900px;table-layout:auto;"><thead><tr><th>${tx("Esporte / categoria")}</th><th>${tx("Mercado")}</th><th>${tx("Odds")}</th><th>${tx("Apostas")}</th><th>${tx("Volume")}</th><th>${tx("Lucro")}</th><th>ROI</th><th>${tx("Acerto")}</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${iconeCategoria(r.category)}${escapeHtml(tx(r.category))}</td><td style="white-space:normal;min-width:260px;">${escapeHtml(BettyI18n.tRotulo(r.market))}</td><td>${escapeHtml(BettyI18n.tRotulo(r.odds))}</td><td>${r.total}</td><td>${fmtEstat(r.volume,false)}</td><td style="color:${color(r.lucro)}">${fmtEstat(r.lucro,true)}</td><td style="color:${color(r.roi)}">${r.roi>0?'+':''}${r.roi.toFixed(2)}%</td><td>${r.taxaAcerto.toFixed(1)}%</td></tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--muted);font-size:.85rem;">' + tx("Nenhum segmento neste critério para os filtros selecionados.") + '</p>'}</section>`;
+return `<div style="padding:4px 0;"><p style="color:var(--muted);font-size:.85rem;margin:0 0 20px;">${tx("Esporte/categoria × mercado × faixa de odds. Respeita todos os filtros acima. Usa os mesmos mercados detalhados de “Por Mercado”, sem juntar períodos ou escopos diferentes.")}</p>
+${section(tx('Segmentos com lucro'),tx('Até 10 maiores lucros líquidos entre cruzamentos com pelo menos 50 apostas.'),lucros)}
+${section(tx('Segmentos com perdas'),tx('Até 10 maiores prejuízos entre cruzamentos com pelo menos 50 apostas.'),perdas)}
+${section(tx('Amostras pequenas'),tx('Até 4 maiores lucros e 4 maiores prejuízos entre cruzamentos com menos de 50 apostas. Não representam uma tendência confirmada.'),pequenas)}
 </div>`;
 }
 function desenharGraficoPatrimonio() {
@@ -6805,7 +6813,7 @@ const variacaoEl = document.getElementById("chartVariacao");
 const labelEl = document.getElementById("chartValorLabel");
 const tooltip = document.getElementById("chartTooltip");
 if (!wrap || !valorEl || !variacaoEl) return;
-if (labelEl) labelEl.textContent = "PnL Acumulado";
+if (labelEl) labelEl.textContent = tx("PnL Acumulado");
 variacaoEl.style.display = "none";
 const pontos = historicoPnlAcumulado(periodoGraficoAtual);
 const atual = pontos.length ? pontos[pontos.length - 1].v : 0;
@@ -6815,7 +6823,7 @@ valorEl.className = "chart-valor " + (atual > 0 ? "positive" : atual < 0 ? "nega
 // somente a linha exibida usa um ponto por dia, no fechamento daquele dia.
 const pontosDiarios = agruparPnlAcumuladoPorDia(pontos);
 if (!pontosDiarios.length) {
-wrap.innerHTML = '<div class="chart-empty">Ainda não há posições fechadas nesse período para montar o gráfico.</div>';
+wrap.innerHTML = '<div class="chart-empty">' + tx("Ainda não há posições fechadas nesse período para montar o gráfico.") + '</div>';
 variacaoEl.textContent = "";
 if (tooltip) tooltip.style.display = "none";
 return;
@@ -6906,7 +6914,7 @@ hoverDot.setAttribute("stroke", corGradientePnl(ponto.v, amplitudeCores));
 hoverDot.style.display = "block";
 if (tooltip) {
 const p = ponto;
-desenharGraficoPatrimonio.formatoTooltip ||= new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "America/Sao_Paulo" });
+desenharGraficoPatrimonio.formatoTooltip ||= new Intl.DateTimeFormat(BettyI18n.locale, { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "America/Sao_Paulo" });
 const dt = desenharGraficoPatrimonio.formatoTooltip.format(new Date(p.t));
 const pct = Math.min(94, Math.max(6, (c[0] / w) * 100));
 tooltip.style.display = "block";
@@ -7076,7 +7084,7 @@ const labelEl = document.getElementById("chartValorLabel");
 const tooltip = document.getElementById("chartTooltip");
 if (!wrap || !valorEl || !variacaoEl) return;
 variacaoEl.style.display = "";
-if (labelEl) labelEl.textContent = "PnL no Período";
+if (labelEl) labelEl.textContent = tx("PnL no Período");
 const dias = bucketsPnlPorDia(30);
 const totalPeriodo = dias.reduce((s, d) => s + d.v, 0);
 valorEl.textContent = (totalPeriodo > 0 ? "+" : "") + fmtDinheiro(totalPeriodo);
@@ -7084,14 +7092,14 @@ valorEl.className = "chart-valor " + (totalPeriodo > 0 ? "positive" : totalPerio
 variacaoEl.className = "chart-variacao " + (totalPeriodo >= 0 ? "positive" : "negative");
 const comMovimento = dias.filter(d => d.v !== 0);
 variacaoEl.textContent = comMovimento.length
-? `${comMovimento.filter(d => d.v > 0).length}/${comMovimento.length} dias no lucro`
+? tx("{lucro}/{total} dias no lucro", { lucro: comMovimento.filter(d => d.v > 0).length, total: comMovimento.length })
 : "";
 if (!dias.length) {
-wrap.innerHTML = '<div class="chart-empty">Sem dados nesse período.</div>';
+wrap.innerHTML = '<div class="chart-empty">' + tx("Sem dados nesse período.") + '</div>';
 if (tooltip) tooltip.style.display = "none";
 return;
 }
-const fmtLabel = (ymd) => { const [, mm, dd] = ymd.split("-"); return `${dd}/${mm}`; };
+const fmtLabel = (ymd) => { const [, mm, dd] = ymd.split("-"); return BettyI18n.dataCurta(dd, mm); };
 desenharBarrasPnl(wrap, dias, { rotulo: fmtLabel, fracBarra: dias.length > 40 ? 0.7 : 0.55, barraMin: 2 });
 }
 // ===== PnL por Mês (barras) =====
@@ -7141,7 +7149,7 @@ const labelEl = document.getElementById("chartValorLabel");
 const tooltip = document.getElementById("chartTooltip");
 if (!wrap || !valorEl || !variacaoEl) return;
 variacaoEl.style.display = "";
-if (labelEl) labelEl.textContent = "PnL por Mês";
+if (labelEl) labelEl.textContent = tx("PnL por Mês");
 const meses = bucketsPnlPorMes();
 const total = meses.reduce((s, d) => s + d.v, 0);
 valorEl.textContent = (total > 0 ? "+" : "") + fmtDinheiro(total);
@@ -7149,10 +7157,10 @@ valorEl.className = "chart-valor " + (total > 0 ? "positive" : total < 0 ? "nega
 variacaoEl.className = "chart-variacao " + (total >= 0 ? "positive" : "negative");
 const comMov = meses.filter(d => d.v !== 0);
 variacaoEl.textContent = comMov.length
-? (comMov.filter(d => d.v > 0).length + "/" + comMov.length + " meses no lucro")
+? tx("{lucro}/{total} meses no lucro", { lucro: comMov.filter(d => d.v > 0).length, total: comMov.length })
 : "";
 if (!meses.length) {
-wrap.innerHTML = '<div class="chart-empty">Sem dados mensais.</div>';
+wrap.innerHTML = '<div class="chart-empty">' + tx("Sem dados mensais.") + '</div>';
 if (tooltip) tooltip.style.display = "none";
 return;
 }
@@ -7185,19 +7193,19 @@ if (!casas.length) return false;
 return casas.some(c => casaSync[c]?.state === "error" || casaSync[c]?.state === "stale");
 }
 function fmtHoraSync(ts) {
-if (!ts) return "nunca";
+if (!ts) return tx("nunca");
 const d = new Date(ts);
-if (Number.isNaN(d.getTime())) return "nunca";
-return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+if (Number.isNaN(d.getTime())) return tx("nunca");
+return d.toLocaleString(BettyI18n.locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 }
 function rotuloEstadoSync(state) {
-if (state === "ok") return "Confirmado";
-if (state === "syncing") return "Atualizando";
-if (state === "error") return "Erro";
-if (state === "stale") return "Desatualizado";
-if (state === "partial") return "Histórico parcial";
-if (state === "disconnected") return "Desconectada";
-return "Aguardando";
+if (state === "ok") return tx("Confirmado");
+if (state === "syncing") return tx("Atualizando");
+if (state === "error") return tx("Erro");
+if (state === "stale") return tx("Desatualizado");
+if (state === "partial") return tx("Histórico parcial");
+if (state === "disconnected") return tx("Desconectada");
+return tx("Aguardando");
 }
 function renderSyncPanel() {
 const el = document.getElementById("syncPanel");
@@ -7206,11 +7214,11 @@ el.innerHTML = Object.entries(NOMES_CASAS).map(([id, nome]) => {
 const s = casaSync[id] || casaSyncPadrao(id);
 const connected = Boolean(BETTY_CONNECTIONS?.[id]);
 const state = connected ? (s.state || "idle") : "disconnected";
-const counts = connected ? `${s.openCount || 0} abertas` + (s.closedCount ? ` · ${s.closedCount} fechadas recebidas` : "") : "Não conectada";
+const counts = connected ? tx((s.openCount || 0) === 1 ? "{n} aberta" : "{n} abertas", { n: s.openCount || 0 }) + (s.closedCount ? " · " + tx(s.closedCount === 1 ? "{n} fechada recebida" : "{n} fechadas recebidas", { n: s.closedCount }) : "") : tx("Não conectada");
 return `<div class="sync-house">
 <div class="name"><span class="status-dot ${state === "ok" ? "" : state === "error" ? "err" : ["stale", "syncing", "partial"].includes(state) ? "warn" : "off"}"></span>${nome} · ${rotuloEstadoSync(state)}</div>
-<div class="meta">Último sync bem-sucedido: ${fmtHoraSync(s.lastOk)}<br>${counts}${s.state === "stale" ? "<br>Exibindo dados anteriores." : ""}</div>
-${s.lastError ? `<div class="err">${escapeHtml(s.lastError)}</div>` : ""}
+<div class="meta">${tx("Último sync bem-sucedido: {hora}", { hora: fmtHoraSync(s.lastOk) })}<br>${counts}${s.state === "stale" ? "<br>" + tx("Exibindo dados anteriores.") : ""}</div>
+${s.lastError ? `<div class="err">${escapeHtml(BettyI18n.tMsg(s.lastError))}</div>` : ""}
 </div>`;
 }).join("");
 }
@@ -7251,8 +7259,8 @@ return;
 const falhas = casasConectadas().filter(c => casaSync[c]?.state === "error" || casaSync[c]?.state === "stale");
 const nomes = falhas.map(c => NOMES_CASAS[c]).join(", ");
 const ts = Math.max(...casasConectadas().map(c => Number(casaSync[c]?.lastOk) || 0));
-const anteriores = falhas.length ? `<strong>Dados desatualizados.</strong> A última atualização de ${escapeHtml(nomes)} falhou. ${ts ? "Última confirmação em " + fmtHoraSync(ts) + "." : ""}` : "";
-text.innerHTML = [anteriores, ...avisos.map(escapeHtml)].filter(Boolean).join(" ");
+const anteriores = falhas.length ? `${tx("<strong>Dados desatualizados.</strong> A última atualização de {casas} falhou.", { casas: escapeHtml(nomes) })} ${ts ? tx("Última confirmação em {hora}.", { hora: fmtHoraSync(ts) }) : ""}` : "";
+text.innerHTML = [anteriores, ...avisos.map(aviso => escapeHtml(BettyI18n.tMsg(aviso)))].filter(Boolean).join(" ");
 banner.classList.add("show");
 }
 function atualizarStatusOnline(ok) {
@@ -7288,7 +7296,7 @@ if (dot) {
 dot.classList.remove("off", "warn", "err");
 if (cls) dot.classList.add(cls);
 }
-if (label) label.textContent = texto;
+if (label) label.textContent = tx(texto);
 if (ok && !stale) ultimoFetchTs = Date.now();
 mostrandoAtualizando = false;
 tickAtualizado();
@@ -7304,8 +7312,8 @@ const ts = ultimoFetchTs || Math.max(0, ...Object.values(casaSync).map(s => Numb
 if (!ts) { el.textContent = "—"; return; }
 const stale = syncEstaStale();
 const diffS = Math.max(0, Math.round((Date.now() - ts) / 1000));
-const base = diffS < 60 ? `há ${diffS}s` : `há ${Math.floor(diffS / 60)}min`;
-const completo=stale ? `Snapshot ${base}` : `Confirmado ${base}`;
+const base = diffS < 60 ? tx("há {n}s", { n: diffS }) : tx("há {n}min", { n: Math.floor(diffS / 60) });
+const completo=stale ? tx("Snapshot {tempo}", { tempo: base }) : tx("Confirmado {tempo}", { tempo: base });
 el.textContent = el.closest?.('#sidebarSyncStatusSlot') ? (diffS<60?`${diffS}s`:`${Math.floor(diffS/60)}min`) : completo;
 el.setAttribute?.('aria-label',completo);
 }
@@ -7331,7 +7339,7 @@ carregarAba(abaDados);
 function atualizarIndicadorAutoRefresh() {
 const label = document.getElementById("autoRefreshLabel");
 const dot = document.getElementById("autoRefreshDot");
-if (label) label.textContent = autoRefreshAtivo ? "Ativado (60s)" : "Pausado";
+if (label) label.textContent = autoRefreshAtivo ? tx("Ativado (60s)") : tx("Pausado");
 if (dot) dot.classList.toggle("off", !autoRefreshAtivo);
 document.getElementById('autoRefreshToggle')?.setAttribute('aria-pressed',String(autoRefreshAtivo));
 }
@@ -7390,12 +7398,12 @@ function teclaToggleSyncPanel(event) {
 // Posições na aba "fechado" (Lista) ou o calendário de lucro (Calendário), e
 // Conexões e Configurações dividem a view de configuração.
 const TITULOS_SECAO = {
-  visao: ["Visão geral", "Resultados no horário de São Paulo"],
-  posicoes: ["Posições", "Apostas em aberto e ao vivo"],
-  historico: ["Histórico", "Apostas fechadas, em lista ou no calendário"],
-  estatisticas: ["Estatísticas", "Desempenho das posições fechadas"],
-  conexoes: ["Conexões", "Contas conectadas, sempre só para leitura"],
-  config: ["Configurações", "Stake e período do histórico por casa"],
+  visao: [tx("Visão geral"), tx("Resultados no horário de São Paulo")],
+  posicoes: [tx("Posições"), tx("Apostas em aberto e ao vivo")],
+  historico: [tx("Histórico"), tx("Apostas fechadas, em lista ou no calendário")],
+  estatisticas: [tx("Estatísticas"), tx("Desempenho das posições fechadas")],
+  conexoes: [tx("Conexões"), tx("Contas conectadas, sempre só para leitura")],
+  config: [tx("Configurações"), tx("Stake e período do histórico por casa")],
 };
 let secaoAtual = "visao";
 let secaoPedida = null;
@@ -7460,12 +7468,12 @@ function atualizarSecaoNavegacao(view) {
 }
 // Rodapé do menu: uma linha por casa com logo, estado e tempo desde o último sync.
 function tempoDesde(ts) {
-  if (!ts) return "nunca";
+  if (!ts) return tx("nunca");
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (s < 60) return "agora";
-  if (s < 3600) return `há ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
-  return `há ${Math.floor(s / 86400)} d`;
+  if (s < 60) return tx("agora");
+  if (s < 3600) return tx("há {n} min", { n: Math.floor(s / 60) });
+  if (s < 86400) return tx("há {n} h", { n: Math.floor(s / 3600) });
+  return tx("há {n} d", { n: Math.floor(s / 86400) });
 }
 function renderSyncCasas() {
   const el = document.getElementById("syncCasas");
@@ -7475,13 +7483,13 @@ function renderSyncCasas() {
     const conectada = Boolean(BETTY_CONNECTIONS?.[id]);
     const estado = conectada ? (s.state || "idle") : "disconnected";
     const ponto = { ok: "ok", syncing: "run", error: "err", stale: "warn", partial: "warn" }[estado] || "";
-    const texto = !conectada ? "não conectada"
+    const texto = !conectada ? tx("não conectada")
       : estado === "ok" ? tempoDesde(s.lastOk)
-      : estado === "syncing" ? "atualizando"
-      : estado === "error" ? "falhou"
-      : estado === "stale" ? "desatualizada"
-      : estado === "partial" ? "parcial"
-      : "aguardando";
+      : estado === "syncing" ? tx("atualizando")
+      : estado === "error" ? tx("falhou")
+      : estado === "stale" ? tx("desatualizada")
+      : estado === "partial" ? tx("parcial")
+      : tx("aguardando");
     return `<button type="button" class="sync-casa${conectada ? "" : " off"}" data-on-click="irPara('conexoes')" title="${escapeHtml(nome)}: ${escapeHtml(rotuloEstadoSync(estado))}"><img src="/assets/platforms/${id}.png" alt="">${escapeHtml(nome)}<span class="st"><span class="dot ${ponto}"></span>${texto}</span></button>`;
   }).join("");
   if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
@@ -7500,7 +7508,7 @@ function fmtDolarSinal(v) {
 function classeSinal(v) { return (Number(v) || 0) >= 0 ? "pos" : "neg"; }
 function kpisVazios(texto) {
   return ["Patrimônio", "PnL não realizado", "Exposição", "ROI"].map((k, i) =>
-    `<div class="fx kpi-vazio"><div class="k">${k}</div><div class="v2">—</div>${i ? "" : `<div class="sm mu">${escapeHtml(texto)}</div>`}</div>`).join("");
+    `<div class="fx kpi-vazio"><div class="k">${tx(k)}</div><div class="v2">—</div>${i ? "" : `<div class="sm mu">${escapeHtml(tx(texto))}</div>`}</div>`).join("");
 }
 function saldoPorCasa() {
   return { polymarket: POLY_API_BALANCE, kalshi: KALSHI_API_BALANCE, predict: PREDICT_API_BALANCE, sxbet: SXBET_API_BALANCE };
@@ -7521,15 +7529,15 @@ function pintarVisaoGeral(d) {
     valor.classList.toggle("neg", d.pnlRealizado < 0);
   }
   if (secundario) {
-    secundario.innerHTML = `${d.patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio"} <b>${textoPatrimonio(d)}</b>`
-      + ` · <span class="${classeSinal(d.pnlHoje)}">${d.pnlHoje >= 0 ? "▲" : "▼"} ${fmtDolarSinal(d.pnlHoje)} hoje</span>`;
+    secundario.innerHTML = `${d.patrimonioParcial ? tx("Patrimônio acompanhado") : tx("Patrimônio")} <b>${textoPatrimonio(d)}</b>`
+      + ` · <span class="${classeSinal(d.pnlHoje)}">${d.pnlHoje >= 0 ? "▲" : "▼"} ${tx("{valor} hoje", { valor: fmtDolarSinal(d.pnlHoje) })}</span>`;
   }
   if (chips) {
     const partes = [
-      `<span class="chip ${classeSinal(d.pnlPeriodo)}">${fmtDolarSinal(d.pnlPeriodo)} em 7 dias${d.pnlAnterior == null ? "" : ` · antes ${fmtDolarSinal(d.pnlAnterior)}`}</span>`,
+      `<span class="chip ${classeSinal(d.pnlPeriodo)}">${tx("{valor} em 7 dias", { valor: fmtDolarSinal(d.pnlPeriodo) })}${d.pnlAnterior == null ? "" : ` · ${tx("antes {valor}", { valor: fmtDolarSinal(d.pnlAnterior) })}`}</span>`,
       d.patrimonioParcial
-        ? `<span class="sm mu">Inclui ${escapeHtml(d.casasPatrimonio.map(c => NOMES_CASAS[c]).join(", ") || "nenhuma casa")}</span>`
-        : `<span class="sm mu">Saldo <b>${fmtDolar(d.saldoPatrimonio)}</b> · em aberto <b>${fmtDolar(d.valorAberto)}</b></span>`,
+        ? `<span class="sm mu">${tx("Inclui {casas}", { casas: escapeHtml(d.casasPatrimonio.map(c => NOMES_CASAS[c]).join(", ") || tx("nenhuma casa")) })}</span>`
+        : `<span class="sm mu">${tx("Saldo <b>{saldo}</b> · em aberto <b>{aberto}</b>", { saldo: fmtDolar(d.saldoPatrimonio), aberto: fmtDolar(d.valorAberto) })}</span>`,
     ];
     chips.innerHTML = partes.join("");
   }
@@ -7545,7 +7553,7 @@ function pintarCasasVisao(d) {
   const pnl7 = new Map((d.periodoDb?.porSite || []).map(r => [r.chave, Number(r.lucroD) || 0]));
   const casas = d.casasAtivas;
   if (!casas.length) {
-    el.innerHTML = `<div class="card visao-casa-vazia"><b>Nenhuma casa conectada</b><span class="sm mu">Conecte uma conta para acompanhar saldo e posições.</span><button type="button" class="btn" data-on-click="irPara('conexoes')">Abrir Conexões</button></div>`;
+    el.innerHTML = `<div class="card visao-casa-vazia"><b>${tx("Nenhuma casa conectada")}</b><span class="sm mu">${tx("Conecte uma conta para acompanhar saldo e posições.")}</span><button type="button" class="btn" data-on-click="irPara('conexoes')">${tx("Abrir Conexões")}</button></div>`;
     return;
   }
   el.innerHTML = casas.map(casa => {
@@ -7554,14 +7562,14 @@ function pintarCasasVisao(d) {
     const saldo = saldos[casa];
     const v7 = pnl7.get(casa) || 0;
     const estado = casaSync[casa]?.state;
-    const aviso = estado === "partial" ? `<span class="chip wn">parcial</span>`
-      : estado === "error" ? `<span class="chip neg">falhou</span>`
-      : estado === "stale" ? `<span class="chip wn">desatualizada</span>` : "";
-    return `<button type="button" class="card visao-casa" data-on-click="abrirCasaNaVisao('${casa}')" aria-label="Ver posições da ${escapeHtml(nome)}">
+    const aviso = estado === "partial" ? `<span class="chip wn">${tx("parcial")}</span>`
+      : estado === "error" ? `<span class="chip neg">${tx("falhou")}</span>`
+      : estado === "stale" ? `<span class="chip wn">${tx("desatualizada")}</span>` : "";
+    return `<button type="button" class="card visao-casa" data-on-click="abrirCasaNaVisao('${casa}')" aria-label="${tx("Ver posições da {casa}", { casa: escapeHtml(nome) })}">
 <div class="visao-casa-topo"><img class="lg l" src="/assets/platforms/${casa}.png" alt="">
-<div class="grow"><div class="b row-gap">${escapeHtml(nome)}${aviso}</div><div class="sm mu">${grupo.count} ${grupo.count === 1 ? "aberta" : "abertas"} · ${fmtDolar(grupo.stake)} em risco</div></div>
+<div class="grow"><div class="b row-gap">${escapeHtml(nome)}${aviso}</div><div class="sm mu">${tx(grupo.count === 1 ? "{n} aberta" : "{n} abertas", { n: grupo.count })} · ${tx("{valor} em risco", { valor: fmtDolar(grupo.stake) })}</div></div>
 <div class="visao-casa-valor"><div class="v2">${Number.isFinite(saldo) ? fmtDolar(saldo) : "—"}</div><div class="sm ${classeSinal(v7)}">${fmtDolarSinal(v7)} · 7d</div></div></div>
-<svg class="visao-spark" data-spark="${casa}" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true"></svg><div class="visao-spark-legenda">PnL acumulado · últimos 30 dias</div>
+<svg class="visao-spark" data-spark="${casa}" viewBox="0 0 120 26" preserveAspectRatio="none" aria-hidden="true"></svg><div class="visao-spark-legenda">${tx("PnL acumulado · últimos 30 dias")}</div>
 </button>`;
   }).join("");
 }
@@ -7577,14 +7585,14 @@ function pintarKpisVisao(d) {
   // Faixa: os quatro números calculados aqui; taxa de acerto e odd média
   // são células fixas do HTML, preenchidas por renderizarStats.
   el.innerHTML = `
-<div class="fx"><div class="k">${d.patrimonioParcial ? "Patrimônio acompanhado" : "Patrimônio"}</div><div class="v2">${textoPatrimonio(d)}</div></div>
-<div class="fx"><div class="k">PnL não realizado</div><div class="v2 ${soSxBet ? "" : classeSinal(d.pnlNaoRealizado)}">${soSxBet ? "—" : fmtDolarSinal(d.pnlNaoRealizado)}</div></div>
-<div class="fx"><div class="k">Exposição</div><div class="v2">${fmtDolar(d.stakeAbertas)}</div></div>
+<div class="fx"><div class="k">${d.patrimonioParcial ? tx("Patrimônio acompanhado") : tx("Patrimônio")}</div><div class="v2">${textoPatrimonio(d)}</div></div>
+<div class="fx"><div class="k">${tx("PnL não realizado")}</div><div class="v2 ${soSxBet ? "" : classeSinal(d.pnlNaoRealizado)}">${soSxBet ? "—" : fmtDolarSinal(d.pnlNaoRealizado)}</div></div>
+<div class="fx"><div class="k">${tx("Exposição")}</div><div class="v2">${fmtDolar(d.stakeAbertas)}</div></div>
 <div class="fx"><div class="k">ROI</div><div class="v2 ${classeSinal(d.roiGeral)}">${(d.roiGeral >= 0 ? "+" : "") + d.roiGeral.toFixed(2)}%</div></div>`;
   const texto = (id, valor) => { const alvo = document.getElementById(id); if (alvo) alvo.textContent = valor; };
-  texto("visaoFechadas", `${d.nFechadas.toLocaleString("en-US")} apostas fechadas no total`);
-  texto("visaoCotacao", d.abertosF.length ? `${comCotacao} de ${d.abertosF.length}` : "—");
-  texto("visaoCotacaoNota", BETTY_CONNECTIONS?.sxbet ? "A SX Bet informa só a exposição, sem valor a mercado" : "Valor a mercado das posições abertas");
+  texto("visaoFechadas", tx("{n} apostas fechadas no total", { n: d.nFechadas.toLocaleString("en-US") }));
+  texto("visaoCotacao", d.abertosF.length ? tx("{n} de {total}", { n: comCotacao, total: d.abertosF.length }) : "—");
+  texto("visaoCotacaoNota", BETTY_CONNECTIONS?.sxbet ? tx("A SX Bet informa só a exposição, sem valor a mercado") : tx("Valor a mercado das posições abertas"));
 }
 // Coluna "Risco": exposição por casa, maior posição e drawdown, uma linha cada.
 function pintarDestaquesVisao(d) {
@@ -7595,15 +7603,15 @@ function pintarDestaquesVisao(d) {
   const legenda = casas.map(([casa, g], i) => `<span class="leg"><span class="key o${Math.min(i, 3)}"></span><img src="/assets/platforms/${casa}.png" alt="${escapeHtml(NOMES_CASAS[casa] || casa)}">${Math.round(g.stake / d.stakeAbertas * 100)}%</span>`).join("");
   const n = d.abertosF.length;
   const itens = [`<div class="visao-linha"><div class="grow">
-<div class="kpi-abertas">${n ? `${n} ${n === 1 ? "posição aberta" : "posições abertas"}` : "Nenhuma posição aberta"}<button type="button" class="link" data-on-click="irPara('posicoes')">Ver posições</button></div>
+<div class="kpi-abertas">${n ? tx(n === 1 ? "{n} posição aberta" : "{n} posições abertas", { n }) : tx("Nenhuma posição aberta")}<button type="button" class="link" data-on-click="irPara('posicoes')">${tx("Ver posições")}</button></div>
 ${casas.length ? `<div class="pbar">${barra}</div><div class="kpi-legenda">${legenda}</div>` : ""}
 </div></div>`];
   if (d.concMercado) {
     const pct = d.stakeAbertas > 0 ? d.concMercado.stake / d.stakeAbertas * 100 : 0;
-    itens.push(`<button type="button" class="visao-linha" data-on-click="irPara('posicoes')"><div><div class="el destaque-titulo">${escapeHtml(d.concMercado.titulo)}</div><div class="sm mu">Maior exposição atual · ${pct.toFixed(1)}% do total</div></div><span class="val">${fmtDolar(d.concMercado.stake)}</span></button>`);
+    itens.push(`<button type="button" class="visao-linha" data-on-click="irPara('posicoes')"><div><div class="el destaque-titulo">${escapeHtml(d.concMercado.titulo)}</div><div class="sm mu">${tx("Maior exposição atual · {pct}% do total", { pct: pct.toFixed(1) })}</div></div><span class="val">${fmtDolar(d.concMercado.stake)}</span></button>`);
   }
   if (Number.isFinite(d.drawdownAtual)) {
-    itens.push(`<div class="visao-linha"><div><div>Drawdown diário</div>${Number.isFinite(d.maxDrawdown) ? `<div class="sm mu">Máximo no histórico <b class="neg">${fmtDolar(d.maxDrawdown)}</b></div>` : ""}</div><span class="val ${d.drawdownAtual < 0 ? "neg" : ""}">${fmtDolar(d.drawdownAtual)}</span></div>`);
+    itens.push(`<div class="visao-linha"><div><div>${tx("Drawdown diário")}</div>${Number.isFinite(d.maxDrawdown) ? `<div class="sm mu">${tx("Máximo no histórico")} <b class="neg">${fmtDolar(d.maxDrawdown)}</b></div>` : ""}</div><span class="val ${d.drawdownAtual < 0 ? "neg" : ""}">${fmtDolar(d.drawdownAtual)}</span></div>`);
   }
   el.innerHTML = itens.join("");
 }
@@ -7685,7 +7693,7 @@ function linhaGrupoCasa(d, casaAnterior, cols) {
   const semValor = g.semCotacao === g.n;
   const pnl = semValor ? "—" : `${g.pnl >= 0 ? "+" : "-"}$${Math.abs(g.pnl).toFixed(2)}`;
   const classe = semValor ? "" : g.pnl > 0 ? "pnl-positive" : g.pnl < 0 ? "pnl-negative" : "";
-  return `<tr class="grupo-casa"><td colspan="${cols}"><div class="grupo-casa-linha"><img class="casa-logo" src="/assets/platforms/${casa}.png" alt=""><strong>${escapeHtml(nome)}</strong><span class="grupo-casa-meta">${g.n} ${g.n === 1 ? "aberta" : "abertas"}</span><span class="grupo-casa-tot">Stake <b>$${g.stake.toFixed(2)}</b> · PnL <b class="${classe}">${pnl}</b></span></div></td></tr>`;
+  return `<tr class="grupo-casa"><td colspan="${cols}"><div class="grupo-casa-linha"><img class="casa-logo" src="/assets/platforms/${casa}.png" alt=""><strong>${escapeHtml(nome)}</strong><span class="grupo-casa-meta">${tx(g.n === 1 ? "{n} aberta" : "{n} abertas", { n: g.n })}</span><span class="grupo-casa-tot">Stake <b>$${g.stake.toFixed(2)}</b> · PnL <b class="${classe}">${pnl}</b></span></div></td></tr>`;
 }
 
 // Estado vazio das tabelas: limpa a busca e todos os filtros de uma vez.

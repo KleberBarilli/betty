@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const [orig, comp, ui] = process.argv.slice(2);
-const SCRIPTS = ['audit-utils.js', 'market-title-utils.js', 'market-breakdown.js', 'odds-ranges.js', 'profit-calendar.js', 'acoes.js', 'dashboard.js'];
+const SCRIPTS = ['i18n.js', 'i18n-en.js', 'audit-utils.js', 'market-title-utils.js', 'market-breakdown.js', 'odds-ranges.js', 'profit-calendar.js', 'acoes.js', 'dashboard.js'];
 
 function stub() {
   const f = function () {};

@@ -285,17 +285,31 @@ fn filtros(c: &Connection, user_id: &str, raw: &Consulta) -> Result<Filtro> {
     }
     let titulo = raw.get("title").map_or("", |s| s.as_str()).trim().to_lowercase();
     if !titulo.is_empty() {
-        let mut escapado = String::with_capacity(titulo.len() + 2);
-        for ch in titulo.chars() {
-            if matches!(ch, '\\' | '%' | '_') {
-                escapado.push('\\');
-            }
-            escapado.push(ch);
+        // `titleAlt`: o mesmo termo com as palavras do índice (em português),
+        // enviado pela interface em outro idioma.
+        let alternativo = raw.get("titleAlt").map_or("", |s| s.as_str()).trim().to_lowercase();
+        if alternativo.is_empty() {
+            f.onde.push("i.title_search LIKE ? ESCAPE '\\'".into());
+            f.params.push(padrao_like(&titulo));
+        } else {
+            f.onde.push("(i.title_search LIKE ? ESCAPE '\\' OR i.title_search LIKE ? ESCAPE '\\')".into());
+            f.params.push(padrao_like(&titulo));
+            f.params.push(padrao_like(&alternativo));
         }
-        f.onde.push("i.title_search LIKE ? ESCAPE '\\'".into());
-        f.params.push(SqlValue::Text(format!("%{escapado}%")));
     }
     Ok(f)
+}
+
+/// "Contém" no `LIKE`, com `\`, `%` e `_` do termo tratados como texto.
+fn padrao_like(termo: &str) -> SqlValue {
+    let mut escapado = String::with_capacity(termo.len() + 2);
+    for ch in termo.chars() {
+        if matches!(ch, '\\' | '%' | '_') {
+            escapado.push('\\');
+        }
+        escapado.push(ch);
+    }
+    SqlValue::Text(format!("%{escapado}%"))
 }
 
 // ---------------------------------------------------------------------------
